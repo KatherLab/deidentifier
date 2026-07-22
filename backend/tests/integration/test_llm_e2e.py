@@ -70,6 +70,36 @@ async def test_recheck_finding_forces_review():
         assert recheck and recheck[0].start is not None
 
 
+async def test_large_document_chunked_with_consistent_tags():
+    # ~30k characters: the patient appears in the first and the last chunk;
+    # the fake LLM only "reports" the name (from whichever chunk), but global
+    # grounding + tag groups must redact both occurrences with the same tag.
+    paragraphs = [f"Abschnitt {i}: " + "Der Befund war unauffällig. " * 15 for i in range(70)]
+    paragraphs[0] = "Patient Karl Testmann wurde stationär aufgenommen. " + paragraphs[0]
+    paragraphs[-1] += (
+        " Abschließend wurde Herr Testmann durch Karl Testmann selbst bestätigt entlassen."
+    )
+    text = "\n\n".join(paragraphs)
+    assert len(text) > 25_000
+
+    entities = [{"text": "Karl Testmann", "type": "PERSON_NAME", "role": "patient"}]
+    with FakeLLM(entities) as server:
+        settings = make_settings(
+            server.base_url,
+            LLM_CHUNK_CHARS=4000,
+            LLM_CHUNK_OVERLAP=400,
+            LLM_RECHECK_ENABLED=False,
+        )
+        response = await run_anonymization(text, settings, "paste")
+
+    assert "Karl Testmann" not in response.anonymized_text
+    assert "Testmann" not in response.anonymized_text  # name part caught too
+    assert "[PERSON_1]" in response.anonymized_text
+    assert "[PERSON_2]" not in response.anonymized_text  # one person, one tag
+    # Both passes hit every chunk.
+    assert len(server.detection_requests()) >= 14
+
+
 async def test_override_rerun_notes_skipped_recheck():
     entities = [{"text": "Johann Schmidt", "type": "PERSON_NAME", "role": "patient"}]
     with FakeLLM(entities) as server:

@@ -93,6 +93,40 @@ def test_name_parts_skip_titles_and_covered_occurrences():
     assert texts == ["Anna", "Dr. med. Anna Beispiel"]
 
 
+def test_person_tag_groups_link_title_variants_and_name_parts():
+    from backend.src.utils.resolver import resolve_spans
+    from backend.src.utils.transformation import apply_policy
+
+    text = "Dr. med. Anna Beispiel behandelte. Anna Beispiel kam erneut. Später sprach Anna."
+    mentions = [
+        Mention("Dr. med. Anna Beispiel", EntityType.PERSON_NAME, "clinician"),
+        Mention("Anna Beispiel", EntityType.PERSON_NAME, "clinician"),
+    ]
+    spans, _ = ground_mentions(text, mentions)
+    assert {s.metadata.get("tag_group") for s in spans} == {"anna beispiel"}
+
+    resolved, _ = resolve_spans(spans)
+    result, applied, _ = apply_policy(text, resolved)
+    # One person, one tag — across the title variant and the standalone part.
+    assert {e.replacement for e in applied} == {"[PERSON_1]"}
+    assert "[PERSON_2]" not in result
+
+
+def test_different_people_keep_different_tags():
+    from backend.src.utils.resolver import resolve_spans
+    from backend.src.utils.transformation import apply_policy
+
+    text = "Anna Beispiel traf Bernd Muster."
+    mentions = [
+        Mention("Anna Beispiel", EntityType.PERSON_NAME),
+        Mention("Bernd Muster", EntityType.PERSON_NAME),
+    ]
+    spans, _ = ground_mentions(text, mentions)
+    resolved, _ = resolve_spans(spans)
+    result, _, _ = apply_policy(text, resolved)
+    assert "[PERSON_1]" in result and "[PERSON_2]" in result
+
+
 def test_non_name_mentions_cover_case_variants():
     # "Gender: Female" is reported by the LLM; the lowercase inline use must
     # also be covered.

@@ -59,7 +59,9 @@ def apply_policy(
             transformation = active_policy.get(span.entity_type, TransformationType.TYPE_MASK)
         replacement: str | None
         if transformation == TransformationType.CONSISTENT_TAG:
-            key = _normalize(span.text)
+            # tag_group (set by LLM grounding) links title variants and name
+            # parts of the same person to one tag; fall back to the text.
+            key = str(span.metadata.get("tag_group") or _normalize(span.text))
             if key not in tag_numbers:
                 tag_numbers[key] = len(tag_numbers) + 1
             replacement = f"[PERSON_{tag_numbers[key]}]"

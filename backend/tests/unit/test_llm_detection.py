@@ -24,15 +24,29 @@ def test_single_chunk_for_short_text():
     assert chunk_text("kurz", 100, 10) == ["kurz"]
 
 
-def test_chunks_overlap_and_cover_everything():
-    text = "abcdefghij" * 100  # 1000 chars
-    chunks = chunk_text(text, 300, 50)
-    assert all(len(c) <= 300 for c in chunks)
-    # Reconstruction: consecutive chunks overlap by 50 chars.
-    step = 250
-    for i, chunk in enumerate(chunks):
-        assert text[i * step : i * step + len(chunk)] == chunk
-    assert (len(chunks) - 1) * step + len(chunks[-1]) >= len(text)
+def test_chunks_cover_everything_and_prefer_boundaries():
+    # Unique paragraph markers so positions are unambiguous.
+    text = "\n\n".join(f"Absatz {i}: " + "Befundtext ohne Namen. " * 8 for i in range(40))
+    chunks = chunk_text(text, 1000, 200)
+    assert len(chunks) > 3
+    assert all(len(chunk) <= 1000 for chunk in chunks)
+    # Full coverage with overlap: each chunk starts at or before the previous end.
+    position = 0
+    for chunk in chunks:
+        index = text.find(chunk, max(0, position - 400))
+        assert index != -1 and index <= position
+        position = index + len(chunk)
+    assert position == len(text)
+    # Boundary preference: intermediate chunks end at paragraph/line/sentence breaks.
+    for chunk in chunks[:-1]:
+        assert chunk.endswith(("\n\n", "\n", ". "))
+
+
+def test_chunks_fall_back_to_hard_cut_without_separators():
+    text = "x" * 3000  # no separators at all
+    chunks = chunk_text(text, 1000, 100)
+    assert all(len(chunk) <= 1000 for chunk in chunks)
+    assert sum(len(c) for c in chunks) >= 3000  # everything covered (with overlap)
 
 
 # --- response parsing --------------------------------------------------------
@@ -110,6 +124,29 @@ async def test_detector_grounds_llm_output(monkeypatch):
     assert all(text[s.start : s.end] == "Max Mustermann" for s in outcome.spans)
     assert len(outcome.warnings) == 1  # the unlocatable ORGANIZATION mention
     assert "ORGANIZATION" in outcome.warnings[0]
+
+
+async def test_truncated_output_bisects_chunk(monkeypatch):
+    from backend.src.utils.llm_detection import _TruncatedOutputError
+
+    detector = LLMDetector(settings_with(LLM_DETECTION_PASSES=1))
+
+    async def fake_chat(kwargs):
+        user = kwargs["messages"][1]["content"]
+        # The full chunk (both names present) exceeds the output budget;
+        # the bisected halves succeed.
+        if "Anna Alt" in user and "Bernd Neu" in user:
+            raise _TruncatedOutputError()
+        if "Anna Alt" in user:
+            return json.dumps(
+                {"entities": [{"text": "Anna Alt", "type": "PERSON_NAME", "role": ""}]}
+            )
+        return json.dumps({"entities": [{"text": "Bernd Neu", "type": "PERSON_NAME", "role": ""}]})
+
+    monkeypatch.setattr(detector, "_chat", fake_chat)
+    text = "Anna Alt wurde untersucht. " + "Befund unauffällig. " * 50 + "Bernd Neu übernahm."
+    outcome = await detector.detect(text)
+    assert {s.text for s in outcome.spans} == {"Anna Alt", "Bernd Neu"}
 
 
 async def test_detector_fails_closed_on_persistent_invalid_json(monkeypatch):

@@ -108,6 +108,8 @@ def ground_mentions(text: str, mentions: list[Mention]) -> tuple[list[EntitySpan
                 metadata["role"] = mention.role
             if partial:
                 metadata["grounding"] = "partial"
+            if mention.entity_type == EntityType.PERSON_NAME:
+                metadata["tag_group"] = _person_tag_group(mention.text)
             spans.append(
                 EntitySpan(
                     start=start,
@@ -160,7 +162,12 @@ def _ground_name_parts(
                     continue
                 seen.add(key)
                 covered.append((start, end))
-                metadata: dict[str, str] = {"grounding": "name_part"}
+                metadata: dict[str, str] = {
+                    "grounding": "name_part",
+                    # Parts inherit their parent mention's tag group so
+                    # "Elisabeth" gets the same [PERSON_n] as "Elisabeth Bauer".
+                    "tag_group": _person_tag_group(mention.text),
+                }
                 if mention.role:
                     metadata["role"] = mention.role
                 extra.append(
@@ -175,6 +182,18 @@ def _ground_name_parts(
                     )
                 )
     return extra
+
+
+def _person_tag_group(mention_text: str) -> str:
+    """Canonical person key: the mention minus titles/salutations, casefolded.
+
+    Makes "Dr. med. Anna Beispiel", "Anna Beispiel" and the name part "Anna"
+    share one consistent [PERSON_n] tag across the whole document. Surname-only
+    mentions still get their own group (no surname-alone coreference)."""
+    tokens = [token.strip(".,;:()") for token in mention_text.split()]
+    core = [t for t in tokens if t and t.lower().strip(".") not in _NAME_PART_STOPWORDS]
+    joined = " ".join(core) if core else mention_text
+    return re.sub(r"\s+", " ", joined).strip().casefold()
 
 
 def _locate(text: str, needle: str) -> list[tuple[int, int]]:

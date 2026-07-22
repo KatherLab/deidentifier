@@ -33,6 +33,14 @@ logger = get_safe_logger(__name__)
 # Later passes sample slightly so independent runs surface different misses.
 _EXTRA_PASS_TEMPERATURE = 0.3
 
+# Below this chunk size a truncated response is no longer bisected but fatal.
+_MIN_BISECT_CHARS = 600
+_BISECT_OVERLAP = 200
+
+
+class _TruncatedOutputError(Exception):
+    """The model hit its output token limit before finishing the JSON."""
+
 
 _ENTITY_TYPES = [t.value for t in EntityType]
 
@@ -114,15 +122,35 @@ def _provider_hints(base_url: str) -> dict:
 
 
 def chunk_text(text: str, size: int, overlap: int) -> list[str]:
+    """Split into overlapping chunks, preferring paragraph → line → sentence
+    boundaries so entities and their context stay intact at chunk edges."""
     if len(text) <= size:
         return [text]
-    step = max(size - overlap, 1)
     chunks: list[str] = []
-    for start in range(0, len(text), step):
-        chunks.append(text[start : start + size])
-        if start + size >= len(text):
+    start = 0
+    while True:
+        hard_end = min(start + size, len(text))
+        if hard_end >= len(text):
+            chunks.append(text[start:])
             break
+        end = _preferred_cut(text, start, hard_end)
+        chunks.append(text[start:end])
+        next_start = max(end - overlap, start + 1)
+        # Snap the overlap start to a word boundary.
+        while next_start < end and not text[next_start - 1].isspace():
+            next_start += 1
+        start = next_start
     return chunks
+
+
+def _preferred_cut(text: str, start: int, hard_end: int) -> int:
+    """Best split point in the last 40% of the chunk window."""
+    window_start = start + int((hard_end - start) * 0.6)
+    for separator in ("\n\n", "\n", ". "):
+        index = text.rfind(separator, window_start, hard_end)
+        if index != -1:
+            return index + len(separator)
+    return hard_end
 
 
 def parse_llm_response(content: str) -> list[Mention]:
@@ -197,6 +225,30 @@ class LLMDetector:
         temperature: float = 0.0,
         system_prompt: str = _SYSTEM_PROMPT,
     ) -> list[Mention]:
+        try:
+            return await self._request_mentions(chunk, temperature, system_prompt)
+        except _TruncatedOutputError:
+            # A PII-dense chunk (e.g. a table of identifiers) exceeded the
+            # model's output budget — bisect with overlap and recurse rather
+            # than losing entities to a truncated JSON list.
+            if len(chunk) < _MIN_BISECT_CHARS:
+                raise DetectorError(
+                    "The PII-detection LLM output was truncated even for a minimal "
+                    "chunk; the document was NOT anonymized."
+                ) from None
+            middle = len(chunk) // 2
+            left = chunk[: middle + _BISECT_OVERLAP]
+            right = chunk[middle - _BISECT_OVERLAP :]
+            return await self._detect_chunk(left, temperature, system_prompt) + (
+                await self._detect_chunk(right, temperature, system_prompt)
+            )
+
+    async def _request_mentions(
+        self,
+        chunk: str,
+        temperature: float,
+        system_prompt: str,
+    ) -> list[Mention]:
         settings = self._settings
         hints = _provider_hints(settings.OPENAI_API_BASE)
         messages = [
@@ -267,9 +319,12 @@ class LLMDetector:
                 "the document was NOT anonymized."
             ) from exc
 
-        content = response.choices[0].message.content if response.choices else None
+        choice = response.choices[0] if response.choices else None
+        content = choice.message.content if choice else None
         if not content:
             raise DetectorError("The PII-detection LLM returned an empty response.")
+        if choice.finish_reason == "length":
+            raise _TruncatedOutputError()
         return content
 
 
@@ -286,12 +341,16 @@ async def recheck_output(anonymized: str, settings: Settings) -> list[Validation
     from .policy import DEFAULT_POLICY
 
     detector = LLMDetector(settings)
+    semaphore = asyncio.Semaphore(settings.LLM_MAX_CONCURRENT_REQUESTS)
+
+    async def limited(chunk: str) -> list[Mention]:
+        async with semaphore:
+            return await detector._detect_chunk(chunk, system_prompt=_RECHECK_SYSTEM_PROMPT)
+
     try:
-        mentions: list[Mention] = []
-        for chunk in chunk_text(anonymized, settings.LLM_CHUNK_CHARS, settings.LLM_CHUNK_OVERLAP):
-            mentions.extend(
-                await detector._detect_chunk(chunk, system_prompt=_RECHECK_SYSTEM_PROMPT)
-            )
+        chunks = chunk_text(anonymized, settings.LLM_CHUNK_CHARS, settings.LLM_CHUNK_OVERLAP)
+        mention_lists = await asyncio.gather(*(limited(chunk) for chunk in chunks))
+        mentions: list[Mention] = [m for mention_list in mention_lists for m in mention_list]
     except DetectorError:
         return [
             ValidationWarning(
