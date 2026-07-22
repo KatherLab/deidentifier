@@ -93,6 +93,23 @@ def test_name_parts_skip_titles_and_covered_occurrences():
     assert texts == ["Anna", "Dr. med. Anna Beispiel"]
 
 
+def test_non_name_mentions_cover_case_variants():
+    # "Gender: Female" is reported by the LLM; the lowercase inline use must
+    # also be covered.
+    text = "Gender: Female. The patient is a 48-year-old female with hypertension."
+    spans, warnings = ground_mentions(text, [Mention("Female", EntityType.OTHER_PII)])
+    assert warnings == []
+    assert sorted(text[s.start : s.end] for s in spans) == ["Female", "female"]
+
+
+def test_person_names_stay_case_strict():
+    # "Ernst" is a surname AND a common German word — names must not expand
+    # to case variants.
+    text = "Ernst kam zur Kontrolle. Die Lage ist ernst."
+    spans, _ = ground_mentions(text, [Mention("Ernst", EntityType.PERSON_NAME)])
+    assert [text[s.start : s.end] for s in spans] == ["Ernst"]
+
+
 def test_umlaut_variant_grounding():
     # OCR text uses the digraph spelling; the LLM reports the umlaut form.
     text = "Patient Hans Mueller wurde entlassen."

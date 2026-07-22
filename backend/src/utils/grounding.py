@@ -89,6 +89,15 @@ def ground_mentions(text: str, mentions: list[Mention]) -> tuple[list[EntitySpan
                 "located in the source text; please review the document manually."
             )
             continue
+        if mention.entity_type != EntityType.PERSON_NAME:
+            # Also cover case-variant occurrences ("Gender: Female" reported,
+            # "a 48-year-old female" in prose). Names stay case-strict:
+            # German surnames like Ernst/Frank/Weiß collide with common words.
+            occurrences = occurrences + [
+                span
+                for span in _find_normalized(text, needle, ignore_case=True)
+                if span not in occurrences and _word_bounded(text, *span)
+            ]
         for start, end in occurrences:
             key = (start, end, mention.entity_type)
             if key in seen:
