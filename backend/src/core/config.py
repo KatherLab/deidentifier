@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     LLM_MODEL: str = ""
     LLM_REQUEST_TIMEOUT_SECONDS: int = Field(default=120, ge=1)
-    LLM_CHUNK_CHARS: int = Field(default=8000, ge=500)
+    LLM_CHUNK_CHARS: int = Field(default=16000, ge=500)
     LLM_CHUNK_OVERLAP: int = Field(default=500, ge=0)
     # Independent detection passes whose results are unioned (recall-first;
     # counters run-to-run variance of the model).
