@@ -62,7 +62,7 @@ Entity types:
 - ID_NUMBER: patient, case, insurance, lab, accession numbers, IBANs.
 - ORGANIZATION: named hospitals, practices, employers, schools, care homes.
 - PROFESSION: professions or occupations of the patient or relatives.
-- OTHER_PII: anything else that could identify a person; use this when unsure.
+- OTHER_PII: anything else that could identify a person, including explicit statements of the patient's gender/sex (e.g. "Gender: Female", "Geschlecht: männlich"); use this type when unsure.
 
 Rules:
 - Copy every mention EXACTLY as written in the document, character for character, including umlauts, punctuation and spacing. Never paraphrase, translate, expand or trim mentions.

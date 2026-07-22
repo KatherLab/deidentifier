@@ -69,6 +69,35 @@ there. Key points:
   docling-serve, Mistral-OCR-compatible API, vision LLM). Local by default;
   the UI shows a banner when a configured endpoint is not local.
 
+## Evaluation
+
+A standalone harness (not part of the web UI) scores the pipeline against
+annotated ground truth:
+
+```bash
+uv run python -m backend.src.evaluation.run \
+    --input annotations.jsonl \
+    --output evaluation-results.json \
+    --detectors rules,llm
+```
+
+- **Inputs:** our JSONL format (`{"document_id", "text", "entities": [{"start",
+  "end", "entity_type"}]}`) or INCEpTION UIMA-CAS JSON exports (the LLMAIx
+  annotation format) — single files, directories, or `.zip` archives. Custom
+  annotation labels map via `--label-map map.json`.
+- **Metrics:** character-level precision/recall/F1 with LLMAIx-compatible
+  semantics (positive class = redacted, whitespace/punctuation excluded),
+  span-level exact & overlap metrics, a per-entity-type breakdown, and —
+  most prominently — **document-level leakage** (% of documents with at
+  least one leaked character).
+- **Modes:** `--mode detection` (default; scores everything the detectors
+  find) or `--mode redaction` (scores what the default policy actually
+  masks — preserved clinical dates count as leaks if annotated).
+- `--restrict-to-gt-types` gives fair precision when the ground truth only
+  annotates a subset of PII types. By default the report contains **no
+  literal entity text**; `--include-sensitive-text` opts into a debugging
+  report that does.
+
 ## Privacy defaults
 
 - All processing is in memory; nothing is persisted server-side.

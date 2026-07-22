@@ -16,6 +16,32 @@ from ..schemas.entities import EntitySpan, EntityType
 _LLM_CONFIDENCE = 0.9
 _MIN_MENTION_LENGTH = 2
 _MIN_TRIMMED_LENGTH = 4
+_MIN_NAME_PART_LENGTH = 3
+
+# Salutations/titles that must not be grounded standalone as name parts.
+_NAME_PART_STOPWORDS = {
+    "herr",
+    "herrn",
+    "frau",
+    "fräulein",
+    "familie",
+    "dr",
+    "prof",
+    "med",
+    "phil",
+    "dent",
+    "rer",
+    "nat",
+    "dipl",
+    "univ",
+    "pd",
+    "von",
+    "van",
+    "de",
+    "zu",
+    "der",
+    "und",
+}
 
 
 @dataclass(frozen=True)
@@ -78,7 +104,62 @@ def ground_mentions(text: str, mentions: list[Mention]) -> tuple[list[EntitySpan
                     metadata=metadata,
                 )
             )
+
+    spans.extend(_ground_name_parts(text, mentions, spans, seen))
     return spans, warnings
+
+
+def _ground_name_parts(
+    text: str,
+    mentions: list[Mention],
+    existing: list[EntitySpan],
+    seen: set[tuple[int, int, EntityType]],
+) -> list[EntitySpan]:
+    """Ground individual tokens of multi-token person names.
+
+    A letter that introduces "Elisabeth Bauer" often continues with just
+    "Elisabeth" — the LLM reports the full name once, so standalone first or
+    last names would slip through. Tokens are grounded word-bounded and only
+    outside spans that are already covered (recall over precision)."""
+    covered = [(span.start, span.end) for span in existing]
+    extra: list[EntitySpan] = []
+    for mention in mentions:
+        if mention.entity_type != EntityType.PERSON_NAME:
+            continue
+        tokens = mention.text.split()
+        if len(tokens) < 2:
+            continue
+        for token in tokens:
+            cleaned = token.strip(".,;:()")
+            if len(cleaned) < _MIN_NAME_PART_LENGTH:
+                continue
+            if cleaned.lower().strip(".") in _NAME_PART_STOPWORDS:
+                continue
+            for start, end in _find_exact(text, cleaned):
+                if not _word_bounded(text, start, end):
+                    continue
+                if any(c_start <= start and end <= c_end for c_start, c_end in covered):
+                    continue
+                key = (start, end, EntityType.PERSON_NAME)
+                if key in seen:
+                    continue
+                seen.add(key)
+                covered.append((start, end))
+                metadata: dict[str, str] = {"grounding": "name_part"}
+                if mention.role:
+                    metadata["role"] = mention.role
+                extra.append(
+                    EntitySpan(
+                        start=start,
+                        end=end,
+                        text=text[start:end],
+                        entity_type=EntityType.PERSON_NAME,
+                        confidence=_LLM_CONFIDENCE,
+                        detector="llm",
+                        metadata=metadata,
+                    )
+                )
+    return extra
 
 
 def _locate(text: str, needle: str) -> list[tuple[int, int]]:

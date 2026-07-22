@@ -68,6 +68,31 @@ def test_trimmed_needle_requires_word_boundaries():
     assert len(warnings) == 1
 
 
+def test_name_parts_grounded_standalone():
+    # The LLM reports the full name once; the standalone first name later in
+    # the text must still be caught.
+    text = "Elisabeth Bauer wurde aufgenommen. Später berichtete Elisabeth über Beschwerden."
+    spans, warnings = ground_mentions(
+        text, [Mention("Elisabeth Bauer", EntityType.PERSON_NAME, "patient")]
+    )
+    assert warnings == []
+    texts = sorted(text[s.start : s.end] for s in spans)
+    assert texts == ["Elisabeth", "Elisabeth Bauer"]
+    part = next(s for s in spans if s.metadata.get("grounding") == "name_part")
+    assert text[part.start : part.end] == "Elisabeth"
+
+
+def test_name_parts_skip_titles_and_covered_occurrences():
+    text = "Dr. med. Anna Beispiel behandelte. Anna kam später."
+    spans, _ = ground_mentions(
+        text, [Mention("Dr. med. Anna Beispiel", EntityType.PERSON_NAME, "clinician")]
+    )
+    texts = sorted(text[s.start : s.end] for s in spans)
+    # Full mention once, standalone "Anna" once — no span for "med"/"Dr" and no
+    # duplicate for the "Anna" inside the full mention.
+    assert texts == ["Anna", "Dr. med. Anna Beispiel"]
+
+
 def test_duplicate_mentions_do_not_duplicate_spans():
     text = "PAT-123456 liegt vor."
     mentions = [
