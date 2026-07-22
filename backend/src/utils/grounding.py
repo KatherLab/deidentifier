@@ -63,6 +63,12 @@ def ground_mentions(text: str, mentions: list[Mention]) -> tuple[list[EntitySpan
         occurrences = _locate(text, needle)
         partial = False
         if not occurrences:
+            # OCR text and LLM output may disagree on umlaut spelling
+            # ("Müller" vs "Mueller") or the text may be hyphenated across
+            # line breaks ("Muster-\nmann").
+            occurrences = _locate_fuzzy(text, needle)
+            partial = bool(occurrences)
+        if not occurrences:
             # The LLM may have normalized inflected German prefixes ("Herrn" →
             # "Herr") or added a salutation not present in the text. Drop
             # leading tokens one by one and retry, requiring word boundaries so
@@ -169,6 +175,51 @@ def _locate(text: str, needle: str) -> list[tuple[int, int]]:
     if not occurrences:
         occurrences = _find_normalized(text, needle, ignore_case=True)
     return occurrences
+
+
+_UMLAUT_PAIRS = [
+    ("ä", "ae"),
+    ("ö", "oe"),
+    ("ü", "ue"),
+    ("Ä", "Ae"),
+    ("Ö", "Oe"),
+    ("Ü", "Ue"),
+    ("ß", "ss"),
+]
+
+
+def _umlaut_variants(needle: str) -> list[str]:
+    to_digraph = needle
+    for umlaut, digraph in _UMLAUT_PAIRS:
+        to_digraph = to_digraph.replace(umlaut, digraph)
+    to_umlaut = needle
+    for umlaut, digraph in _UMLAUT_PAIRS:
+        to_umlaut = to_umlaut.replace(digraph, umlaut)
+    return [variant for variant in (to_digraph, to_umlaut) if variant != needle]
+
+
+def _find_dehyphenated(text: str, needle: str) -> list[tuple[int, int]]:
+    """Match needles broken by soft hyphenation in the text ("Muster-\\nmann")."""
+    tokens = needle.split()
+    if not tokens:
+        return []
+    token_patterns = [r"(?:-\s*)?".join(re.escape(char) for char in token) for token in tokens]
+    pattern = r"\s+".join(token_patterns)
+    return [match.span() for match in re.finditer(pattern, text)]
+
+
+def _locate_fuzzy(text: str, needle: str) -> list[tuple[int, int]]:
+    for variant in _umlaut_variants(needle):
+        occurrences = _locate(text, variant)
+        if occurrences:
+            return occurrences
+    if len(needle) >= 5:
+        occurrences = [
+            span for span in _find_dehyphenated(text, needle) if _word_bounded(text, *span)
+        ]
+        if occurrences:
+            return occurrences
+    return []
 
 
 def _word_bounded(text: str, start: int, end: int) -> bool:

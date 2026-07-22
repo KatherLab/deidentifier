@@ -93,6 +93,23 @@ def test_name_parts_skip_titles_and_covered_occurrences():
     assert texts == ["Anna", "Dr. med. Anna Beispiel"]
 
 
+def test_umlaut_variant_grounding():
+    # OCR text uses the digraph spelling; the LLM reports the umlaut form.
+    text = "Patient Hans Mueller wurde entlassen."
+    spans, warnings = ground_mentions(text, [Mention("Hans Müller", EntityType.PERSON_NAME)])
+    assert warnings == []
+    assert any(text[s.start : s.end] == "Hans Mueller" for s in spans)
+    full = next(s for s in spans if s.text == "Hans Mueller")
+    assert full.metadata["grounding"] == "partial"
+
+
+def test_dehyphenated_grounding():
+    text = "Der Befund von Max Muster-\nmann liegt vor."
+    spans, warnings = ground_mentions(text, [Mention("Max Mustermann", EntityType.PERSON_NAME)])
+    assert warnings == []
+    assert any(text[s.start : s.end] == "Max Muster-\nmann" for s in spans)
+
+
 def test_duplicate_mentions_do_not_duplicate_spans():
     text = "PAT-123456 liegt vor."
     mentions = [

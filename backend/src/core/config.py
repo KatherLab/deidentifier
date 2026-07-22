@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     LLM_REQUEST_TIMEOUT_SECONDS: int = Field(default=120, ge=1)
     LLM_CHUNK_CHARS: int = Field(default=8000, ge=500)
     LLM_CHUNK_OVERLAP: int = Field(default=500, ge=0)
+    # Independent detection passes whose results are unioned (recall-first;
+    # counters run-to-run variance of the model).
+    LLM_DETECTION_PASSES: int = Field(default=2, ge=1, le=5)
+    LLM_MAX_CONCURRENT_REQUESTS: int = Field(default=4, ge=1, le=32)
+    # After transformation, ask the LLM whether PII remains in the output
+    # (adds warnings, never edits).
+    LLM_RECHECK_ENABLED: bool = True
 
     # Extraction / OCR — Milestone 2
     DOCLING_SERVE_URL: str = ""

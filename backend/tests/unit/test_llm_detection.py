@@ -69,6 +69,27 @@ def test_invalid_json_raises():
 # --- detector ----------------------------------------------------------------
 
 
+async def test_multi_pass_unions_results(monkeypatch):
+    detector = LLMDetector(settings_with(LLM_DETECTION_PASSES=2))
+    calls = []
+
+    async def fake_chat(kwargs):
+        calls.append(kwargs["temperature"])
+        if len(calls) == 1:
+            return json.dumps(
+                {"entities": [{"text": "Johann Schmidt", "type": "PERSON_NAME", "role": ""}]}
+            )
+        return json.dumps({"entities": [{"text": "0351 4584711", "type": "PHONE", "role": ""}]})
+
+    monkeypatch.setattr(detector, "_chat", fake_chat)
+    text = "Johann Schmidt, erreichbar unter 0351 4584711."
+    outcome = await detector.detect(text)
+    assert len(calls) == 2
+    assert calls[0] != calls[1]  # first pass temperature 0, second samples
+    found = {s.text for s in outcome.spans}
+    assert found == {"Johann Schmidt", "0351 4584711"}
+
+
 async def test_detector_grounds_llm_output(monkeypatch):
     detector = LLMDetector(settings_with())
 

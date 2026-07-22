@@ -232,6 +232,13 @@ German clinical text.
 - Malformed JSON → one retry (llmaixweb also retries with raised max_tokens on
   length-truncation — copy that), then fail the request with a clear error.
   Never silently return "no entities found".
+- **Multi-pass detection:** `LLM_DETECTION_PASSES` (default 2) independent
+  runs whose grounded spans are unioned — a recall-first safety net against
+  run-to-run model variance. Passes × chunks run in parallel (bounded by
+  `LLM_MAX_CONCURRENT_REQUESTS`).
+- **Prompt-injection hardening:** the document is fenced between explicit
+  DOCUMENT START/END markers and the system prompt declares it untrusted
+  data whose embedded instructions must be ignored.
 
 ### 2. Rule-based detector
 
@@ -301,8 +308,11 @@ Separate pass over the anonymized output (`utils/leakage.py`):
 2. Rule detectors re-run on the output at sensitive settings.
 3. Suspicious labelled fields (`Patient:`, `Name:`, `Geburtsdatum:` followed
    by non-redacted content) are flagged.
-4. Optionally, the LLM re-checks the output ("does PII remain? return JSON"),
-   and/or privacy-filter runs — both grounded the same way, warnings only.
+4. The LLM re-checks the output with an audit framing ("what PII remains?" —
+   `LLM_RECHECK_ENABLED`, default on): findings are grounded the same way and
+   become warnings, never edits. Placeholders, preserved dates/ages and bare
+   years are excluded. Runs on full runs only; override re-runs carry an INFO
+   note instead.
 
 Result: `PASS` | `REVIEW_REQUIRED` | `FAIL` with located warnings. Validation
 never silently edits the output; warnings surface in the UI.

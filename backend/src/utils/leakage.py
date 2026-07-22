@@ -99,10 +99,13 @@ async def validate_output(
             )
         )
 
+    return ValidationResult(status=compute_status(warnings), warnings=warnings)
+
+
+def compute_status(warnings: list[ValidationWarning]) -> ValidationStatus:
+    """HIGH → FAIL, WARNING → REVIEW_REQUIRED; INFO alone still passes."""
     if any(w.severity == ValidationSeverity.HIGH for w in warnings):
-        status = ValidationStatus.FAIL
-    elif warnings:
-        status = ValidationStatus.REVIEW_REQUIRED
-    else:
-        status = ValidationStatus.PASS
-    return ValidationResult(status=status, warnings=warnings)
+        return ValidationStatus.FAIL
+    if any(w.severity == ValidationSeverity.WARNING for w in warnings):
+        return ValidationStatus.REVIEW_REQUIRED
+    return ValidationStatus.PASS

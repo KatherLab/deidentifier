@@ -20,6 +20,7 @@ class CachedDetection:
     spans: list[EntitySpan]
     extraction_warnings: list[str]
     detection_warnings: list[str] = field(default_factory=list)
+    llm_recheck_performed: bool = False
     timestamp: float = 0.0
 
 
