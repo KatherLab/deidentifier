@@ -1,0 +1,20 @@
+SYNTHETIC TEST DATA – NO REAL PATIENT INFORMATION
+
+Entlassungsbrief
+
+Patient: Max Mustermann, geb. 01.02.1980
+Anschrift: Musterstraße 12, 01307 Dresden
+Pat.-Nr.: PAT-123456
+Fallnummer: 2024-004711
+
+Sehr geehrte Kollegin, sehr geehrter Kollege,
+
+wir berichten über den o. g. Patienten, der sich vom 10.03.2024 bis zum
+15.03.2024 in unserer stationären Behandlung befand. Die Aufnahme erfolgte
+bei akuter Cholezystitis. Die laparoskopische Cholezystektomie am 11.03.2024
+verlief komplikationslos.
+
+Rückfragen an: Tel.: 0351 458-0, E-Mail: chirurgie@beispiel-klinikum.de
+
+Mit freundlichen Grüßen
+Erika Musterfrau

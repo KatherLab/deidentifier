@@ -1,0 +1,26 @@
+# Reference clone — not part of this repository
+llmaixweb/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Environment / secrets — never commit real configuration
+.env
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

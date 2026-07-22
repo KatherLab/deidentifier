@@ -1,0 +1,32 @@
+[project]
+name = "deidentifier"
+version = "0.1.0"
+description = "Locally deployable anonymizer for German clinical documents"
+requires-python = ">=3.13,<3.15"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "python-multipart>=0.0.20",
+    "httpx>=0.28",
+    "openai>=2.0",
+    "pypdf>=5.0",
+    "python-docx>=1.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "httpx>=0.28",
+    "ruff>=0.9",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]

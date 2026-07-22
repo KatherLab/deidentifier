@@ -1,0 +1,43 @@
+{
+  "name": "deidentifier",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deidentifier frontend — anonymize German clinical documents locally.",
+  "license": "AGPL-3.0-or-later",
+  "author": "KatherLab",
+  "type": "module",
+  "//typescript": "Pinned to 6.x like llmaixweb: typescript-eslint (8.x) still requires typescript <6.1.0 and vue-tsc has no TS 7 support yet.",
+  "scripts": {
+    "dev": "vite --config frontend/vite.config.ts",
+    "build": "vue-tsc --noEmit -p tsconfig.json && vite build --config frontend/vite.config.ts",
+    "preview": "vite preview --config frontend/vite.config.ts",
+    "format": "prettier --write \"frontend/**/*.{js,ts,vue,css}\"",
+    "format:check": "prettier --check \"frontend/**/*.{js,ts,vue,css}\"",
+    "lint": "eslint frontend/",
+    "lint:fix": "eslint frontend/ --fix",
+    "type-check": "vue-tsc --noEmit -p tsconfig.json",
+    "check": "npm run format:check && npm run lint && npm run type-check"
+  },
+  "dependencies": {
+    "@lucide/vue": "1.25.0",
+    "@tailwindcss/vite": "4.3.3",
+    "axios": "1.18.1",
+    "pinia": "4.0.2",
+    "tailwindcss": "4.3.3",
+    "vue": "3.5.40"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.1.1",
+    "@vitejs/plugin-vue": "6.0.8",
+    "eslint": "10.7.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-vue": "10.10.0",
+    "globals": "17.7.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vite": "8.1.5",
+    "vue-tsc": "3.3.7"
+  }
+}

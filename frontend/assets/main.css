@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens (Tailwind v4 @theme), mirroring llmaixweb.
+ *
+ * ONE neutral (slate) and ONE accent (blue). Semantic tokens alias that
+ * palette so components reference a name (`bg-surface`, `text-content`,
+ * `border-default`, `bg-primary`, `rounded-card`) instead of hardcoding a
+ * shade. With a plain `@theme` (not `@theme inline`), Tailwind generates
+ * utilities that reference the CSS variable, so the `.dark` overrides below
+ * switch them at runtime.
+ */
+@theme {
+  /* Radius scale — two intent-based radii. */
+  --radius-card: 0.5rem; /* surfaces, tables, inputs */
+  --radius-modal: 0.75rem; /* modals, dialogs, large containers */
+
+  /* Semantic surfaces */
+  --color-surface: #ffffff; /* page/card background */
+  --color-surface-muted: #f8fafc; /* slate-50 — hover/zebra/subtle panels */
+  --color-surface-sunken: #f1f5f9; /* slate-100 — headers, wells */
+
+  /* Borders / dividers */
+  --color-default-border: #e2e8f0; /* slate-200 */
+  --color-strong-border: #cbd5e1; /* slate-300 */
+
+  /* Text */
+  --color-content: #0f172a; /* slate-900 — headings */
+  --color-content-muted: #475569; /* slate-600 — body */
+  --color-content-subtle: #64748b; /* slate-500 — placeholders, captions */
+
+  /* Accent (blue) */
+  --color-primary: #2563eb; /* blue-600 */
+  --color-primary-hover: #1d4ed8; /* blue-700 */
+  --color-primary-soft: #dbeafe; /* blue-100 — tinted backgrounds */
+  --color-ring: #3b82f6; /* blue-500 — focus rings */
+}
+
+/*
+ * Short border-color utilities.
+ *
+ * The border tokens are declared above as `--color-default-border` and
+ * `--color-strong-border`, so Tailwind v4 only generates the long-form
+ * utilities from them. Components use the short `border-default` /
+ * `border-strong` form, which would otherwise match nothing and leave borders
+ * falling back to `currentColor`. These `@utility` rules bridge that gap.
+ */
+@utility border-default {
+  border-color: var(--color-default-border);
+}
+@utility border-strong {
+  border-color: var(--color-strong-border);
+}
+@utility divide-default {
+  border-color: var(--color-default-border);
+}
+@utility divide-strong {
+  border-color: var(--color-strong-border);
+}
+@utility ring-default {
+  --tw-ring-color: var(--color-default-border);
+}
+@utility ring-strong {
+  --tw-ring-color: var(--color-strong-border);
+}
+
+/* Dark-mode overrides — App.vue toggles `.dark` on <html>. */
+.dark {
+  --color-surface: #0f172a; /* slate-900 */
+  --color-surface-muted: #1e293b; /* slate-800 */
+  --color-surface-sunken: #1e293b; /* slate-800 */
+
+  --color-default-border: #334155; /* slate-700 */
+  --color-strong-border: #475569; /* slate-600 */
+
+  --color-content: #f1f5f9; /* slate-100 */
+  --color-content-muted: #cbd5e1; /* slate-300 */
+  --color-content-subtle: #94a3b8; /* slate-400 */
+
+  --color-primary: #3b82f6; /* blue-500 */
+  --color-primary-hover: #60a5fa; /* blue-400 */
+  --color-primary-soft: rgba(59, 130, 246, 0.15); /* blue-500 @ 15% */
+  --color-ring: #60a5fa; /* blue-400 */
+}
+
+/* Base element styles: token-backed base text/background color so elements
+   without an explicit `text-*` utility switch with `.dark`. */
+body {
+  min-height: 100vh;
+  color: var(--color-content-muted);
+  background-color: var(--color-surface);
+  transition:
+    color 0.5s,
+    background-color 0.5s;
+  line-height: 1.6;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans',
+    'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-size: 15px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Respect the user's reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Shared fade transition. */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Toast auto-dismiss progress bar (used by components/common/ToastItem.vue). */
+@keyframes toast-shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
