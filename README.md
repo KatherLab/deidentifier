@@ -57,6 +57,21 @@ uv run ruff check backend/ && uv run ruff format --check backend/
 npm run check && npm run build
 ```
 
+## Docker deployment
+
+```bash
+docker compose up -d --build                                  # → http://localhost:8080
+docker compose -f compose.yml -f compose.dev.yml up --build   # dev: hot reload + :8000
+docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d   # + GPU OCR sidecar
+```
+
+The stack runs in production mode by default (docs disabled, unsafe
+configurations refuse to start). The backend has no published port, a
+read-only filesystem and no volumes — nothing is persisted. Configuration is
+read from `backend/.env` (never copied into images). The `unlimited-ocr`
+overlay serves `baidu/Unlimited-OCR` via vLLM on an NVIDIA GPU and wires it
+as the scanned-PDF OCR engine. Works with Docker or Podman.
+
 ## Configuration
 
 Copy `.env.example` to `backend/.env` and adjust. Every variable is documented
