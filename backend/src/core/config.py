@@ -12,8 +12,19 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_env_path = Path(os.getenv("ENV_PATH", "backend/.env"))
-_env_file = str(_env_path) if _env_path.is_file() else None
+def _default_env_file() -> str | None:
+    """ENV_PATH wins; otherwise the repo-top .env, then backend/.env."""
+    override = os.getenv("ENV_PATH")
+    if override:
+        path = Path(override)
+        return str(path) if path.is_file() else None
+    for candidate in (Path(".env"), Path("backend/.env")):
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+_env_file = _default_env_file()
 
 
 class Settings(BaseSettings):

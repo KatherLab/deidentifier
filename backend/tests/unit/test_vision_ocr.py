@@ -59,6 +59,23 @@ async def test_vision_request_carries_unlimited_ocr_recipe():
     assert parts[1]["image_url"]["url"].startswith("data:image/png;base64,")
 
 
+async def test_unlimited_ocr_layout_prefixes_stripped():
+    # Real Unlimited-OCR output format: element type + bounding box per line.
+    with FakeLLM(
+        [],
+        vision_text=(
+            "text [112, 76, 681, 95]SYNTHETIC TEST DATA\n"
+            "text [114, 117, 548, 135]Patientin: Erika Musterfrau, geb. 03.11.1957\n"
+            "title [10, 20, 30, 40]Entlassungsbrief"
+        ),
+    ) as server:
+        settings = vision_settings(server.base_url)
+        document = await extract_document(make_scanned_pdf(pages=1), "scan.pdf", settings)
+    assert "[112" not in document.text
+    assert "Patientin: Erika Musterfrau, geb. 03.11.1957" in document.text
+    assert "Entlassungsbrief" in document.text
+
+
 async def test_special_tokens_stripped_from_transcription():
     with FakeLLM(
         [], vision_text="<|ref|>Befund<|/ref|> Patientin Erika Musterfrau <|det|>[[1,2]]<|/det|>"

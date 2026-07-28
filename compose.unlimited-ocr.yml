@@ -9,7 +9,7 @@
 
 services:
   unlimited-ocr:
-    image: vllm/vllm-openai:unlimited-ocr
+    image: vllm/vllm-openai:latest
     ipc: host
     shm_size: "8gb"
     volumes:

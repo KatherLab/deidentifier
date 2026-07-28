@@ -18,6 +18,8 @@ services:
     image: ghcr.io/katherlab/deidentifier-backend:${DEIDENTIFIER_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
+      - path: .env
+        required: false
       - path: backend/.env
         required: false
     environment:

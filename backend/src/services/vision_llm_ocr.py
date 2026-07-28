@@ -29,6 +29,10 @@ class VisionOCRError(Exception):
 
 # Model markup such as <|ref|>…<|/ref|> emitted with skip_special_tokens=false.
 _SPECIAL_TOKENS = re.compile(r"<\|[^|>]{0,40}\|>")
+# Unlimited-OCR line prefixes: element type + bounding box, e.g.
+# "text [112, 76, 681, 95]Patientin: …". The boxes could later drive a
+# layout-preserving redacted-PDF reconstruction; for text output they are noise.
+_LAYOUT_PREFIX = re.compile(r"^[a-z_]{1,20} \[\d+(?:,\s*\d+){3}\]", re.IGNORECASE | re.MULTILINE)
 
 
 class VisionOCRService:
@@ -134,4 +138,6 @@ class VisionOCRService:
             raise VisionOCRError(
                 f"The vision OCR endpoint returned no text for page {page_number}."
             )
-        return _SPECIAL_TOKENS.sub("", content).strip()
+        content = _SPECIAL_TOKENS.sub("", content)
+        content = _LAYOUT_PREFIX.sub("", content)
+        return content.strip()
