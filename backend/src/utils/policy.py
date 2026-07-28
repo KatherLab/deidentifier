@@ -8,9 +8,11 @@ from ..schemas.entities import EntityType, TransformationType
 
 DEFAULT_POLICY: dict[EntityType, TransformationType] = {
     EntityType.PERSON_NAME: TransformationType.CONSISTENT_TAG,
-    EntityType.DATE_OF_BIRTH: TransformationType.GENERALIZE,
+    # Masked by default (user decision); switch to GENERALIZE to keep the
+    # birth year, or PRESERVE ages, when a use case needs them.
+    EntityType.DATE_OF_BIRTH: TransformationType.TYPE_MASK,
+    EntityType.AGE: TransformationType.TYPE_MASK,
     EntityType.OTHER_DATE: TransformationType.PRESERVE,  # clinical timelines stay useful
-    EntityType.AGE: TransformationType.PRESERVE,
     EntityType.ADDRESS: TransformationType.TYPE_MASK,
     EntityType.PHONE: TransformationType.TYPE_MASK,
     EntityType.EMAIL: TransformationType.TYPE_MASK,

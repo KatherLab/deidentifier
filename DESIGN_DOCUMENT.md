@@ -288,9 +288,9 @@ Default policy:
 | Entity type   | Transformation                                  |
 |---------------|-------------------------------------------------|
 | PERSON_NAME   | CONSISTENT_TAG → `[PERSON_1]`, `[PERSON_2]` …   |
-| DATE_OF_BIRTH | GENERALIZE → year only (`01.02.1980` → `1980`)  |
+| DATE_OF_BIRTH | TYPE_MASK → `[GEBURTSDATUM]` (GENERALIZE→year opt-in) |
 | OTHER_DATE    | PRESERVE (clinical timelines stay useful)       |
-| AGE           | PRESERVE                                        |
+| AGE           | TYPE_MASK → `[ALTER]`                           |
 | ADDRESS       | TYPE_MASK → `[ADRESSE]`                         |
 | PHONE/EMAIL/URL | TYPE_MASK                                     |
 | ID_NUMBER     | TYPE_MASK → `[ID]`                              |

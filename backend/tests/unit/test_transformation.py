@@ -44,11 +44,30 @@ def test_right_to_left_application_keeps_offsets_valid():
     assert result == "Tel.: [TELEFON], [ADRESSE], [E-MAIL]"
 
 
-def test_dob_generalized_to_year():
+def test_dob_masked_by_default():
     text, spans = make(
         "geboren am 01.02.1980 in Dresden", [("01.02.1980", EntityType.DATE_OF_BIRTH)]
     )
     result, applied, _ = apply_policy(text, spans)
+    assert result == "geboren am [GEBURTSDATUM] in Dresden"
+    assert applied[0].status == SpanStatus.REDACTED
+
+
+def test_age_masked_by_default():
+    text, spans = make("Die 66-jaehrige Patientin", [("66", EntityType.AGE)])
+    result, applied, _ = apply_policy(text, spans)
+    assert result == "Die [ALTER]-jaehrige Patientin"
+
+
+def test_generalize_via_explicit_policy():
+    from backend.src.utils.policy import DEFAULT_POLICY
+    from backend.src.schemas.entities import TransformationType
+
+    text, spans = make(
+        "geboren am 01.02.1980 in Dresden", [("01.02.1980", EntityType.DATE_OF_BIRTH)]
+    )
+    policy = {**DEFAULT_POLICY, EntityType.DATE_OF_BIRTH: TransformationType.GENERALIZE}
+    result, applied, _ = apply_policy(text, spans, policy=policy)
     assert result == "geboren am 1980 in Dresden"
     assert applied[0].status == SpanStatus.GENERALIZED
     assert applied[0].replacement == "1980"

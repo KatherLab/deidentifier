@@ -19,7 +19,7 @@ def test_anonymize_text(client):
     anonymized = body["anonymized_text"]
     assert "Max Mustermann" not in anonymized
     assert "[PERSON_1]" in anonymized
-    assert "geb. 1980" in anonymized  # DOB generalized to year
+    assert "geb. [GEBURTSDATUM]" in anonymized  # DOB masked by default
     assert "01.02.1980" not in anonymized
     assert "[ADRESSE]" in anonymized
     assert "[TELEFON]" in anonymized

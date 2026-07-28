@@ -100,7 +100,7 @@ _USER_TEMPLATE = (
 
 _RECHECK_SYSTEM_PROMPT = """You are auditing an anonymized German clinical document for remaining privacy leaks.
 The document was already processed: placeholder tokens in square brackets (e.g. [PERSON_1], [ADRESSE], [TELEFON], [ID], [E-MAIL], [ORGANISATION], [BERUF], [GESCHWÄRZT]) and bare years (e.g. "1980") are intentional replacements — never report them.
-Clinical event dates (e.g. "10.03.2024") and age statements are intentionally preserved — do not report them.
+Clinical event dates (e.g. "10.03.2024") are intentionally preserved — do not report them.
 Report every piece of REAL personal data that still remains: person names, addresses, phone numbers, e-mail addresses, identification numbers, and organization names that could identify a person.
 
 Rules:

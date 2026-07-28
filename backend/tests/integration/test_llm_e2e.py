@@ -169,7 +169,7 @@ async def test_scanned_pdf_ocr_to_anonymized_text():
     assert "Erika Musterfrau" not in response.anonymized_text
     assert "[PERSON_1]" in response.anonymized_text
     assert "[ID]" in response.anonymized_text  # Fallnummer via rules
-    assert "geb. 1980" in response.anonymized_text
+    assert "geb. [GEBURTSDATUM]" in response.anonymized_text
     assert any("OCR" in w for w in response.warnings)
 
 
