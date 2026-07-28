@@ -36,7 +36,7 @@
     </div>
 
     <header class="border-b border-default">
-      <div class="mx-auto flex max-w-4xl items-center gap-3 px-4 py-4">
+      <div class="mx-auto flex items-center gap-3 px-4 py-4" :class="containerClass">
         <h1 class="text-xl font-semibold text-content">Medizinischer Dokumenten-Anonymisierer</h1>
         <button
           type="button"
@@ -50,7 +50,7 @@
       </div>
     </header>
 
-    <main class="mx-auto max-w-4xl px-4 py-8">
+    <main class="mx-auto px-4 py-8" :class="containerClass">
       <ResultView v-if="session.phase === 'result' && session.result" :result="session.result" />
       <InputPanel v-else />
     </main>
@@ -72,6 +72,13 @@ const session = useSessionStore()
 const externalEndpointsLabel = computed(() =>
   session.externalEndpoints.map((endpoint) => `${endpoint.name} (${endpoint.host})`).join(', '),
 )
+
+/**
+ * The landing page stays narrow and centered; the result screen uses (nearly)
+ * the full viewport width so side-by-side panels have room (96rem = the 2xl
+ * breakpoint).
+ */
+const containerClass = computed(() => (session.phase === 'result' ? 'max-w-[96rem]' : 'max-w-4xl'))
 
 // Dark mode (Tailwind class strategy). Only the theme preference is
 // persisted — never any document content.

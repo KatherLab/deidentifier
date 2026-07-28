@@ -77,6 +77,28 @@
       </p>
     </div>
 
+    <!-- Advanced settings: default-policy editor (collapsed by default). -->
+    <section class="rounded-card border border-default bg-surface">
+      <button
+        type="button"
+        class="flex w-full items-center gap-2 rounded-card px-4 py-3 text-sm font-medium text-content transition-colors hover:bg-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :aria-expanded="advancedOpen"
+        aria-controls="advanced-settings"
+        @click="advancedOpen = !advancedOpen"
+      >
+        <ChevronDown
+          class="h-4 w-4 shrink-0 transition-transform"
+          :class="advancedOpen ? '' : '-rotate-90'"
+          aria-hidden="true"
+        />
+        Erweiterte Einstellungen
+        <StatusBadge v-if="session.policyCustomized" label="angepasst" color="purple" />
+      </button>
+      <div v-if="advancedOpen" id="advanced-settings" class="border-t border-default px-4 py-4">
+        <PolicyEditor />
+      </div>
+    </section>
+
     <!-- Submit -->
     <div class="flex items-center gap-3">
       <BaseButton size="lg" :loading="loading" :disabled="!canSubmit" @click="submit">
@@ -91,8 +113,10 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { UploadCloud } from '@lucide/vue'
+import { ChevronDown, UploadCloud } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
+import StatusBadge from '@/components/common/StatusBadge.vue'
+import PolicyEditor from '@/components/anonymizer/PolicyEditor.vue'
 import { useSessionStore } from '@/stores/session'
 import { useToast } from '@/composables/useToast'
 import { extractApiErrorMessage } from '@/utils/errors'
@@ -104,6 +128,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
 const pastedText = ref('')
 const dragActive = ref(false)
+const advancedOpen = ref(false)
 
 const loading = computed(() => session.phase === 'loading')
 const canSubmit = computed(

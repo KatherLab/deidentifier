@@ -18,6 +18,7 @@ from starlette.datastructures import UploadFile
 
 from ....core.config import Settings, get_settings
 from ....schemas.anonymize import AnonymizeResponse, EntityOverride
+from ....schemas.entities import EntityType, TransformationType
 from ....utils.cache import request_cache
 from ....utils.detection import DetectorError
 from ....utils.extraction import ExtractionError, LayoutLine, extract_document
@@ -33,6 +34,7 @@ router = APIRouter()
 logger = get_safe_logger(__name__)
 
 _OVERRIDES_ADAPTER = TypeAdapter(list[EntityOverride])
+_POLICY_ADAPTER = TypeAdapter(dict[EntityType, TransformationType])
 
 
 @router.post("/export/pdf")
@@ -62,10 +64,23 @@ async def export_pdf(
         except (json.JSONDecodeError, ValidationError):
             raise HTTPException(status_code=422, detail="Invalid 'overrides' payload.") from None
 
+    policy = None
+    raw_policy = form.get("policy")
+    if isinstance(raw_policy, str) and raw_policy.strip():
+        try:
+            policy = _POLICY_ADAPTER.validate_python(json.loads(raw_policy))
+        except (json.JSONDecodeError, ValidationError):
+            raise HTTPException(status_code=422, detail="Invalid 'policy' payload.") from None
+
     file_hash = hashlib.sha256(data).hexdigest()
     request_id = form.get("request_id")
     result, layout, page_count, source_type = await _detect(
-        data, file_hash, request_id if isinstance(request_id, str) else None, overrides, settings
+        data,
+        file_hash,
+        request_id if isinstance(request_id, str) else None,
+        overrides,
+        policy,
+        settings,
     )
 
     try:
@@ -99,6 +114,7 @@ async def _detect(
     file_hash: str,
     request_id: str | None,
     overrides: list[EntityOverride],
+    policy,
     settings: Settings,
 ) -> tuple[AnonymizeResponse, list[LayoutLine], int, str]:
     """Reuse cached detection when the file matches; otherwise run the full
@@ -106,7 +122,7 @@ async def _detect(
     if request_id:
         entry = request_cache.get(request_id)
         if entry is not None and entry.file_sha256 == file_hash:
-            result = await rerun_with_overrides(request_id, overrides)
+            result = await rerun_with_overrides(request_id, overrides, policy=policy)
             if result is not None:
                 return result, entry.layout, entry.page_count, entry.source_type
 
@@ -121,6 +137,7 @@ async def _detect(
             extracted.source_type,
             extraction_warnings=extracted.warnings,
             overrides=overrides,
+            policy=policy,
             file_sha256=file_hash,
             layout=extracted.layout,
             page_count=len(extracted.pages),

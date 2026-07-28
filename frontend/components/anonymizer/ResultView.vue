@@ -1,87 +1,85 @@
 <template>
-  <!-- With a redacted-PDF preview the view becomes two columns (≥lg): result
-       content left, PDF preview right. Non-PDF results stay single-column. -->
-  <section class="grid gap-6 lg:items-start" :class="{ 'lg:grid-cols-2': showPdfPanel }">
-    <div class="min-w-0 space-y-6">
-      <!-- Header: validation status + actions -->
-      <div class="flex flex-wrap items-center gap-3">
-        <StatusBadge
-          :label="validationStatusLabel(result.validation.status)"
-          :color="validationStatusColor(result.validation.status)"
-          class="text-sm"
-        />
-        <StatusBadge :label="sourceTypeLabel(result.source_type)" color="gray" />
-        <span class="text-xs text-content-subtle">
-          Verarbeitet in {{ Math.round(result.timing_ms.total) }} ms
-        </span>
-        <span
-          v-if="session.rerunning"
-          class="inline-flex items-center gap-1.5 text-xs text-content-subtle"
-          aria-live="polite"
+  <section class="space-y-5">
+    <!-- Header: validation status, meta and actions in one row. -->
+    <div class="flex flex-wrap items-center gap-3">
+      <StatusBadge
+        :label="validationStatusLabel(result.validation.status)"
+        :color="validationStatusColor(result.validation.status)"
+        class="text-sm"
+      />
+      <StatusBadge :label="sourceTypeLabel(result.source_type)" color="gray" />
+      <span class="text-xs text-content-subtle">
+        Verarbeitet in {{ Math.round(result.timing_ms.total) }} ms
+      </span>
+      <span
+        v-if="session.rerunning"
+        class="inline-flex items-center gap-1.5 text-xs text-content-subtle"
+        aria-live="polite"
+      >
+        <LoadingSpinner size="small" color="gray" inline label="" />
+        Wird neu berechnet …
+      </span>
+      <!-- Copy/download always act on the anonymized text, regardless of the
+           visible panels. -->
+      <div class="ml-auto flex flex-wrap items-center gap-2">
+        <BaseButton size="sm" variant="secondary" @click="copyAnonymized">
+          <Copy class="h-4 w-4" aria-hidden="true" />
+          Kopieren
+        </BaseButton>
+        <BaseButton size="sm" variant="secondary" @click="downloadAnonymized">
+          <Download class="h-4 w-4" aria-hidden="true" />
+          Als .txt
+        </BaseButton>
+        <BaseButton
+          v-if="canExportPdf"
+          size="sm"
+          variant="secondary"
+          :loading="exportingPdf"
+          @click="downloadRedactedPdf"
         >
-          <LoadingSpinner size="small" color="gray" inline label="" />
-          Wird neu berechnet …
-        </span>
-        <div class="ml-auto">
-          <BaseButton variant="secondary" @click="session.reset()">Neues Dokument</BaseButton>
-        </div>
+          <FileDown v-if="!exportingPdf" class="h-4 w-4" aria-hidden="true" />
+          PDF herunterladen
+        </BaseButton>
+        <BaseButton size="sm" @click="session.reset()">Neues Dokument</BaseButton>
       </div>
+    </div>
 
-      <!-- View toggle: anonymized text | source review -->
+    <!-- Panel selector: 1–3 views at once; enabling a 4th disables the oldest. -->
+    <div class="flex flex-wrap items-center gap-3">
       <div
-        class="inline-flex rounded-card border border-default bg-surface-sunken p-1"
-        role="tablist"
-        aria-label="Ansicht wählen"
+        class="inline-flex flex-wrap gap-1 rounded-card border border-default bg-surface-sunken p-1"
+        role="group"
+        aria-label="Ansichten wählen (bis zu drei gleichzeitig)"
       >
         <button
-          v-for="tab in tabs"
-          :key="tab.id"
+          v-for="panel in availablePanels"
+          :key="panel.id"
           type="button"
-          role="tab"
-          :aria-selected="activeTab === tab.id"
-          class="rounded-card px-3 py-1.5 text-sm font-medium transition-colors"
+          :aria-pressed="isActive(panel.id)"
+          class="inline-flex items-center gap-1.5 rounded-card px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :class="
-            activeTab === tab.id
+            isActive(panel.id)
               ? 'bg-surface text-content shadow-sm'
               : 'text-content-muted hover:text-content'
           "
-          @click="activeTab = tab.id"
+          @click="togglePanel(panel.id)"
         >
-          {{ tab.label }}
+          <Check v-if="isActive(panel.id)" class="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+          {{ panel.label }}
         </button>
       </div>
+      <span class="text-xs text-content-subtle">Bis zu 3 Ansichten gleichzeitig</span>
+    </div>
 
-      <!-- Anonymized text -->
-      <div v-if="activeTab === 'anonymized'" class="space-y-3">
-        <div class="flex flex-wrap gap-2">
-          <BaseButton variant="secondary" @click="copyAnonymized">
-            <Copy class="h-4 w-4" aria-hidden="true" />
-            Kopieren
-          </BaseButton>
-          <BaseButton variant="secondary" @click="downloadAnonymized">
-            <Download class="h-4 w-4" aria-hidden="true" />
-            Als .txt herunterladen
-          </BaseButton>
-          <BaseButton
-            v-if="canExportPdf"
-            variant="secondary"
-            :loading="exportingPdf"
-            @click="downloadRedactedPdf"
-          >
-            <FileDown v-if="!exportingPdf" class="h-4 w-4" aria-hidden="true" />
-            Geschwärztes PDF
-          </BaseButton>
-        </div>
-        <!-- v-text: the panel is whitespace-pre-wrap, so template indentation must not leak in. -->
-        <div
-          class="rounded-card border border-default bg-surface p-4 text-sm leading-7 whitespace-pre-wrap break-words text-content"
-          v-text="result.anonymized_text"
-        ></div>
-      </div>
-
-      <!-- Source review -->
-      <div v-else class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    <!-- Panels: equal-height cards in a responsive grid. -->
+    <div class="grid items-start gap-4" :class="gridClass">
+      <!-- Quellprüfung: interactive source review (primary view). -->
+      <section v-if="isActive('source')" :class="panelCardClass">
+        <header :class="panelHeaderClass">
+          <h3 class="text-sm font-semibold text-content">Quellprüfung</h3>
+        </header>
         <EntityHighlights
+          class="min-h-0 flex-1"
           :source-text="result.source_text"
           :entities="result.entities"
           :warnings="result.validation.warnings"
@@ -91,74 +89,113 @@
         <EntityDetailPanel
           v-if="session.selectedEntity"
           :entity="session.selectedEntity"
-          class="lg:sticky lg:top-4 self-start"
           @close="session.selectEntity(null)"
         />
-        <p v-else class="text-sm text-content-subtle lg:pt-4">
-          Klicken Sie auf eine markierte Stelle, um Details zur erkannten Entität anzuzeigen.
+        <p v-else class="shrink-0 border-t border-default px-4 py-2.5 text-xs text-content-subtle">
+          Klicken Sie auf eine markierte Stelle, um Details und Aktionen anzuzeigen.
         </p>
-      </div>
-
-      <!-- Entity counts by type -->
-      <section v-if="session.entityCounts.length > 0" class="space-y-2">
-        <h3 class="text-sm font-semibold text-content">Erkannte Entitäten</h3>
-        <div class="flex flex-wrap gap-2">
-          <StatusBadge
-            v-for="item in session.entityCounts"
-            :key="item.type"
-            :label="`${entityTypeLabel(item.type)}: ${item.count}`"
-            color="blue"
-          />
-        </div>
       </section>
-      <p v-else class="text-sm text-content-subtle">Keine Entitäten erkannt.</p>
 
-      <!-- Warnings -->
-      <WarningsList
-        :validation-warnings="result.validation.warnings"
-        :general-warnings="result.warnings"
-        @locate="showWarningInSource"
-      />
+      <!-- Redacted-PDF preview (PDF sources only; refreshed after every
+           override re-run, so it always mirrors the text result). -->
+      <section v-if="isActive('pdf')" :class="panelCardClass">
+        <header class="shrink-0 space-y-0.5 border-b border-default bg-surface-muted px-4 py-2.5">
+          <h3 class="text-sm font-semibold text-content">Geschwärztes PDF</h3>
+          <p v-if="result.source_type === 'pdf-ocr'" class="text-xs text-content-subtle">
+            Rekonstruiertes Dokument – Layout angenähert, Originalpixel werden verworfen.
+          </p>
+        </header>
+        <div
+          v-if="session.pdfPreviewLoading"
+          class="flex flex-1 items-center justify-center gap-2 p-4 text-sm text-content-subtle"
+          aria-live="polite"
+        >
+          <LoadingSpinner size="small" color="gray" inline label="" />
+          PDF wird erzeugt …
+        </div>
+        <div v-else-if="session.pdfPreviewError" class="space-y-3 p-4">
+          <p class="rounded-card px-3 py-2 text-sm" :class="getBannerClass('red')">
+            {{ session.pdfPreviewError }}
+          </p>
+          <BaseButton size="sm" variant="secondary" @click="session.refreshPdfPreview()">
+            Erneut versuchen
+          </BaseButton>
+        </div>
+        <iframe
+          v-else-if="session.pdfPreviewUrl"
+          :src="session.pdfPreviewUrl"
+          title="Geschwärztes PDF (Vorschau)"
+          class="min-h-0 w-full flex-1"
+        ></iframe>
+        <p v-else class="p-6 text-sm text-content-subtle">Keine Vorschau verfügbar.</p>
+      </section>
+
+      <!-- Original document: PDF sources render the untouched upload, text
+           sources the extracted source text. -->
+      <section v-if="isActive('original')" :class="panelCardClass">
+        <header :class="panelHeaderClass">
+          <h3 class="text-sm font-semibold text-content">Original</h3>
+        </header>
+        <template v-if="isPdfSource">
+          <iframe
+            v-if="session.originalPreviewUrl"
+            :src="session.originalPreviewUrl"
+            title="Originaldokument"
+            class="min-h-0 w-full flex-1"
+          ></iframe>
+          <p v-else class="p-6 text-sm text-content-subtle">
+            Die Originaldatei ist nicht mehr verfügbar.
+          </p>
+        </template>
+        <!-- v-text: the panel is whitespace-pre-wrap, so template indentation
+             must not leak in. -->
+        <div
+          v-else
+          class="min-h-0 flex-1 overflow-y-auto p-6 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words text-content"
+          v-text="result.source_text"
+        ></div>
+      </section>
+
+      <!-- Anonymized output as plain selectable text. -->
+      <section v-if="isActive('anonymized')" :class="panelCardClass">
+        <header :class="panelHeaderClass">
+          <h3 class="text-sm font-semibold text-content">Anonymisierter Text</h3>
+        </header>
+        <div
+          class="min-h-0 flex-1 overflow-y-auto p-6 font-sans text-[15px] leading-relaxed whitespace-pre-wrap break-words text-content"
+          v-text="result.anonymized_text"
+        ></div>
+      </section>
     </div>
 
-    <!-- Redacted-PDF preview (PDF sources only; refreshed after every
-         override re-run, so it always mirrors the text result). -->
-    <aside v-if="showPdfPanel" class="min-w-0 space-y-2">
-      <h3 class="text-sm font-semibold text-content">Geschwärztes PDF</h3>
-      <p v-if="result.source_type === 'pdf-ocr'" class="text-xs text-content-subtle">
-        Rekonstruiertes Dokument – Layout angenähert, Originalpixel werden verworfen.
-      </p>
-      <div
-        v-if="session.pdfPreviewLoading"
-        class="flex items-center gap-2 rounded-card border border-default bg-surface p-4 text-sm text-content-subtle"
-        aria-live="polite"
-      >
-        <LoadingSpinner size="small" color="gray" inline label="" />
-        PDF wird erzeugt …
-      </div>
-      <div
-        v-else-if="session.pdfPreviewError"
-        class="space-y-3 rounded-card px-3 py-2 text-sm"
-        :class="getBannerClass('red')"
-      >
-        <p>{{ session.pdfPreviewError }}</p>
-        <BaseButton variant="secondary" @click="session.refreshPdfPreview()">
-          Erneut versuchen
-        </BaseButton>
-      </div>
-      <iframe
-        v-else-if="session.pdfPreviewUrl"
-        :src="session.pdfPreviewUrl"
-        title="Geschwärztes PDF (Vorschau)"
-        class="h-[72vh] w-full rounded-card border border-default bg-surface"
-      ></iframe>
-    </aside>
+    <!-- Entity counts by type -->
+    <section
+      v-if="session.entityCounts.length > 0"
+      class="flex flex-wrap items-center gap-2"
+      aria-label="Erkannte Entitäten"
+    >
+      <h3 class="text-sm font-semibold text-content">Erkannte Entitäten:</h3>
+      <StatusBadge
+        v-for="item in session.entityCounts"
+        :key="item.type"
+        :label="`${entityTypeLabel(item.type)}: ${item.count}`"
+        color="blue"
+      />
+    </section>
+    <p v-else class="text-sm text-content-subtle">Keine Entitäten erkannt.</p>
+
+    <!-- Warnings -->
+    <WarningsList
+      :validation-warnings="result.validation.warnings"
+      :general-warnings="result.warnings"
+      @locate="showWarningInSource"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Copy, Download, FileDown } from '@lucide/vue'
+import { Check, Copy, Download, FileDown } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -189,12 +226,70 @@ const session = useSessionStore()
 const toast = useToast()
 const { downloadBlob, downloadFromApi } = useFileDownload()
 
-type TabId = 'anonymized' | 'source'
-const tabs: { id: TabId; label: string }[] = [
-  { id: 'anonymized', label: 'Anonymisierter Text' },
-  { id: 'source', label: 'Quellprüfung' },
-]
-const activeTab = ref<TabId>('anonymized')
+/** Shared card chrome so all panel columns align at the same height. */
+const panelCardClass =
+  'flex h-[72vh] min-w-0 flex-col overflow-hidden rounded-card border border-default bg-surface'
+const panelHeaderClass =
+  'flex shrink-0 items-baseline gap-2 border-b border-default bg-surface-muted px-4 py-2.5'
+
+const isPdfSource = computed(
+  () => props.result.source_type === 'pdf' || props.result.source_type === 'pdf-ocr',
+)
+
+type PanelId = 'source' | 'pdf' | 'original' | 'anonymized'
+
+const availablePanels = computed<{ id: PanelId; label: string }[]>(() => {
+  const panels: { id: PanelId; label: string }[] = [{ id: 'source', label: 'Quellprüfung' }]
+  if (isPdfSource.value) panels.push({ id: 'pdf', label: 'Geschwärztes PDF' })
+  panels.push(
+    { id: 'original', label: 'Original' },
+    { id: 'anonymized', label: 'Anonymisierter Text' },
+  )
+  return panels
+})
+
+/**
+ * Active panels in ACTIVATION order (oldest first) — enabling a 4th panel
+ * evicts the oldest-activated one. The template renders them in a fixed
+ * canonical order regardless. Quellprüfung is the default; PDF sources start
+ * with the redacted-PDF preview alongside.
+ */
+const activePanels = ref<PanelId[]>(isPdfSource.value ? ['source', 'pdf'] : ['source'])
+
+function isActive(id: PanelId): boolean {
+  return activePanels.value.includes(id)
+}
+
+function activatePanel(id: PanelId): void {
+  if (activePanels.value.includes(id)) return
+  // The original-PDF object URL is created lazily on first activation.
+  if (id === 'original' && isPdfSource.value) session.ensureOriginalPreviewUrl()
+  activePanels.value.push(id)
+  if (activePanels.value.length > 3) activePanels.value.shift()
+}
+
+function togglePanel(id: PanelId): void {
+  const index = activePanels.value.indexOf(id)
+  if (index === -1) {
+    activatePanel(id)
+    return
+  }
+  // At least one panel stays visible.
+  if (activePanels.value.length === 1) return
+  activePanels.value.splice(index, 1)
+}
+
+const gridClass = computed(() => {
+  switch (activePanels.value.length) {
+    case 1:
+      return 'grid-cols-1'
+    case 2:
+      return 'grid-cols-1 lg:grid-cols-2'
+    default:
+      // Three columns only on very wide screens; two columns wrapping at lg.
+      return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'
+  }
+})
 
 async function copyAnonymized() {
   try {
@@ -213,20 +308,7 @@ function downloadAnonymized() {
  * Redacted-PDF export is only possible for PDF sources AND while the original
  * File is still held in memory (it is re-sent — the server stores nothing).
  */
-const canExportPdf = computed(
-  () =>
-    (props.result.source_type === 'pdf' || props.result.source_type === 'pdf-ocr') &&
-    session.sourceFile !== null,
-)
-
-/**
- * Show the preview panel whenever there is (or will be) something to show:
- * a loaded preview, one in flight, or a failed export with its retry button.
- */
-const showPdfPanel = computed(
-  () =>
-    session.pdfPreviewUrl !== null || session.pdfPreviewLoading || session.pdfPreviewError !== null,
-)
+const canExportPdf = computed(() => isPdfSource.value && session.sourceFile !== null)
 
 const exportingPdf = ref(false)
 
@@ -248,7 +330,7 @@ async function downloadRedactedPdf() {
   exportingPdf.value = true
   try {
     await downloadFromApi(
-      () => anonymizeApi.exportPdf(file, requestId, overrides),
+      () => anonymizeApi.exportPdf(file, requestId, overrides, session.policyOverrides),
       'anonymisiert.pdf',
     )
   } catch (err) {
@@ -258,7 +340,8 @@ async function downloadRedactedPdf() {
   }
 }
 
+/** "Im Text anzeigen" from the warnings list: make sure the review is visible. */
 function showWarningInSource() {
-  activeTab.value = 'source'
+  activatePanel('source')
 }
 </script>

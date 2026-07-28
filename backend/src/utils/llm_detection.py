@@ -331,15 +331,18 @@ class LLMDetector:
 _YEAR_ONLY = re.compile(r"(?:19|20)\d{2}")
 
 
-async def recheck_output(anonymized: str, settings: Settings) -> list[ValidationWarning]:
+async def recheck_output(
+    anonymized: str, settings: Settings, policy=None
+) -> list[ValidationWarning]:
     """Independent LLM audit of the anonymized output (warnings only).
 
     A different task framing ("what PII remains?") catches misses the
     extraction framing can produce. Never edits the output; failures degrade
     to a warning so the deterministic validation still stands on its own.
     """
-    from .policy import DEFAULT_POLICY
+    from .policy import merge_policy
 
+    active_policy = merge_policy(policy)
     detector = LLMDetector(settings)
     semaphore = asyncio.Semaphore(settings.LLM_MAX_CONCURRENT_REQUESTS)
 
@@ -365,7 +368,7 @@ async def recheck_output(anonymized: str, settings: Settings) -> list[Validation
         mention
         for mention in unique
         if "[" not in mention.text
-        and DEFAULT_POLICY.get(mention.entity_type) != TransformationType.PRESERVE
+        and active_policy.get(mention.entity_type) != TransformationType.PRESERVE
         and not _YEAR_ONLY.fullmatch(mention.text.strip())
     ]
     spans, ground_warnings = ground_mentions(anonymized, filtered)

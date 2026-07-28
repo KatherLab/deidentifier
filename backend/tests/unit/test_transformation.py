@@ -60,8 +60,8 @@ def test_age_masked_by_default():
 
 
 def test_generalize_via_explicit_policy():
-    from backend.src.utils.policy import DEFAULT_POLICY
     from backend.src.schemas.entities import TransformationType
+    from backend.src.utils.policy import DEFAULT_POLICY
 
     text, spans = make(
         "geboren am 01.02.1980 in Dresden", [("01.02.1980", EntityType.DATE_OF_BIRTH)]

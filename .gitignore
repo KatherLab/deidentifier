@@ -25,3 +25,6 @@ backend/.env.*
 .idea/
 .vscode/
 .DS_Store
+
+# Claude Code session settings
+.claude/

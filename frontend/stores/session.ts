@@ -9,6 +9,7 @@ import { defineStore } from 'pinia'
 import { anonymizeApi } from '@/services/anonymizeApi'
 import { statusApi } from '@/services/statusApi'
 import { extractPdfExportErrorMessage, isExpiredResultError } from '@/utils/errors'
+import { DEFAULT_POLICY, policyDeviations } from '@/utils/policy'
 import type {
   AnonymizeResponse,
   AnonymizedEntity,
@@ -16,6 +17,7 @@ import type {
   EntityType,
   ExternalEndpoint,
   Override,
+  PolicyMap,
   StatusResponse,
   TransformationType,
 } from '@/types/anonymizer'
@@ -39,6 +41,13 @@ export const useSessionStore = defineStore('session', () => {
    */
   const sourceFile = ref<File | null>(null)
 
+  /**
+   * Editable default policy (advanced settings on the landing page). Memory
+   * only — never persisted. Only DEVIATIONS from DEFAULT_POLICY are sent to
+   * the backend (as the request-level `policy` field on every request).
+   */
+  const policy = ref<Record<EntityType, TransformationType>>({ ...DEFAULT_POLICY })
+
   /** Accumulated per-entity overrides, keyed by `${start}:${end}`. */
   const overrides = ref<Map<string, Override>>(new Map())
   /** True while an override re-run is in flight (result view stays visible). */
@@ -56,6 +65,13 @@ export const useSessionStore = defineStore('session', () => {
   const pdfPreviewError = ref<string | null>(null)
   /** Bumped on every refresh/clear so stale in-flight responses are ignored. */
   let pdfPreviewToken = 0
+
+  /**
+   * Object URL for the ORIGINAL uploaded PDF (the "Original" result panel).
+   * Created lazily on first activation of that panel, revoked on reset/new
+   * result. Memory only — never persisted.
+   */
+  const originalPreviewUrl = ref<string | null>(null)
 
   const status = ref<StatusResponse | null>(null)
   const externalBannerDismissed = ref(false)
@@ -89,6 +105,20 @@ export const useSessionStore = defineStore('session', () => {
     () => status.value?.detectors.filter((detector) => detector.enabled && !detector.ready) ?? [],
   )
 
+  /** The deviations from the default policy to send with requests (or null). */
+  const policyOverrides = computed<PolicyMap | null>(() => policyDeviations(policy.value))
+
+  /** True when the user changed any policy entry (badge in advanced settings). */
+  const policyCustomized = computed(() => policyOverrides.value !== null)
+
+  function setPolicyTransformation(type: EntityType, transformation: TransformationType): void {
+    policy.value = { ...policy.value, [type]: transformation }
+  }
+
+  function resetPolicy(): void {
+    policy.value = { ...DEFAULT_POLICY }
+  }
+
   /** The pending override for an entity, if any. */
   function overrideFor(entity: { start: number; end: number }): Override | undefined {
     return overrides.value.get(overrideKey(entity))
@@ -110,6 +140,25 @@ export const useSessionStore = defineStore('session', () => {
   /** True when the response was produced from a PDF (redactable source). */
   function isPdfResult(response: AnonymizeResponse | null): boolean {
     return response?.source_type === 'pdf' || response?.source_type === 'pdf-ocr'
+  }
+
+  /**
+   * Lazily create the object URL for the ORIGINAL uploaded PDF (used by the
+   * "Original" panel for PDF sources). Returns null when the original file is
+   * gone or the result is not a PDF.
+   */
+  function ensureOriginalPreviewUrl(): string | null {
+    if (originalPreviewUrl.value !== null) return originalPreviewUrl.value
+    const file = sourceFile.value
+    if (file === null || !isPdfResult(result.value)) return null
+    originalPreviewUrl.value = URL.createObjectURL(file)
+    return originalPreviewUrl.value
+  }
+
+  /** Revoke the original-document object URL, if any. */
+  function clearOriginalPreview(): void {
+    if (originalPreviewUrl.value !== null) URL.revokeObjectURL(originalPreviewUrl.value)
+    originalPreviewUrl.value = null
   }
 
   /** Revoke the preview object URL and drop all preview state. */
@@ -139,9 +188,12 @@ export const useSessionStore = defineStore('session', () => {
     pdfPreviewLoading.value = true
     pdfPreviewError.value = null
     try {
-      const { data } = await anonymizeApi.exportPdf(file, current.request_id, [
-        ...overrides.value.values(),
-      ])
+      const { data } = await anonymizeApi.exportPdf(
+        file,
+        current.request_id,
+        [...overrides.value.values()],
+        policyOverrides.value,
+      )
       if (token !== pdfPreviewToken) return
       if (pdfPreviewUrl.value !== null) URL.revokeObjectURL(pdfPreviewUrl.value)
       pdfPreviewBlob.value = data
@@ -161,8 +213,9 @@ export const useSessionStore = defineStore('session', () => {
       result.value = data
       selectedEntityIndex.value = null
       overrides.value = new Map()
-      // A new result invalidates any previous redacted-PDF preview.
+      // A new result invalidates any previous document previews.
       clearPdfPreview()
+      clearOriginalPreview()
       phase.value = 'result'
     } catch (err) {
       phase.value = 'idle'
@@ -189,12 +242,16 @@ export const useSessionStore = defineStore('session', () => {
     try {
       let response: AnonymizeResponse
       try {
-        response = (await anonymizeApi.rerunWithOverrides(requestId, allOverrides)).data
+        response = (
+          await anonymizeApi.rerunWithOverrides(requestId, allOverrides, policyOverrides.value)
+        ).data
       } catch (err) {
         if (!isExpiredResultError(err)) throw err
         // Cache expired — re-detect from the original text with the same
         // overrides; the response carries a fresh request_id.
-        response = (await anonymizeApi.anonymizeText(sourceText, allOverrides)).data
+        response = (
+          await anonymizeApi.anonymizeText(sourceText, allOverrides, policyOverrides.value)
+        ).data
       }
       result.value = response
       // Re-select the same entity by offsets (indices may shift on re-runs).
@@ -254,13 +311,13 @@ export const useSessionStore = defineStore('session', () => {
 
   /** Anonymize pasted text. Rejects with the API error (caller shows a toast). */
   async function submitText(text: string): Promise<void> {
-    await run(() => anonymizeApi.anonymizeText(text))
+    await run(() => anonymizeApi.anonymizeText(text, undefined, policyOverrides.value))
     sourceFile.value = null
   }
 
   /** Anonymize an uploaded file. Rejects with the API error (caller shows a toast). */
   async function submitFile(file: File): Promise<void> {
-    await run(() => anonymizeApi.anonymizeFile(file))
+    await run(() => anonymizeApi.anonymizeFile(file, policyOverrides.value))
     sourceFile.value = file
     // For PDF sources, load the redacted-PDF preview right away (not awaited —
     // the text result is already usable while the preview renders).
@@ -278,6 +335,7 @@ export const useSessionStore = defineStore('session', () => {
     overrides.value = new Map()
     sourceFile.value = null
     clearPdfPreview()
+    clearOriginalPreview()
     phase.value = 'idle'
   }
 
@@ -290,11 +348,18 @@ export const useSessionStore = defineStore('session', () => {
     entityCounts,
     overrides,
     rerunning,
+    policy,
+    policyOverrides,
+    policyCustomized,
+    setPolicyTransformation,
+    resetPolicy,
     pdfPreviewUrl,
     pdfPreviewBlob,
     pdfPreviewLoading,
     pdfPreviewError,
     refreshPdfPreview,
+    originalPreviewUrl,
+    ensureOriginalPreviewUrl,
     status,
     externalEndpoints,
     showExternalBanner,

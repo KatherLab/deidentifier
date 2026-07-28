@@ -15,6 +15,7 @@ from ..schemas.entities import EntitySpan, ValidationResult, ValidationSeverity,
 from .cache import CachedDetection, request_cache
 from .detection import build_detectors, validate_spans
 from .leakage import compute_status, validate_output
+from .policy import merge_policy
 from .resolver import resolve_spans
 from .transformation import apply_policy
 
@@ -26,6 +27,7 @@ async def run_anonymization(
     extraction_ms: float = 0.0,
     extraction_warnings: list[str] | None = None,
     overrides: list[EntityOverride] | None = None,
+    policy=None,
     file_sha256: str | None = None,
     layout: list | None = None,
     page_count: int = 0,
@@ -68,6 +70,7 @@ async def run_anonymization(
         warnings=list(extraction_warnings or []),
         detector_warnings=detection_warnings,
         overrides=overrides,
+        policy=policy,
         extraction_ms=extraction_ms,
         detection_ms=detection_ms,
         recheck_settings=settings if recheck_enabled else None,
@@ -78,6 +81,7 @@ async def run_anonymization(
 async def rerun_with_overrides(
     request_id: str,
     overrides: list[EntityOverride],
+    policy=None,
 ) -> AnonymizeResponse | None:
     """Re-run transformation + validation from cached detection results.
 
@@ -95,6 +99,7 @@ async def rerun_with_overrides(
         warnings=list(entry.extraction_warnings),
         detector_warnings=list(entry.detection_warnings),
         overrides=overrides,
+        policy=policy,
         extraction_ms=0.0,
         detection_ms=0.0,
         recheck_settings=None,
@@ -111,21 +116,27 @@ async def _finalize(
     warnings: list[str],
     detector_warnings: list[str],
     overrides: list[EntityOverride] | None,
+    policy,
     extraction_ms: float,
     detection_ms: float,
     recheck_settings: Settings | None,
     recheck_skipped_note: bool,
 ) -> AnonymizeResponse:
+    active_policy = merge_policy(policy)
     t1 = time.perf_counter()
-    anonymized, applied, override_warnings = apply_policy(text, resolved, overrides=overrides)
+    anonymized, applied, override_warnings = apply_policy(
+        text, resolved, policy=active_policy, overrides=overrides
+    )
     t2 = time.perf_counter()
-    validation = await validate_output(anonymized, applied, detector_warnings=detector_warnings)
+    validation = await validate_output(
+        anonymized, applied, policy=active_policy, detector_warnings=detector_warnings
+    )
 
     extra_warnings: list[ValidationWarning] = []
     if recheck_settings is not None:
         from .llm_detection import recheck_output
 
-        extra_warnings = await recheck_output(anonymized, recheck_settings)
+        extra_warnings = await recheck_output(anonymized, recheck_settings, policy=active_policy)
     elif recheck_skipped_note:
         extra_warnings = [
             ValidationWarning(

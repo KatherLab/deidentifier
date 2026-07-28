@@ -23,6 +23,9 @@ class AnonymizeTextRequest(BaseModel):
     text: str | None = Field(default=None, min_length=1)
     request_id: str | None = None
     overrides: list[EntityOverride] = Field(default_factory=list)
+    # Partial per-type policy from the UI's advanced settings; overlays the
+    # default policy. Sent with every request (stateless, like overrides).
+    policy: dict[EntityType, TransformationType] | None = None
 
     @model_validator(mode="after")
     def _text_or_request_id(self) -> "AnonymizeTextRequest":

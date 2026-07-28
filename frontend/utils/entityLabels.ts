@@ -115,18 +115,21 @@ export function severityColor(severity: string): string {
 }
 
 /**
- * Highlight classes for entity spans in the source-review view, by entity
- * status: REDACTED red-ish, GENERALIZED amber, TAGGED blue, PRESERVED gray
- * outline. Paired with a visible label chip in EntityHighlights.vue.
+ * Highlight classes for entity marks in the source-review view, by entity
+ * status: REDACTED red-ish, GENERALIZED amber, TAGGED blue, PRESERVED neutral
+ * outline. Subtle tinted background with a thin ring on hover; selection adds
+ * a strong ring in EntityHighlights.vue. Never color alone — every mark also
+ * carries a text tooltip/aria label.
  */
 export const ENTITY_HIGHLIGHT_CLASSES: Record<EntityStatus, string> = {
   REDACTED:
-    'bg-red-100 text-red-900 ring-1 ring-red-300 dark:bg-red-900/40 dark:text-red-200 dark:ring-red-700',
+    'bg-red-100 text-red-900 hover:ring-1 hover:ring-red-400 dark:bg-red-900/40 dark:text-red-200 dark:hover:ring-red-600',
   GENERALIZED:
-    'bg-amber-100 text-amber-900 ring-1 ring-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:ring-amber-700',
+    'bg-amber-100 text-amber-900 hover:ring-1 hover:ring-amber-400 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:ring-amber-600',
   TAGGED:
-    'bg-blue-100 text-blue-900 ring-1 ring-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:ring-blue-700',
-  PRESERVED: 'bg-transparent text-content ring-1 ring-slate-400 dark:ring-slate-500',
+    'bg-blue-100 text-blue-900 hover:ring-1 hover:ring-blue-400 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:ring-blue-600',
+  PRESERVED:
+    'bg-transparent text-content ring-1 ring-slate-400 hover:ring-slate-600 dark:ring-slate-500 dark:hover:ring-slate-300',
 }
 
 export function entityHighlightClass(status: string): string {
@@ -137,17 +140,16 @@ export function entityHighlightClass(status: string): string {
 export const WARNING_HIGHLIGHT_CLASS =
   'bg-yellow-100 text-yellow-900 ring-1 ring-yellow-400 dark:bg-yellow-900/40 dark:text-yellow-200 dark:ring-yellow-600'
 
-/** Small label chip inside a highlight, by entity status. */
-export const ENTITY_CHIP_CLASSES: Record<EntityStatus, string> = {
-  REDACTED: 'bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100',
-  GENERALIZED: 'bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100',
-  TAGGED: 'bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-blue-100',
-  PRESERVED: 'bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-100',
+/** Compact legend dot per entity status (always paired with a text label). */
+export const ENTITY_DOT_CLASSES: Record<EntityStatus, string> = {
+  REDACTED: 'bg-red-400 dark:bg-red-500',
+  GENERALIZED: 'bg-amber-400 dark:bg-amber-500',
+  TAGGED: 'bg-blue-400 dark:bg-blue-500',
+  PRESERVED: 'bg-transparent ring-1 ring-inset ring-slate-400 dark:ring-slate-500',
 }
 
-export function entityChipClass(status: string): string {
-  return ENTITY_CHIP_CLASSES[status as EntityStatus] ?? ENTITY_CHIP_CLASSES.PRESERVED
-}
+/** Legend dot for validation-warning locations. */
+export const WARNING_DOT_CLASS = 'bg-yellow-400 dark:bg-yellow-500'
 
 /** StatusBadge pill color per entity status (legend, detail panel). */
 export const ENTITY_STATUS_PILL_COLORS: Record<EntityStatus, string> = {

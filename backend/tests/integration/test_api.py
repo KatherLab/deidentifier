@@ -176,6 +176,46 @@ def test_export_pdf_native_with_cached_detection(client):
     assert extracted.strip() == ""
 
 
+def test_custom_policy_overlays_defaults(client):
+    response = client.post(
+        "/api/v1/anonymize",
+        json={
+            "text": SAMPLE_TEXT,
+            "policy": {"DATE_OF_BIRTH": "GENERALIZE", "ADDRESS": "PRESERVE"},
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "geb. 1980" in body["anonymized_text"]  # GENERALIZE instead of mask
+    assert "Musterstraße 12" in body["anonymized_text"]  # ADDRESS preserved
+    assert "Max Mustermann" not in body["anonymized_text"]  # defaults intact
+
+
+def test_custom_policy_carries_into_override_rerun(client):
+    first = client.post(
+        "/api/v1/anonymize",
+        json={"text": SAMPLE_TEXT, "policy": {"DATE_OF_BIRTH": "GENERALIZE"}},
+    ).json()
+    second = client.post(
+        "/api/v1/anonymize",
+        json={
+            "request_id": first["request_id"],
+            "overrides": [],
+            "policy": {"DATE_OF_BIRTH": "GENERALIZE"},
+        },
+    )
+    assert second.status_code == 200
+    assert "geb. 1980" in second.json()["anonymized_text"]
+
+
+def test_invalid_policy_rejected(client):
+    response = client.post(
+        "/api/v1/anonymize",
+        json={"text": "Ein Text.", "policy": {"NO_SUCH_TYPE": "TYPE_MASK"}},
+    )
+    assert response.status_code == 422
+
+
 def test_export_pdf_rejects_non_pdf(client):
     response = client.post(
         "/api/v1/export/pdf", files={"file": ("brief.txt", b"text", "text/plain")}

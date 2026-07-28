@@ -39,3 +39,13 @@ TYPE_MASK_LABELS: dict[EntityType, str] = {
 }
 
 REDACTED_LABEL = "[GESCHWÄRZT]"
+
+
+def merge_policy(
+    partial: dict[EntityType, TransformationType] | None,
+) -> dict[EntityType, TransformationType]:
+    """A request-level policy overlays the defaults (advanced settings in the
+    UI); omitted types keep their default transformation."""
+    if not partial:
+        return DEFAULT_POLICY
+    return {**DEFAULT_POLICY, **partial}

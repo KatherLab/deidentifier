@@ -68,16 +68,25 @@ export interface Override {
   entity_type?: EntityType
 }
 
+/**
+ * Request-level policy: entity type → transformation, overlaying the backend
+ * defaults. Only DEVIATIONS from the defaults need to be sent; omitted types
+ * keep their default transformation.
+ */
+export type PolicyMap = Partial<Record<EntityType, TransformationType>>
+
 /** Fresh run from raw text (optionally with overrides, e.g. after a 410). */
 export interface AnonymizeTextRequest {
   text: string
   overrides?: Override[]
+  policy?: PolicyMap
 }
 
 /** Cheap re-run from the backend's cached detection of a previous request. */
 export interface AnonymizeRerunRequest {
   request_id: string
   overrides: Override[]
+  policy?: PolicyMap
 }
 
 export type AnonymizeRequest = AnonymizeTextRequest | AnonymizeRerunRequest

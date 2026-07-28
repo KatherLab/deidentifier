@@ -1,103 +1,62 @@
 <template>
+  <!-- Compact footer bar inside the Quellprüfung card for the selected entity. -->
   <aside
-    class="rounded-card border border-default bg-surface-muted p-4 space-y-3"
+    class="shrink-0 border-t border-default bg-surface-muted px-4 py-3"
     aria-label="Details zur ausgewählten Entität"
   >
-    <div class="flex items-start justify-between gap-2">
-      <h3 class="text-sm font-semibold text-content">Entitäts-Details</h3>
-      <BaseButton variant="icon" tone="gray" aria-label="Details schließen" @click="emit('close')">
-        <X class="h-4 w-4" aria-hidden="true" />
-      </BaseButton>
-    </div>
-
-    <dl class="space-y-3 text-sm">
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-content-subtle">Erkannter Text</dt>
-        <dd class="mt-0.5 font-mono text-content break-all">{{ entity.text }}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-content-subtle">Typ</dt>
-        <dd class="mt-0.5 flex flex-wrap items-center gap-1.5">
+    <div class="flex items-start gap-2">
+      <div class="min-w-0 flex-1 space-y-2">
+        <!-- Facts row: text, type, status, replacement, provenance. -->
+        <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span
+            class="max-w-60 truncate font-mono text-sm font-medium text-content"
+            :title="entity.text"
+            >{{ entity.text }}</span
+          >
           <StatusBadge :label="entityTypeLabel(entity.entity_type)" color="blue" />
-          <StatusBadge v-if="isOverridden" label="Geändert" color="purple" />
-        </dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-content-subtle">Status</dt>
-        <dd class="mt-0.5">
           <StatusBadge
             :label="entityStatusLabel(entity.status)"
             :color="entityStatusPillColor(entity.status)"
           />
-        </dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-content-subtle">Transformation</dt>
-        <dd class="mt-0.5 text-content">{{ transformationLabel(entity.transformation) }}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-content-subtle">Ersetzt durch</dt>
-        <dd class="mt-0.5 font-mono text-content break-all">
-          <template v-if="entity.replacement !== null">{{ entity.replacement }}</template>
-          <span v-else class="font-sans text-content-subtle">— (keine Ersetzung)</span>
-        </dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-content-subtle">Detektor</dt>
-        <dd class="mt-0.5 text-content">{{ entity.detector }}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-content-subtle">Konfidenz</dt>
-        <dd class="mt-0.5 text-content">{{ confidenceLabel }}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-content-subtle">Position</dt>
-        <dd class="mt-0.5 text-content">Zeichen {{ entity.start }}–{{ entity.end }}</dd>
-      </div>
-    </dl>
+          <StatusBadge v-if="isOverridden" label="Geändert" color="purple" />
+          <span
+            v-if="entity.replacement !== null"
+            class="font-mono text-xs text-content-muted"
+            :title="`Ersetzt durch ${entity.replacement}`"
+            >→ {{ entity.replacement }}</span
+          >
+          <span class="text-xs text-content-subtle">
+            {{ transformationLabel(entity.transformation) }} · {{ entity.detector }} ·
+            {{ confidenceLabel }} · Zeichen {{ entity.start }}–{{ entity.end }}
+          </span>
+        </div>
 
-    <!-- Override actions -->
-    <div class="space-y-3 border-t border-default pt-3">
-      <h4 class="text-xs uppercase tracking-wide text-content-subtle">Aktionen</h4>
-
-      <div class="flex flex-wrap items-center gap-2">
-        <BaseButton
-          v-if="entity.status !== 'PRESERVED'"
-          size="sm"
-          variant="secondary"
-          :disabled="rerunning"
-          @click="setTransformation('PRESERVE')"
-        >
-          Beibehalten
-        </BaseButton>
-        <BaseButton
-          v-else
-          size="sm"
-          variant="secondary"
-          :disabled="rerunning"
-          @click="setTransformation('TYPE_MASK')"
-        >
-          Schwärzen
-        </BaseButton>
-        <BaseButton
-          v-if="hasOverride"
-          size="sm"
-          variant="ghost"
-          :disabled="rerunning"
-          @click="resetOverride"
-        >
-          Zurücksetzen
-        </BaseButton>
-      </div>
-
-      <div class="space-y-1.5">
-        <label :for="typeSelectId" class="block text-xs text-content-subtle">Entitätstyp</label>
-        <div class="flex items-center gap-2">
+        <!-- Actions row. -->
+        <div class="flex flex-wrap items-center gap-2">
+          <BaseButton
+            v-if="entity.status !== 'PRESERVED'"
+            size="sm"
+            variant="secondary"
+            :disabled="rerunning"
+            @click="setTransformation('PRESERVE')"
+          >
+            Beibehalten
+          </BaseButton>
+          <BaseButton
+            v-else
+            size="sm"
+            variant="secondary"
+            :disabled="rerunning"
+            @click="setTransformation('TYPE_MASK')"
+          >
+            Schwärzen
+          </BaseButton>
+          <label :for="typeSelectId" class="sr-only">Entitätstyp</label>
           <select
             :id="typeSelectId"
             v-model="selectedType"
             :disabled="rerunning"
-            class="min-w-0 flex-1 rounded-card border border-strong bg-surface px-2 py-1.5 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            class="rounded-card border border-strong bg-surface px-2 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           >
             <option v-for="(label, type) in ENTITY_TYPE_LABELS" :key="type" :value="type">
               {{ label }}
@@ -111,17 +70,28 @@
           >
             Typ ändern
           </BaseButton>
+          <BaseButton
+            v-if="hasOverride"
+            size="sm"
+            variant="ghost"
+            :disabled="rerunning"
+            @click="resetOverride"
+          >
+            Zurücksetzen
+          </BaseButton>
+          <span
+            v-if="rerunning"
+            class="inline-flex items-center gap-1.5 text-xs text-content-subtle"
+            aria-live="polite"
+          >
+            <LoadingSpinner size="small" color="gray" inline label="" />
+            Wird neu berechnet …
+          </span>
         </div>
       </div>
-
-      <p
-        v-if="rerunning"
-        class="flex items-center gap-2 text-xs text-content-subtle"
-        aria-live="polite"
-      >
-        <LoadingSpinner size="small" color="gray" inline label="" />
-        Wird neu berechnet …
-      </p>
+      <BaseButton variant="icon" tone="gray" aria-label="Details schließen" @click="emit('close')">
+        <X class="h-4 w-4" aria-hidden="true" />
+      </BaseButton>
     </div>
   </aside>
 </template>

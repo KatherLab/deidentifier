@@ -66,7 +66,9 @@ async def _handle_json(request: Request, settings: Settings) -> AnonymizeRespons
 
     # Override re-run from cached detection results.
     if payload.text is None:
-        response = await rerun_with_overrides(payload.request_id or "", payload.overrides)
+        response = await rerun_with_overrides(
+            payload.request_id or "", payload.overrides, policy=payload.policy
+        )
         if response is None:
             raise HTTPException(
                 status_code=410,
@@ -75,11 +77,14 @@ async def _handle_json(request: Request, settings: Settings) -> AnonymizeRespons
         return response
 
     _check_text_limits(payload.text, settings)
-    return await _run(payload.text, settings, "paste", overrides=payload.overrides or None)
+    return await _run(
+        payload.text, settings, "paste", overrides=payload.overrides or None, policy=payload.policy
+    )
 
 
 async def _handle_upload(request: Request, settings: Settings) -> AnonymizeResponse:
     form = await request.form()
+    policy = _parse_policy_form(form.get("policy"))
     upload = form.get("file")
     if not isinstance(upload, UploadFile):
         raise HTTPException(status_code=400, detail="Multipart field 'file' is required.")
@@ -109,6 +114,7 @@ async def _handle_upload(request: Request, settings: Settings) -> AnonymizeRespo
         extracted.source_type,
         extraction_ms=extraction_ms,
         extraction_warnings=extracted.warnings,
+        policy=policy,
         file_sha256=hashlib.sha256(data).hexdigest(),
         layout=extracted.layout,
         page_count=len(extracted.pages),
@@ -122,6 +128,7 @@ async def _run(
     extraction_ms: float = 0.0,
     extraction_warnings: list[str] | None = None,
     overrides=None,
+    policy=None,
     file_sha256: str | None = None,
     layout=None,
     page_count: int = 0,
@@ -134,12 +141,29 @@ async def _run(
             extraction_ms=extraction_ms,
             extraction_warnings=extraction_warnings,
             overrides=overrides,
+            policy=policy,
             file_sha256=file_sha256,
             layout=layout,
             page_count=page_count,
         )
     except DetectorError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+
+
+def _parse_policy_form(raw) -> dict | None:
+    """Parse the multipart 'policy' field (JSON object) if present."""
+    import json
+
+    from pydantic import TypeAdapter
+
+    from ....schemas.entities import EntityType, TransformationType
+
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        return TypeAdapter(dict[EntityType, TransformationType]).validate_python(json.loads(raw))
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid 'policy' payload.") from None
 
 
 def _check_text_limits(text: str, settings: Settings) -> None:
