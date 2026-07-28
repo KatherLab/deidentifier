@@ -129,6 +129,55 @@ def test_native_redaction_produces_textless_pdf_with_black_boxes():
     redacted.close()
 
 
+def test_native_generalized_dob_shows_year_not_black_bar():
+    import pypdfium2 as pdfium
+
+    source_line = "Patient geboren am 01.02.1980 in Dresden"
+    pdf = make_pdf([source_line])
+
+    document = pdfium.PdfDocument(pdf)
+    page = document[0]
+    page_width, page_height = page.get_size()
+    textpage = page.get_textpage()
+    searcher = textpage.search("01.02.1980", match_case=True)
+    index, count = searcher.get_next()
+    left, bottom, right, top = textpage.get_charbox(index)
+    document.close()
+
+    entity = AppliedEntity(
+        start=19,
+        end=29,
+        text="01.02.1980",
+        entity_type=EntityType.DATE_OF_BIRTH,
+        confidence=0.9,
+        detector="test",
+        transformation=TransformationType.GENERALIZE,
+        replacement="1980",
+        status=SpanStatus.GENERALIZED,
+    )
+    output = redact_native_pdf(pdf, [entity], native_settings())
+
+    scale = native_settings().VISION_OCR_RENDER_SCALE
+    redacted = pdfium.PdfDocument(output)
+    image = redacted[0].render(scale=scale).to_pil().convert("L")
+    redacted.close()
+    # Crop the region where the date was: must contain white background
+    # (erased) AND some dark pixels (the replacement year) — not a black bar.
+    crop = image.crop(
+        (
+            int(left * scale),
+            int((page_height - top - 2) * scale),
+            int((right + 20) * scale),
+            int((page_height - bottom + 2) * scale),
+        )
+    )
+    pixels = list(crop.getdata())
+    dark = sum(1 for value in pixels if value < 100)
+    light = sum(1 for value in pixels if value > 200)
+    assert light > len(pixels) * 0.4, "expected mostly erased (white) region"
+    assert 0 < dark < len(pixels) * 0.5, "expected replacement text, not a solid black bar"
+
+
 def test_native_redaction_fails_closed_when_entity_not_found():
     pdf = make_pdf(["Ganz anderer Inhalt ohne Namen."])
     entities = [applied("Nicht Vorhandener Name", 0)]
@@ -188,6 +237,26 @@ def test_rebuild_places_anonymized_text_and_verifies():
     assert "[PERSON_1]" in extracted
     assert "Akute Cholezystitis" in extracted
     assert "rekonstruiertes" in extracted  # the reconstruction notice
+
+
+def test_rebuild_wraps_paragraph_boxes_and_maps_bullets():
+    from pypdf import PdfReader
+
+    paragraph = (
+        "• Die Patientin wurde nach komplikationslosem Verlauf in gutem "
+        "Allgemeinzustand entlassen und eine ambulante Kontrolle wurde "
+        "innerhalb von zwei Wochen dringend empfohlen."
+    )
+    source = paragraph
+    # Paragraph-level box: tall (three text lines worth of height).
+    layout = [LayoutLine(page_number=1, x1=100, y1=100, x2=900, y2=160, start=0, end=len(source))]
+    output = rebuild_scanned_pdf(source, layout, [], page_count=1)
+    extracted = "\n".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(output)).pages)
+    # All words survive (wrapped, not truncated), bullet mapped to "-".
+    for word in ("Patientin", "Allgemeinzustand", "empfohlen"):
+        assert word in extracted
+    assert "•" not in extracted
+    assert "- Die Patientin" in extracted.replace("\n", " ")
 
 
 def test_rebuild_without_layout_fails():

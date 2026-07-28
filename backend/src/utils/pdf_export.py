@@ -47,9 +47,17 @@ def redacted_texts(entities: list[AppliedEntity]) -> list[str]:
 
 def redact_native_pdf(data: bytes, entities: list[AppliedEntity], settings: Settings) -> bytes:
     import pypdfium2 as pdfium
-    from PIL import ImageDraw
+    from PIL import ImageDraw, ImageFont
 
     needles = redacted_texts(entities)
+    # GENERALIZED entities (e.g. birth date → year) are not blacked out but
+    # erased and replaced with their generalized value, mirroring the text
+    # output ("Date of Birth: 1996" instead of a black bar).
+    replacements = {
+        e.text.strip(): e.replacement
+        for e in entities
+        if e.status == SpanStatus.GENERALIZED and e.replacement
+    }
     scale = settings.VISION_OCR_RENDER_SCALE
     found: set[str] = set()
 
@@ -62,25 +70,37 @@ def redact_native_pdf(data: bytes, entities: list[AppliedEntity], settings: Sett
         for page in document:
             page_width, page_height = page.get_size()
             textpage = page.get_textpage()
-            boxes: list[tuple[float, float, float, float]] = []
+            boxes: list[tuple[float, float, float, float, str | None]] = []
             for needle in needles:
+                replacement = replacements.get(needle)
                 for start, count in _search_all(textpage, needle):
                     found.add(needle)
-                    boxes.extend(_char_rects(textpage, start, count))
+                    for rect in _char_rects(textpage, start, count):
+                        boxes.append((*rect, replacement))
             bitmap = page.render(scale=scale)
             image = bitmap.to_pil()
             draw = ImageDraw.Draw(image)
             padding = 1.5
-            for left, bottom, right, top in boxes:
-                draw.rectangle(
-                    (
-                        (left - padding) * scale,
-                        (page_height - top - padding) * scale,
-                        (right + padding) * scale,
-                        (page_height - bottom + padding) * scale,
-                    ),
-                    fill="black",
+            for left, bottom, right, top, replacement in boxes:
+                pixel_box = (
+                    (left - padding) * scale,
+                    (page_height - top - padding) * scale,
+                    (right + padding) * scale,
+                    (page_height - bottom + padding) * scale,
                 )
+                if replacement is None:
+                    draw.rectangle(pixel_box, fill="black")
+                else:
+                    draw.rectangle(pixel_box, fill="white")
+                    box_height = pixel_box[3] - pixel_box[1]
+                    size = max(int(box_height * 0.9), 10)
+                    font = ImageFont.load_default(size=size)
+                    draw.text(
+                        (pixel_box[0] + 2, pixel_box[1] + box_height * 0.05),
+                        replacement,
+                        fill="black",
+                        font=font,
+                    )
             images.append(image.convert("RGB"))
             textpage.close()
             page.close()
@@ -193,20 +213,46 @@ def rebuild_scanned_pdf(
         for line in layout:
             if line.page_number != page_number:
                 continue
-            text = anonymize_line(source_text, line.start, line.end, entities)
+            text = _latin1_safe(anonymize_line(source_text, line.start, line.end, entities))
             if not text.strip():
                 continue
-            font_size = min(max((line.y2 - line.y1) / 1000 * height * 0.75, 6.0), 16.0)
+            box_width = max((line.x2 - line.x1) / 1000 * width, 30.0)
+            box_height = max((line.y2 - line.y1) / 1000 * height, 8.0)
+            font_size, wrapped = _fit_text(text, box_width, box_height)
             x = line.x1 / 1000 * width
-            y = height - (line.y2 / 1000 * height)
+            top = line.y1 / 1000 * height
             pdf.setFont("Helvetica", font_size)
-            pdf.drawString(x, y, _latin1_safe(text))
+            for index, wrapped_line in enumerate(wrapped):
+                baseline = height - top - (index + 1) * font_size * _LINE_SPACING + font_size * 0.2
+                pdf.drawString(x, baseline, wrapped_line)
         pdf.showPage()
     pdf.save()
     output = buffer.getvalue()
 
     _verify_rebuilt(output, entities)
     return output
+
+
+_LINE_SPACING = 1.25
+_FONT_CANDIDATES = (11.0, 10.0, 9.0, 8.0, 7.0, 6.0)
+
+
+def _fit_text(text: str, box_width: float, box_height: float) -> tuple[float, list[str]]:
+    """Choose a font size and wrap the text so it fits the OCR box.
+
+    Unlimited-OCR emits paragraph-level boxes for wrapped text, so a "line"
+    can be a whole paragraph: wrap it into as many lines as the box height
+    allows instead of scaling the font to the box height."""
+    from reportlab.lib.utils import simpleSplit
+
+    for size in _FONT_CANDIDATES:
+        if size > box_height:
+            continue
+        wrapped = simpleSplit(text, "Helvetica", size, box_width)
+        if len(wrapped) * size * _LINE_SPACING <= box_height * 1.2:
+            return size, wrapped
+    size = _FONT_CANDIDATES[-1]
+    return size, simpleSplit(text, "Helvetica", size, box_width)
 
 
 def anonymize_line(
@@ -233,9 +279,28 @@ def anonymize_line(
     return "".join(parts)
 
 
+# Common characters outside latin-1 that OCR output contains regularly.
+_UNICODE_FALLBACKS = str.maketrans(
+    {
+        "•": "-",  # bullet
+        "▪": "-",
+        "–": "-",  # en dash
+        "—": "-",  # em dash
+        "‘": "'",
+        "’": "'",
+        "“": '"',
+        "”": '"',
+        "„": '"',
+        "…": "...",
+        " ": " ",  # non-breaking space
+        "→": "->",
+    }
+)
+
+
 def _latin1_safe(text: str) -> str:
-    """Helvetica covers latin-1 (incl. äöüß); replace anything else."""
-    return text.encode("latin-1", errors="replace").decode("latin-1")
+    """Helvetica covers latin-1 (incl. äöüß); map or replace anything else."""
+    return text.translate(_UNICODE_FALLBACKS).encode("latin-1", errors="replace").decode("latin-1")
 
 
 def _verify_rebuilt(output: bytes, entities: list[AppliedEntity]) -> None:
