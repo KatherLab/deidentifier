@@ -143,6 +143,46 @@ def test_override_rerun_with_expired_id(client):
     assert response.status_code == 410
 
 
+def test_export_pdf_native_with_cached_detection(client):
+    from backend.tests.pdf_builder import make_pdf
+
+    pdf = make_pdf(
+        [
+            "Patient: Max Mustermann, geb. 01.02.1980",
+            "Der Patient wurde stationaer aufgenommen und komplikationslos behandelt.",
+            "Die Entlassung erfolgte in gutem Allgemeinzustand nach Hause.",
+        ]
+    )
+    first = client.post(
+        "/api/v1/anonymize", files={"file": ("brief.pdf", pdf, "application/pdf")}
+    ).json()
+    response = client.post(
+        "/api/v1/export/pdf",
+        files={"file": ("brief.pdf", pdf, "application/pdf")},
+        data={"request_id": first["request_id"], "overrides": "[]"},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert "anonymisiert.pdf" in response.headers["content-disposition"]
+    assert response.content.startswith(b"%PDF")
+    # Rasterized output: no text layer to leak.
+    import io
+
+    from pypdf import PdfReader
+
+    extracted = "".join(
+        p.extract_text() or "" for p in PdfReader(io.BytesIO(response.content)).pages
+    )
+    assert extracted.strip() == ""
+
+
+def test_export_pdf_rejects_non_pdf(client):
+    response = client.post(
+        "/api/v1/export/pdf", files={"file": ("brief.txt", b"text", "text/plain")}
+    )
+    assert response.status_code == 415
+
+
 def test_llm_detector_unconfigured_fails_closed(client, monkeypatch):
     from backend.src.core.config import get_settings
 

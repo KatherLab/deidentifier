@@ -26,6 +26,9 @@ async def run_anonymization(
     extraction_ms: float = 0.0,
     extraction_warnings: list[str] | None = None,
     overrides: list[EntityOverride] | None = None,
+    file_sha256: str | None = None,
+    layout: list | None = None,
+    page_count: int = 0,
 ) -> AnonymizeResponse:
     """Full run: detection, resolution, transformation, validation."""
     t0 = time.perf_counter()
@@ -52,6 +55,9 @@ async def run_anonymization(
             extraction_warnings=list(extraction_warnings or []),
             detection_warnings=detection_warnings,
             llm_recheck_performed=recheck_enabled,
+            file_sha256=file_sha256,
+            layout=list(layout or []),
+            page_count=page_count,
         ),
     )
     return await _finalize(

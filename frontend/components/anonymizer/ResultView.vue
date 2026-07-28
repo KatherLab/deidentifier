@@ -59,7 +59,22 @@
           <Download class="h-4 w-4" aria-hidden="true" />
           Als .txt herunterladen
         </BaseButton>
+        <BaseButton
+          v-if="canExportPdf"
+          variant="secondary"
+          :loading="exportingPdf"
+          @click="downloadRedactedPdf"
+        >
+          <FileDown v-if="!exportingPdf" class="h-4 w-4" aria-hidden="true" />
+          Geschwärztes PDF
+        </BaseButton>
       </div>
+      <p
+        v-if="canExportPdf && result.source_type === 'pdf-ocr'"
+        class="text-xs text-content-subtle"
+      >
+        Rekonstruiertes Dokument – Layout angenähert, Originalpixel werden verworfen.
+      </p>
       <!-- v-text: the panel is whitespace-pre-wrap, so template indentation must not leak in. -->
       <div
         class="rounded-card border border-default bg-surface p-4 text-sm leading-7 whitespace-pre-wrap break-words text-content"
@@ -111,8 +126,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Copy, Download } from '@lucide/vue'
+import { computed, ref } from 'vue'
+import { Copy, Download, FileDown } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -122,6 +137,8 @@ import WarningsList from '@/components/anonymizer/WarningsList.vue'
 import { useSessionStore } from '@/stores/session'
 import { useToast } from '@/composables/useToast'
 import { useFileDownload } from '@/composables/useFileDownload'
+import { anonymizeApi } from '@/services/anonymizeApi'
+import { extractPdfExportErrorMessage } from '@/utils/errors'
 import {
   entityTypeLabel,
   sourceTypeLabel,
@@ -138,7 +155,7 @@ const props = defineProps<Props>()
 
 const session = useSessionStore()
 const toast = useToast()
-const { downloadBlob } = useFileDownload()
+const { downloadBlob, downloadFromApi } = useFileDownload()
 
 type TabId = 'anonymized' | 'source'
 const tabs: { id: TabId; label: string }[] = [
@@ -158,6 +175,40 @@ async function copyAnonymized() {
 
 function downloadAnonymized() {
   downloadBlob(props.result.anonymized_text, 'anonymisiert.txt', 'text/plain;charset=utf-8')
+}
+
+/**
+ * Redacted-PDF export is only possible for PDF sources AND while the original
+ * File is still held in memory (it is re-sent — the server stores nothing).
+ */
+const canExportPdf = computed(
+  () =>
+    (props.result.source_type === 'pdf' || props.result.source_type === 'pdf-ocr') &&
+    session.sourceFile !== null,
+)
+
+const exportingPdf = ref(false)
+
+/**
+ * Export the redacted PDF with all current overrides applied. Can take up to
+ * a minute for scans on a backend cache miss, hence the button loading state.
+ */
+async function downloadRedactedPdf() {
+  const file = session.sourceFile
+  if (!file || exportingPdf.value) return
+  const requestId = props.result.request_id
+  const overrides = [...session.overrides.values()]
+  exportingPdf.value = true
+  try {
+    await downloadFromApi(
+      () => anonymizeApi.exportPdf(file, requestId, overrides),
+      'anonymisiert.pdf',
+    )
+  } catch (err) {
+    toast.error(await extractPdfExportErrorMessage(err))
+  } finally {
+    exportingPdf.value = false
+  }
 }
 
 function showWarningInSource() {

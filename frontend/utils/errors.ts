@@ -21,6 +21,30 @@ export function isExpiredResultError(err: unknown): boolean {
   return isAxiosError(err) && err.response?.status === 410
 }
 
+/**
+ * Error message for the redacted-PDF export. The export request uses
+ * `responseType: 'blob'`, so error bodies arrive as a Blob and must be parsed
+ * back into `{"detail": string}` before the usual mapping. A 422 detail (e.g.
+ * "redaction could not be verified") is user-appropriate English from the
+ * backend — surface it with a German prefix.
+ */
+export async function extractPdfExportErrorMessage(err: unknown): Promise<string> {
+  if (isAxiosError(err) && err.response && err.response.data instanceof Blob) {
+    try {
+      err.response.data = JSON.parse(await err.response.data.text())
+    } catch {
+      // Not a JSON body — fall through to the status-based mapping.
+      err.response.data = undefined
+    }
+  }
+  if (isAxiosError(err) && err.response?.status === 422) {
+    const data = err.response.data as { detail?: unknown } | undefined
+    const detail = typeof data?.detail === 'string' ? data.detail.trim() : ''
+    if (detail) return `PDF-Export fehlgeschlagen: ${detail}`
+  }
+  return extractApiErrorMessage(err, 'PDF-Export fehlgeschlagen. Bitte versuchen Sie es erneut.')
+}
+
 export function extractApiErrorMessage(
   err: unknown,
   fallback = 'Anonymisierung fehlgeschlagen. Bitte versuchen Sie es erneut.',

@@ -31,10 +31,25 @@ class PageRange(BaseModel):
     end: int
 
 
+class LayoutLine(BaseModel):
+    """A transcribed line with its normalized (0–1000, top-left origin)
+    bounding box and its character range in the extracted text. Basis for the
+    layout-preserving redacted-PDF reconstruction of scanned documents."""
+
+    page_number: int
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+    start: int
+    end: int
+
+
 class ExtractedDocument(BaseModel):
     text: str
     source_type: str  # "txt" | "docx" | "pdf" | "pdf-ocr" | "paste"
     pages: list[PageRange] = Field(default_factory=list)
+    layout: list[LayoutLine] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -185,21 +200,44 @@ async def extract_pdf(data: bytes, filename: str, settings: Settings) -> Extract
         from ..services.vision_llm_ocr import VisionOCRError, VisionOCRService
 
         try:
-            page_texts = await VisionOCRService(settings).process_pdf(data)
+            page_lines = await VisionOCRService(settings).process_pdf(data)
         except VisionOCRError as exc:
             raise ExtractionError(str(exc), status_code=exc.status_code) from exc
+
+        parts: list[str] = []
         pages: list[PageRange] = []
+        layout: list[LayoutLine] = []
         offset = 0
-        for number, page_text in enumerate(page_texts, start=1):
-            pages.append(PageRange(page_number=number, start=offset, end=offset + len(page_text)))
-            offset += len(page_text) + 2  # "\n\n" separator
-        text = "\n\n".join(page_texts)
+        for number, lines in enumerate(page_lines, start=1):
+            page_start = offset
+            for index, line in enumerate(lines):
+                if index > 0:
+                    offset += 1  # "\n" between lines
+                if line.box is not None:
+                    x1, y1, x2, y2 = line.box
+                    layout.append(
+                        LayoutLine(
+                            page_number=number,
+                            x1=x1,
+                            y1=y1,
+                            x2=x2,
+                            y2=y2,
+                            start=offset,
+                            end=offset + len(line.text),
+                        )
+                    )
+                offset += len(line.text)
+            parts.append("\n".join(line.text for line in lines))
+            pages.append(PageRange(page_number=number, start=page_start, end=offset))
+            offset += 2  # "\n\n" between pages
+        text = "\n\n".join(parts)
         if not text.strip():
             raise ExtractionError("OCR produced no text for this document.")
         return ExtractedDocument(
             text=text,
             source_type="pdf-ocr",
             pages=pages,
+            layout=layout,
             warnings=["Text was produced by OCR; recognition errors are possible."],
         )
     if engine == "mistral_ocr":

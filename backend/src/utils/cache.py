@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass, field
 
 from ..schemas.entities import EntitySpan
+from .extraction import LayoutLine
 
 
 @dataclass
@@ -21,6 +22,11 @@ class CachedDetection:
     extraction_warnings: list[str]
     detection_warnings: list[str] = field(default_factory=list)
     llm_recheck_performed: bool = False
+    # For redacted-PDF export: identity of the uploaded file plus (for scans)
+    # the OCR layout, so an export never repeats OCR/LLM detection.
+    file_sha256: str | None = None
+    layout: list[LayoutLine] = field(default_factory=list)
+    page_count: int = 0
     timestamp: float = 0.0
 
 

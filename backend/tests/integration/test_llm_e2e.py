@@ -100,6 +100,49 @@ async def test_large_document_chunked_with_consistent_tags():
     assert len(server.detection_requests()) >= 14
 
 
+async def test_scanned_pdf_ocr_rebuild_to_redacted_pdf():
+    """Scanned PDF → OCR with layout boxes → detection → rebuilt redacted PDF."""
+    import io
+
+    from pypdf import PdfReader
+
+    from backend.src.utils.extraction import extract_document
+    from backend.src.utils.pdf_export import rebuild_scanned_pdf
+    from backend.tests.pdf_builder import make_scanned_pdf
+
+    ocr_text = (
+        "text [112, 76, 681, 95]Entlassungsbrief\n"
+        "text [112, 100, 681, 119]Patientin Erika Musterfrau, geb. 01.02.1980\n"
+        "text [112, 124, 681, 143]Fallnummer: 2026-00815. Aufnahme am 12.03.2026."
+    )
+    entities = [{"text": "Erika Musterfrau", "type": "PERSON_NAME", "role": "patient"}]
+    with FakeLLM(entities, vision_text=ocr_text) as server:
+        settings = make_settings(
+            server.base_url,
+            OCR_ENGINE="llm_vision",
+            VISION_OCR_API_BASE=f"{server.base_url}/v1",
+            VISION_OCR_MODEL="baidu/Unlimited-OCR",
+        )
+        document = await extract_document(make_scanned_pdf(pages=1), "scan.pdf", settings)
+        assert len(document.layout) == 3
+        response = await run_anonymization(
+            document.text,
+            settings,
+            document.source_type,
+            extraction_warnings=document.warnings,
+            layout=document.layout,
+            page_count=len(document.pages),
+        )
+        output = rebuild_scanned_pdf(
+            response.source_text, document.layout, response.entities, len(document.pages)
+        )
+
+    extracted = "\n".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(output)).pages)
+    assert "Erika Musterfrau" not in extracted
+    assert "[PERSON_1]" in extracted
+    assert "Fallnummer" in extracted
+
+
 async def test_scanned_pdf_ocr_to_anonymized_text():
     """Full path: scanned PDF → vision OCR → detection → anonymized output."""
     from backend.src.utils.extraction import extract_document

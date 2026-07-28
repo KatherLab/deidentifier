@@ -32,6 +32,13 @@ export const useSessionStore = defineStore('session', () => {
   const result = ref<AnonymizeResponse | null>(null)
   const selectedEntityIndex = ref<number | null>(null)
 
+  /**
+   * The ORIGINAL uploaded file of the current result (memory only — NEVER
+   * persisted). Needed for the redacted-PDF export, which re-sends the file
+   * because the server stores nothing. Null for pasted-text runs.
+   */
+  const sourceFile = ref<File | null>(null)
+
   /** Accumulated per-entity overrides, keyed by `${start}:${end}`. */
   const overrides = ref<Map<string, Override>>(new Map())
   /** True while an override re-run is in flight (result view stays visible). */
@@ -182,13 +189,15 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   /** Anonymize pasted text. Rejects with the API error (caller shows a toast). */
-  function submitText(text: string): Promise<void> {
-    return run(() => anonymizeApi.anonymizeText(text))
+  async function submitText(text: string): Promise<void> {
+    await run(() => anonymizeApi.anonymizeText(text))
+    sourceFile.value = null
   }
 
   /** Anonymize an uploaded file. Rejects with the API error (caller shows a toast). */
-  function submitFile(file: File): Promise<void> {
-    return run(() => anonymizeApi.anonymizeFile(file))
+  async function submitFile(file: File): Promise<void> {
+    await run(() => anonymizeApi.anonymizeFile(file))
+    sourceFile.value = file
   }
 
   function selectEntity(index: number | null): void {
@@ -200,12 +209,14 @@ export const useSessionStore = defineStore('session', () => {
     result.value = null
     selectedEntityIndex.value = null
     overrides.value = new Map()
+    sourceFile.value = null
     phase.value = 'idle'
   }
 
   return {
     phase,
     result,
+    sourceFile,
     selectedEntityIndex,
     selectedEntity,
     entityCounts,

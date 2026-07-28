@@ -1,6 +1,7 @@
 """The anonymization endpoint. Accepts pasted text or override re-runs (JSON)
 and file uploads (multipart) on the same route, dispatched by content type."""
 
+import hashlib
 import time
 from pathlib import Path
 
@@ -108,6 +109,9 @@ async def _handle_upload(request: Request, settings: Settings) -> AnonymizeRespo
         extracted.source_type,
         extraction_ms=extraction_ms,
         extraction_warnings=extracted.warnings,
+        file_sha256=hashlib.sha256(data).hexdigest(),
+        layout=extracted.layout,
+        page_count=len(extracted.pages),
     )
 
 
@@ -118,6 +122,9 @@ async def _run(
     extraction_ms: float = 0.0,
     extraction_warnings: list[str] | None = None,
     overrides=None,
+    file_sha256: str | None = None,
+    layout=None,
+    page_count: int = 0,
 ) -> AnonymizeResponse:
     try:
         return await run_anonymization(
@@ -127,6 +134,9 @@ async def _run(
             extraction_ms=extraction_ms,
             extraction_warnings=extraction_warnings,
             overrides=overrides,
+            file_sha256=file_sha256,
+            layout=layout,
+            page_count=page_count,
         )
     except DetectorError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None

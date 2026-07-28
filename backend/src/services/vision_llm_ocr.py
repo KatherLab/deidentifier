@@ -29,10 +29,35 @@ class VisionOCRError(Exception):
 
 # Model markup such as <|ref|>…<|/ref|> emitted with skip_special_tokens=false.
 _SPECIAL_TOKENS = re.compile(r"<\|[^|>]{0,40}\|>")
-# Unlimited-OCR line prefixes: element type + bounding box, e.g.
-# "text [112, 76, 681, 95]Patientin: …". The boxes could later drive a
-# layout-preserving redacted-PDF reconstruction; for text output they are noise.
-_LAYOUT_PREFIX = re.compile(r"^[a-z_]{1,20} \[\d+(?:,\s*\d+){3}\]", re.IGNORECASE | re.MULTILINE)
+# Unlimited-OCR line prefixes: element type + bounding box in 0–1000
+# page-normalized coordinates (top-left origin), e.g.
+# "text [112, 76, 681, 95]Patientin: …". The boxes drive the
+# layout-preserving redacted-PDF reconstruction; the prefix itself is
+# stripped from the text output.
+_LAYOUT_LINE = re.compile(
+    r"^([a-z_]{1,20}) \[(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\](.*)$", re.IGNORECASE
+)
+
+
+class TranscribedLine:
+    """One output line: text plus optional normalized bounding box."""
+
+    def __init__(self, text: str, box: tuple[int, int, int, int] | None = None):
+        self.text = text
+        self.box = box
+
+
+def parse_transcription(raw: str) -> list[TranscribedLine]:
+    cleaned = _SPECIAL_TOKENS.sub("", raw).strip()
+    lines: list[TranscribedLine] = []
+    for line in cleaned.splitlines():
+        match = _LAYOUT_LINE.match(line)
+        if match:
+            box = tuple(int(match.group(i)) for i in range(2, 6))
+            lines.append(TranscribedLine(text=match.group(6), box=box))  # type: ignore[arg-type]
+        elif line.strip():
+            lines.append(TranscribedLine(text=line))
+    return lines
 
 
 class VisionOCRService:
@@ -54,16 +79,16 @@ class VisionOCRService:
                 "VISION_OCR_EXTRA_BODY is not valid JSON.", status_code=500
             ) from exc
 
-    async def process_pdf(self, data: bytes) -> list[str]:
-        """Return one transcription per page, in order."""
+    async def process_pdf(self, data: bytes) -> list[list[TranscribedLine]]:
+        """Return the parsed transcription (lines with boxes) per page, in order."""
         images = self._render_pages(data)
         if not images:
             raise VisionOCRError("The PDF contains no pages.", status_code=422)
         semaphore = asyncio.Semaphore(self._settings.VISION_OCR_MAX_CONCURRENT_PAGES)
 
-        async def limited(page_number: int, png: bytes) -> str:
+        async def limited(page_number: int, png: bytes) -> list[TranscribedLine]:
             async with semaphore:
-                return await self._transcribe_page(page_number, png)
+                return parse_transcription(await self._transcribe_page(page_number, png))
 
         return list(
             await asyncio.gather(
@@ -138,6 +163,4 @@ class VisionOCRService:
             raise VisionOCRError(
                 f"The vision OCR endpoint returned no text for page {page_number}."
             )
-        content = _SPECIAL_TOKENS.sub("", content)
-        content = _LAYOUT_PREFIX.sub("", content)
-        return content.strip()
+        return content
