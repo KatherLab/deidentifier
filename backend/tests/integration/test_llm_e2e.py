@@ -100,6 +100,36 @@ async def test_large_document_chunked_with_consistent_tags():
     assert len(server.detection_requests()) >= 14
 
 
+async def test_scanned_pdf_ocr_to_anonymized_text():
+    """Full path: scanned PDF → vision OCR → detection → anonymized output."""
+    from backend.src.utils.extraction import extract_document
+    from backend.tests.pdf_builder import make_scanned_pdf
+
+    ocr_text = (
+        "Entlassungsbrief. Patientin Erika Musterfrau, geb. 01.02.1980, "
+        "Fallnummer: 2026-00815. Aufnahme am 12.03.2026."
+    )
+    entities = [{"text": "Erika Musterfrau", "type": "PERSON_NAME", "role": "patient"}]
+    with FakeLLM(entities, vision_text=ocr_text) as server:
+        settings = make_settings(
+            server.base_url,
+            OCR_ENGINE="llm_vision",
+            VISION_OCR_API_BASE=f"{server.base_url}/v1",
+            VISION_OCR_MODEL="baidu/Unlimited-OCR",
+        )
+        document = await extract_document(make_scanned_pdf(pages=1), "scan.pdf", settings)
+        response = await run_anonymization(
+            document.text, settings, document.source_type, extraction_warnings=document.warnings
+        )
+
+    assert response.source_type == "pdf-ocr"
+    assert "Erika Musterfrau" not in response.anonymized_text
+    assert "[PERSON_1]" in response.anonymized_text
+    assert "[ID]" in response.anonymized_text  # Fallnummer via rules
+    assert "geb. 1980" in response.anonymized_text
+    assert any("OCR" in w for w in response.warnings)
+
+
 async def test_override_rerun_notes_skipped_recheck():
     entities = [{"text": "Johann Schmidt", "type": "PERSON_NAME", "role": "patient"}]
     with FakeLLM(entities) as server:

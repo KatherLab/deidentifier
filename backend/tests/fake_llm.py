@@ -11,9 +11,15 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class FakeLLM:
-    def __init__(self, entities: list[dict], recheck_findings: list[dict] | None = None):
+    def __init__(
+        self,
+        entities: list[dict],
+        recheck_findings: list[dict] | None = None,
+        vision_text: str = "",
+    ):
         self.entities = entities
         self.recheck_findings = recheck_findings or []
+        self.vision_text = vision_text
         self.requests: list[dict] = []
         self._server: HTTPServer | None = None
         self._thread: threading.Thread | None = None
@@ -36,6 +42,13 @@ class FakeLLM:
         )
         return "auditing" in system
 
+    @staticmethod
+    def _is_vision(request: dict) -> bool:
+        return any(isinstance(m.get("content"), list) for m in request.get("messages", []))
+
+    def vision_requests(self) -> list[dict]:
+        return [r for r in self.requests if self._is_vision(r)]
+
     def __enter__(self) -> "FakeLLM":
         fake = self
 
@@ -44,7 +57,11 @@ class FakeLLM:
                 length = int(self.headers.get("content-length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")
                 fake.requests.append(body)
-                entities = fake.recheck_findings if FakeLLM._is_recheck(body) else fake.entities
+                if FakeLLM._is_vision(body):
+                    content = fake.vision_text
+                else:
+                    entities = fake.recheck_findings if FakeLLM._is_recheck(body) else fake.entities
+                    content = json.dumps({"entities": entities})
                 payload = json.dumps(
                     {
                         "id": "fake",
@@ -53,10 +70,7 @@ class FakeLLM:
                         "choices": [
                             {
                                 "index": 0,
-                                "message": {
-                                    "role": "assistant",
-                                    "content": json.dumps({"entities": entities}),
-                                },
+                                "message": {"role": "assistant", "content": content},
                                 "finish_reason": "stop",
                             }
                         ],

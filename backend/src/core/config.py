@@ -61,6 +61,17 @@ class Settings(BaseSettings):
     VISION_OCR_API_BASE: str = ""
     VISION_OCR_API_KEY: str = ""
     VISION_OCR_MODEL: str = ""
+    # Prompt sent with each page image; "<image>document parsing." is the
+    # Unlimited-OCR recipe and works for most vision OCR models.
+    VISION_OCR_PROMPT: str = "<image>document parsing."
+    VISION_OCR_MAX_TOKENS: int = Field(default=8192, ge=256)
+    # Raw JSON merged into the request body (e.g. Unlimited-OCR's
+    # skip_special_tokens / vllm_xargs); empty = none.
+    VISION_OCR_EXTRA_BODY: str = ""
+    VISION_OCR_TIMEOUT_SECONDS: int = Field(default=600, ge=1)
+    VISION_OCR_MAX_CONCURRENT_PAGES: int = Field(default=2, ge=1, le=16)
+    # Page render scale: 1.0 = 72 dpi; 2.8 ≈ 200 dpi.
+    VISION_OCR_RENDER_SCALE: float = Field(default=2.8, ge=1.0, le=6.0)
 
     # Optional second-net detector — Milestone 3
     PRIVACY_FILTER_ENABLED: bool = False

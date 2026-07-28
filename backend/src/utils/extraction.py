@@ -181,9 +181,30 @@ async def extract_pdf(data: bytes, filename: str, settings: Settings) -> Extract
             source_type="pdf-ocr",
             warnings=["Text was produced by OCR; recognition errors are possible."],
         )
-    if engine in {"mistral_ocr", "llm_vision"}:
+    if engine == "llm_vision":
+        from ..services.vision_llm_ocr import VisionOCRError, VisionOCRService
+
+        try:
+            page_texts = await VisionOCRService(settings).process_pdf(data)
+        except VisionOCRError as exc:
+            raise ExtractionError(str(exc), status_code=exc.status_code) from exc
+        pages: list[PageRange] = []
+        offset = 0
+        for number, page_text in enumerate(page_texts, start=1):
+            pages.append(PageRange(page_number=number, start=offset, end=offset + len(page_text)))
+            offset += len(page_text) + 2  # "\n\n" separator
+        text = "\n\n".join(page_texts)
+        if not text.strip():
+            raise ExtractionError("OCR produced no text for this document.")
+        return ExtractedDocument(
+            text=text,
+            source_type="pdf-ocr",
+            pages=pages,
+            warnings=["Text was produced by OCR; recognition errors are possible."],
+        )
+    if engine == "mistral_ocr":
         raise ExtractionError(
-            f"OCR engine '{engine}' is not available yet in this milestone.", status_code=501
+            "OCR engine 'mistral_ocr' is not available yet in this milestone.", status_code=501
         )
     raise ExtractionError(f"Unknown OCR engine '{engine}'.", status_code=500)
 

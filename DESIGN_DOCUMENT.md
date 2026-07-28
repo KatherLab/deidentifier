@@ -145,7 +145,10 @@ Routing (`utils/extraction.py`, mode `auto`):
      the real API and the self-hosted DeepSeek-OCR-2 + katdocextract stack
      from `compose.deepseek.yml`)
    - `llm_vision` — OpenAI-compatible vision model (`VISION_OCR_API_BASE`),
-     page images via pymupdf/Pillow, concurrent per-page
+     page images rendered via pypdfium2 (permissive license, deliberately not
+     AGPL-licensed pymupdf), concurrent per-page, fail-closed if any page
+     fails. Default recipe targets baidu/Unlimited-OCR on vLLM
+     (`VISION_OCR_PROMPT`, `VISION_OCR_EXTRA_BODY` for its vllm_xargs)
    - `none` — scanned PDFs rejected with a clear message
 
 Extraction result:
