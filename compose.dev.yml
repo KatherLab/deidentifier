@@ -1,0 +1,14 @@
+# Dev overlay: source mount + hot reload + published backend port + docs.
+# Usage: docker compose -f compose.yml -f compose.dev.yml up --build
+
+services:
+  backend:
+    command:
+      ["uvicorn", "backend.src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      - APP_ENV=development
+    volumes:
+      - ./backend:/app/backend
+    ports:
+      - "8000:8000"
+    read_only: false

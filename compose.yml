@@ -1,0 +1,56 @@
+# Base stack: backend + frontend. Usage:
+#   docker compose up -d --build          → http://localhost:8080
+#
+# Configuration comes from backend/.env (optional, see .env.example) plus the
+# environment below. APP_ENV defaults to production: docs are disabled and
+# unsafe configurations (mock detector, insecure content logging, enabled but
+# unconfigured llm detector) refuse to start.
+#
+# Layered variants:
+#   compose.dev.yml            → source mount + hot reload
+#   compose.unlimited-ocr.yml  → GPU sidecar serving baidu/Unlimited-OCR
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: ghcr.io/katherlab/deidentifier-backend:${DEIDENTIFIER_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+    # No published ports: the frontend proxies /api/ internally. Uncomment for
+    # direct backend access during debugging:
+    # ports: ["8000:8000"]
+    # No volumes: nothing is persisted; documents live in memory only.
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=5)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    image: ghcr.io/katherlab/deidentifier-frontend:${DEIDENTIFIER_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5

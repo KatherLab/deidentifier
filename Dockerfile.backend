@@ -1,0 +1,32 @@
+################### deidentifier – backend ###################
+FROM ghcr.io/astral-sh/uv:latest AS uv
+
+FROM python:3.14-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/app/.venv \
+    VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:/usr/local/bin:${PATH}"
+
+COPY --from=uv /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+RUN groupadd --system --gid 10001 app && \
+    useradd --system --uid 10001 --gid app --create-home --home-dir /home/app app
+
+# Dependency metadata first for Docker layer caching.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev && uv cache clean
+
+# App code last. The read-only .venv stays root-owned (world-readable);
+# the runtime user only needs read access to /app and writes only to /tmp.
+COPY --chown=app:app backend ./backend
+
+USER 10001:10001
+
+EXPOSE 8000
+
+CMD ["uvicorn", "backend.src.main:app", "--host", "0.0.0.0", "--port", "8000"]

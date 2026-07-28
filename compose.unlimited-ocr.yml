@@ -1,0 +1,48 @@
+# GPU sidecar serving baidu/Unlimited-OCR via vLLM, wired as the llm_vision
+# OCR engine for scanned PDFs.
+# Usage: docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d
+#
+# Prerequisites: NVIDIA GPU + NVIDIA Container Toolkit.
+#
+# Inside the compose network there is no port collision with the backend —
+# the sidecar keeps vLLM's default port 8000 and is not published to the host.
+
+services:
+  unlimited-ocr:
+    image: vllm/vllm-openai:unlimited-ocr
+    ipc: host
+    shm_size: "8gb"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    command: >
+      --model baidu/Unlimited-OCR
+      --trust-remote-code
+      --logits_processors vllm.model_executor.models.unlimited_ocr:NGramPerReqLogitsProcessor
+      --no-enable-prefix-caching
+      --mm-processor-cache-gb 0
+      --host 0.0.0.0
+      --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  backend:
+    environment:
+      - OCR_ENGINE=llm_vision
+      - VISION_OCR_API_BASE=http://unlimited-ocr:8000/v1
+      - VISION_OCR_MODEL=baidu/Unlimited-OCR
+      - 'VISION_OCR_EXTRA_BODY={"skip_special_tokens": false, "vllm_xargs": {"ngram_size": 35, "window_size": 128}}'
+    depends_on:
+      unlimited-ocr:
+        condition: service_healthy

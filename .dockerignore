@@ -1,0 +1,21 @@
+# Reference clones — never ship
+llmaixweb/
+LLMAIx/
+
+# Secrets — the real .env must never enter an image layer
+backend/.env
+backend/.env.*
+.env
+
+# Local artifacts
+.git/
+.venv/
+node_modules/
+frontend/dist/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.idea/
+.vscode/
+.DS_Store
+/tmp
