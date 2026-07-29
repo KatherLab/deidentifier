@@ -71,8 +71,35 @@
       <span class="text-xs text-content-subtle">Bis zu 3 Ansichten gleichzeitig</span>
     </div>
 
-    <!-- Panels: equal-height cards in a responsive grid. -->
+    <!-- Panels: equal-height cards in a responsive grid. Reading order
+         follows the transformation: Original → Quellprüfung → Ergebnis. -->
     <div class="grid items-start gap-4" :class="gridClass">
+      <!-- Original document: PDF sources render the untouched upload, text
+           sources the extracted source text. -->
+      <section v-if="isActive('original')" :class="panelCardClass">
+        <header :class="panelHeaderClass">
+          <h3 class="text-sm font-semibold text-content">Original</h3>
+        </header>
+        <template v-if="isPdfSource">
+          <iframe
+            v-if="session.originalPreviewUrl"
+            :src="session.originalPreviewUrl"
+            title="Originaldokument"
+            class="min-h-0 w-full flex-1"
+          ></iframe>
+          <p v-else class="p-6 text-sm text-content-subtle">
+            Die Originaldatei ist nicht mehr verfügbar.
+          </p>
+        </template>
+        <!-- v-text: the panel is whitespace-pre-wrap, so template indentation
+             must not leak in. -->
+        <div
+          v-else
+          class="min-h-0 flex-1 overflow-y-auto p-6 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words text-content"
+          v-text="result.source_text"
+        ></div>
+      </section>
+
       <!-- Quellprüfung: interactive source review (primary view). -->
       <section v-if="isActive('source')" :class="panelCardClass">
         <header :class="panelHeaderClass">
@@ -128,32 +155,6 @@
           class="min-h-0 w-full flex-1"
         ></iframe>
         <p v-else class="p-6 text-sm text-content-subtle">Keine Vorschau verfügbar.</p>
-      </section>
-
-      <!-- Original document: PDF sources render the untouched upload, text
-           sources the extracted source text. -->
-      <section v-if="isActive('original')" :class="panelCardClass">
-        <header :class="panelHeaderClass">
-          <h3 class="text-sm font-semibold text-content">Original</h3>
-        </header>
-        <template v-if="isPdfSource">
-          <iframe
-            v-if="session.originalPreviewUrl"
-            :src="session.originalPreviewUrl"
-            title="Originaldokument"
-            class="min-h-0 w-full flex-1"
-          ></iframe>
-          <p v-else class="p-6 text-sm text-content-subtle">
-            Die Originaldatei ist nicht mehr verfügbar.
-          </p>
-        </template>
-        <!-- v-text: the panel is whitespace-pre-wrap, so template indentation
-             must not leak in. -->
-        <div
-          v-else
-          class="min-h-0 flex-1 overflow-y-auto p-6 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words text-content"
-          v-text="result.source_text"
-        ></div>
       </section>
 
       <!-- Anonymized output as plain selectable text. -->
@@ -239,12 +240,13 @@ const isPdfSource = computed(
 type PanelId = 'source' | 'pdf' | 'original' | 'anonymized'
 
 const availablePanels = computed<{ id: PanelId; label: string }[]>(() => {
-  const panels: { id: PanelId; label: string }[] = [{ id: 'source', label: 'Quellprüfung' }]
-  if (isPdfSource.value) panels.push({ id: 'pdf', label: 'Geschwärztes PDF' })
-  panels.push(
+  // Chip order mirrors the panel reading order: Original → Quellprüfung → Ergebnis.
+  const panels: { id: PanelId; label: string }[] = [
     { id: 'original', label: 'Original' },
-    { id: 'anonymized', label: 'Anonymisierter Text' },
-  )
+    { id: 'source', label: 'Quellprüfung' },
+  ]
+  if (isPdfSource.value) panels.push({ id: 'pdf', label: 'Geschwärztes PDF' })
+  panels.push({ id: 'anonymized', label: 'Anonymisierter Text' })
   return panels
 })
 
