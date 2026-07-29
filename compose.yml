@@ -41,9 +41,9 @@ services:
       start_period: 15s
 
   frontend:
-    # NOTE: after rebuilding/recreating the backend container, restart this
-    # service too (`compose restart frontend`) — nginx resolves the backend
-    # hostname once at startup and would keep proxying to the old IP (502).
+    # nginx re-resolves the backend hostname at request time (see
+    # frontend/docker-entrypoint.d/05-resolver.sh), so recreating the backend
+    # container does NOT require a frontend restart.
     build:
       context: .
       dockerfile: Dockerfile.frontend
