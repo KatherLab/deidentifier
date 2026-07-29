@@ -1,69 +1,150 @@
 <template>
-  <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="text-sm text-content-muted">
-        Legt fest, wie erkannte Entitäten standardmäßig behandelt werden. Einzelne Fundstellen
-        lassen sich später in der Quellprüfung anpassen.
+  <div class="space-y-5">
+    <div class="flex flex-wrap items-start justify-between gap-2">
+      <p class="max-w-prose text-sm text-content-muted">
+        Hier legen Sie fest, wie erkannte Datenarten ersetzt werden und ergänzen eigene Regeln. Die
+        Standardeinstellung schwärzt alles Erkannte.
       </p>
       <BaseButton
         size="sm"
         variant="ghost"
-        :disabled="!session.policyCustomized"
-        @click="session.resetPolicy()"
+        :disabled="!session.advancedCustomized"
+        @click="session.resetAdvancedSettings()"
       >
         Zurücksetzen
       </BaseButton>
     </div>
 
-    <div class="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+    <!-- Default-policy table: one row per entity type. -->
+    <div class="grid gap-x-4 gap-y-1 sm:grid-cols-2">
       <div
         v-for="entityType in entityTypes"
         :key="entityType"
-        class="flex items-center justify-between gap-3"
+        class="rounded-card px-2 py-2"
+        :class="isPreserved(entityType) ? 'bg-amber-50 dark:bg-amber-900/20' : ''"
       >
-        <label
-          :for="`policy-${entityType}`"
-          class="inline-flex items-center gap-1.5 text-sm text-content"
-        >
-          {{ ENTITY_TYPE_LABELS[entityType] }}
-          <span
-            v-if="isCustomized(entityType)"
-            class="h-1.5 w-1.5 rounded-full bg-purple-500 dark:bg-purple-400"
-            title="Vom Standard abweichend"
-            aria-hidden="true"
-          ></span>
-          <span v-if="isCustomized(entityType)" class="sr-only">(vom Standard abweichend)</span>
-        </label>
-        <select
-          :id="`policy-${entityType}`"
-          class="w-52 rounded-card border border-strong bg-surface px-2 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :value="session.policy[entityType]"
-          @change="onChange(entityType, $event)"
-        >
-          <option
-            v-for="option in POLICY_OPTIONS[entityType]"
-            :key="option.value"
-            :value="option.value"
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <label
+              :for="`policy-${entityType}`"
+              class="inline-flex items-center gap-1.5 text-sm text-content"
+            >
+              {{ ENTITY_TYPE_LABELS[entityType] }}
+              <span
+                v-if="isCustomized(entityType)"
+                class="h-1.5 w-1.5 rounded-full bg-purple-500 dark:bg-purple-400"
+                title="Vom Standard abweichend"
+                aria-hidden="true"
+              ></span>
+              <span v-if="isCustomized(entityType)" class="sr-only">
+                (vom Standard abweichend)
+              </span>
+            </label>
+            <p class="text-xs text-content-subtle">
+              {{ ENTITY_TYPE_DESCRIPTIONS[entityType] }}
+            </p>
+          </div>
+          <select
+            :id="`policy-${entityType}`"
+            class="w-44 shrink-0 rounded-card border border-strong bg-surface px-2 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            :value="session.policy[entityType]"
+            @change="onChange(entityType, $event)"
           >
-            {{ option.label }}
-          </option>
-        </select>
+            <option
+              v-for="option in POLICY_OPTIONS[entityType]"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </option>
+          </select>
+        </div>
+        <!-- Hint for the CURRENTLY selected transformation, with an example. -->
+        <p
+          class="mt-1 text-xs"
+          :class="
+            isPreserved(entityType) ? 'text-amber-700 dark:text-amber-300' : 'text-content-subtle'
+          "
+        >
+          {{ TRANSFORMATION_HINTS[session.policy[entityType]] }}
+        </p>
       </div>
     </div>
 
-    <p class="rounded-card px-3 py-2 text-sm" :class="getBannerClass('amber')">
-      Beibehalten reduziert den Schutz — nur verwenden, wenn die Daten im Ergebnis benötigt werden.
-    </p>
+    <!-- Eigene Regeln: user-defined terms + free-text LLM instruction. -->
+    <section class="space-y-4 border-t border-default pt-4">
+      <h3 class="text-sm font-semibold text-content">Eigene Regeln</h3>
+
+      <div>
+        <label for="redact-terms" class="text-sm font-medium text-content">
+          Zusätzlich schwärzen
+        </label>
+        <ChipsInput
+          v-model="session.redactTerms"
+          input-id="redact-terms"
+          class="mt-1"
+          placeholder="Begriff eingeben, mit Enter oder Komma hinzufügen"
+        />
+        <p class="mt-1 text-xs text-content-subtle">
+          Diese Begriffe werden immer und überall geschwärzt – unabhängig von der KI-Erkennung
+          (ganze Wörter, Groß-/Kleinschreibung egal). Beispiel: interne Stationsnamen.
+        </p>
+      </div>
+
+      <div class="rounded-card bg-amber-50 p-3 dark:bg-amber-900/20">
+        <label for="preserve-terms" class="text-sm font-medium text-content">Nie schwärzen</label>
+        <ChipsInput
+          v-model="session.preserveTerms"
+          input-id="preserve-terms"
+          tone="amber"
+          class="mt-1"
+          placeholder="Begriff eingeben, mit Enter oder Komma hinzufügen"
+        />
+        <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">
+          Erkannte Stellen mit genau diesem Wortlaut bleiben sichtbar. Vorsicht: reduziert den
+          Schutz.
+        </p>
+      </div>
+
+      <div>
+        <label for="custom-instruction" class="text-sm font-medium text-content">
+          Zusätzliche Anweisung an die KI-Erkennung
+        </label>
+        <textarea
+          id="custom-instruction"
+          v-model="session.customInstruction"
+          rows="3"
+          :maxlength="INSTRUCTION_MAX_LENGTH"
+          placeholder="z. B.: Melde auch Zimmernummern und Studien-IDs (z. B. NCT-Nummern)."
+          class="mt-1 w-full rounded-card border border-strong bg-surface p-3 text-sm text-content placeholder:text-content-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        ></textarea>
+        <div class="flex items-start justify-between gap-3">
+          <p class="text-xs text-content-subtle">
+            Freitext, der der KI-Erkennung mitgegeben wird. Kann die Erkennung nur erweitern oder
+            präzisieren – die Standarderkennung und alle deterministischen Prüfungen bleiben immer
+            aktiv.
+          </p>
+          <span class="shrink-0 text-xs tabular-nums text-content-subtle">
+            {{ session.customInstruction.length }}/{{ INSTRUCTION_MAX_LENGTH }}
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <p class="text-xs text-content-subtle">Änderungen gelten für den nächsten Durchlauf.</p>
   </div>
 </template>
 
 <script setup lang="ts">
 import BaseButton from '@/components/common/BaseButton.vue'
+import ChipsInput from '@/components/common/ChipsInput.vue'
 import { useSessionStore } from '@/stores/session'
-import { getBannerClass } from '@/utils/statusStyles'
-import { ENTITY_TYPE_LABELS } from '@/utils/entityLabels'
-import { DEFAULT_POLICY, POLICY_OPTIONS } from '@/utils/policy'
+import { ENTITY_TYPE_DESCRIPTIONS, ENTITY_TYPE_LABELS } from '@/utils/entityLabels'
+import { DEFAULT_POLICY, POLICY_OPTIONS, TRANSFORMATION_HINTS } from '@/utils/policy'
 import type { EntityType, TransformationType } from '@/types/anonymizer'
+
+/** Mirrors the backend's limit for `custom_instruction`. */
+const INSTRUCTION_MAX_LENGTH = 2000
 
 const session = useSessionStore()
 
@@ -72,6 +153,11 @@ const entityTypes = Object.keys(ENTITY_TYPE_LABELS) as EntityType[]
 
 function isCustomized(type: EntityType): boolean {
   return session.policy[type] !== DEFAULT_POLICY[type]
+}
+
+/** PRESERVE rows are tinted amber as a visual caution (reduced protection). */
+function isPreserved(type: EntityType): boolean {
+  return session.policy[type] === 'PRESERVE'
 }
 
 function onChange(type: EntityType, event: Event) {

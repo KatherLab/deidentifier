@@ -47,6 +47,22 @@ export function entityTypeLabel(type: string): string {
   return ENTITY_TYPE_LABELS[type as EntityType] ?? type
 }
 
+/** Entity type → short German description (policy editor rows). */
+export const ENTITY_TYPE_DESCRIPTIONS: Record<EntityType, string> = {
+  PERSON_NAME: 'Namen von Patient:innen, Angehörigen und Behandelnden',
+  DATE_OF_BIRTH: 'Geburtsdaten',
+  OTHER_DATE: 'Aufnahme-, Entlassungs- und Behandlungsdaten',
+  AGE: 'Altersangaben',
+  ADDRESS: 'Straßen, Postleitzahlen, Orte',
+  PHONE: 'Telefon- und Faxnummern',
+  EMAIL: 'E-Mail-Adressen',
+  URL: 'Internetadressen',
+  ID_NUMBER: 'Patienten-, Fall- und Versichertennummern',
+  ORGANIZATION: 'Kliniken, Praxen, Arbeitgeber',
+  PROFESSION: 'Berufsangaben',
+  OTHER_PII: 'Sonstige identifizierende Angaben (z. B. Geschlecht)',
+}
+
 /** Entity status → German display name. */
 export const ENTITY_STATUS_LABELS: Record<EntityStatus, string> = {
   REDACTED: 'Entfernt',

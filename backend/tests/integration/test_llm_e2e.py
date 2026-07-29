@@ -55,6 +55,22 @@ async def test_requests_carry_injection_hardening():
             assert "=== DOCUMENT END ===" in user
 
 
+async def test_custom_instruction_reaches_detection_prompt_framed():
+    with FakeLLM([]) as server:
+        settings = make_settings(server.base_url, LLM_RECHECK_ENABLED=False)
+        await run_anonymization(
+            "Zimmer 204, unauffälliger Befund.",
+            settings,
+            "paste",
+            custom_instruction="Melde auch Zimmernummern als OTHER_PII.",
+        )
+        for request in server.detection_requests():
+            system = next(m["content"] for m in request["messages"] if m["role"] == "system")
+            assert "Melde auch Zimmernummern" in system
+            # The framing forbids using the instruction to suppress detection.
+            assert "NEVER justify omitting" in system
+
+
 async def test_recheck_finding_forces_review():
     # Detection misses the name; the re-check audit finds it in the output.
     with FakeLLM(

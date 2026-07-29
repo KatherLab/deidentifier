@@ -28,13 +28,18 @@ async def run_anonymization(
     extraction_warnings: list[str] | None = None,
     overrides: list[EntityOverride] | None = None,
     policy=None,
+    custom_instruction: str | None = None,
+    redact_terms: list[str] | None = None,
+    preserve_terms: list[str] | None = None,
     file_sha256: str | None = None,
     layout: list | None = None,
     page_count: int = 0,
 ) -> AnonymizeResponse:
     """Full run: detection, resolution, transformation, validation."""
     t0 = time.perf_counter()
-    detectors = build_detectors(settings)
+    detectors = build_detectors(
+        settings, custom_instruction=custom_instruction, redact_terms=redact_terms
+    )
     all_spans: list[EntitySpan] = []
     detection_warnings: list[str] = []
     for detector in detectors:
@@ -71,6 +76,7 @@ async def run_anonymization(
         detector_warnings=detection_warnings,
         overrides=overrides,
         policy=policy,
+        preserve_terms=preserve_terms,
         extraction_ms=extraction_ms,
         detection_ms=detection_ms,
         recheck_settings=settings if recheck_enabled else None,
@@ -82,6 +88,7 @@ async def rerun_with_overrides(
     request_id: str,
     overrides: list[EntityOverride],
     policy=None,
+    preserve_terms: list[str] | None = None,
 ) -> AnonymizeResponse | None:
     """Re-run transformation + validation from cached detection results.
 
@@ -100,6 +107,7 @@ async def rerun_with_overrides(
         detector_warnings=list(entry.detection_warnings),
         overrides=overrides,
         policy=policy,
+        preserve_terms=preserve_terms,
         extraction_ms=0.0,
         detection_ms=0.0,
         recheck_settings=None,
@@ -117,6 +125,7 @@ async def _finalize(
     detector_warnings: list[str],
     overrides: list[EntityOverride] | None,
     policy,
+    preserve_terms: list[str] | None,
     extraction_ms: float,
     detection_ms: float,
     recheck_settings: Settings | None,
@@ -125,7 +134,7 @@ async def _finalize(
     active_policy = merge_policy(policy)
     t1 = time.perf_counter()
     anonymized, applied, override_warnings = apply_policy(
-        text, resolved, policy=active_policy, overrides=overrides
+        text, resolved, policy=active_policy, overrides=overrides, preserve_terms=preserve_terms
     )
     t2 = time.perf_counter()
     validation = await validate_output(

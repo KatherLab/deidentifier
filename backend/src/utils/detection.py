@@ -1,5 +1,6 @@
 """Detector protocol, shared detection types, mock detector, and registry."""
 
+import re
 from typing import Protocol
 
 from ..core.config import Settings
@@ -64,6 +65,46 @@ class MockDetector:
         return DetectionOutcome(spans=spans)
 
 
+class TermListDetector:
+    """Deterministic always-redact terms from the user's custom rules.
+
+    Word-bounded, case-insensitive matching of every occurrence; entirely
+    independent of the LLM, so user-critical terms never depend on model
+    behavior."""
+
+    name = "user_terms"
+    version = "1.0"
+
+    def __init__(self, terms: list[str]):
+        self._patterns = [
+            re.compile(rf"(?<!\w){re.escape(term.strip())}(?!\w)", re.IGNORECASE)
+            for term in terms
+            if term.strip()
+        ]
+
+    async def detect(self, text: str) -> DetectionOutcome:
+        spans: list[EntitySpan] = []
+        seen: set[tuple[int, int]] = set()
+        for pattern in self._patterns:
+            for match in pattern.finditer(text):
+                start, end = match.span()
+                if (start, end) in seen:
+                    continue
+                seen.add((start, end))
+                spans.append(
+                    EntitySpan(
+                        start=start,
+                        end=end,
+                        text=text[start:end],
+                        entity_type=EntityType.OTHER_PII,
+                        confidence=1.0,
+                        detector=self.name,
+                        metadata={"user_term": True},
+                    )
+                )
+        return DetectionOutcome(spans=spans)
+
+
 def detector_ready(name: str, settings: Settings) -> bool:
     """Whether a configured detector can actually run right now."""
     if name in {"rules", "mock"}:
@@ -73,7 +114,11 @@ def detector_ready(name: str, settings: Settings) -> bool:
     return False  # privacy_filter arrives in Milestone 3
 
 
-def build_detectors(settings: Settings) -> list[SpanDetector]:
+def build_detectors(
+    settings: Settings,
+    custom_instruction: str | None = None,
+    redact_terms: list[str] | None = None,
+) -> list[SpanDetector]:
     """Instantiate configured detectors.
 
     Raises DetectorError for detectors that are enabled but cannot run —
@@ -84,6 +129,8 @@ def build_detectors(settings: Settings) -> list[SpanDetector]:
     from .rules import RuleBasedDetector
 
     detectors: list[SpanDetector] = []
+    if redact_terms:
+        detectors.append(TermListDetector(redact_terms))
     for name in settings.detector_names:
         if name == "rules":
             detectors.append(RuleBasedDetector())
@@ -96,7 +143,7 @@ def build_detectors(settings: Settings) -> list[SpanDetector]:
                     "configured; the document was NOT anonymized.",
                     status_code=503,
                 )
-            detectors.append(LLMDetector(settings))
+            detectors.append(LLMDetector(settings, custom_instruction=custom_instruction))
         else:
             raise DetectorError(
                 f"Detector '{name}' is not available in this build; "

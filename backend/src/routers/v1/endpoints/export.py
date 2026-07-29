@@ -37,6 +37,19 @@ _OVERRIDES_ADAPTER = TypeAdapter(list[EntityOverride])
 _POLICY_ADAPTER = TypeAdapter(dict[EntityType, TransformationType])
 
 
+def _parse_terms(raw) -> list[str] | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        payload = json.loads(raw)
+        if not isinstance(payload, list) or len(payload) > 100:
+            raise ValueError
+        terms = [str(term)[:200] for term in payload if str(term).strip()]
+        return terms or None
+    except (json.JSONDecodeError, ValueError):
+        raise HTTPException(status_code=422, detail="Invalid terms payload.") from None
+
+
 @router.post("/export/pdf")
 async def export_pdf(
     request: Request,
@@ -72,6 +85,12 @@ async def export_pdf(
         except (json.JSONDecodeError, ValidationError):
             raise HTTPException(status_code=422, detail="Invalid 'policy' payload.") from None
 
+    custom_instruction = form.get("custom_instruction")
+    if not isinstance(custom_instruction, str) or not custom_instruction.strip():
+        custom_instruction = None
+    redact_terms = _parse_terms(form.get("redact_terms"))
+    preserve_terms = _parse_terms(form.get("preserve_terms"))
+
     file_hash = hashlib.sha256(data).hexdigest()
     request_id = form.get("request_id")
     result, layout, page_count, source_type = await _detect(
@@ -80,6 +99,9 @@ async def export_pdf(
         request_id if isinstance(request_id, str) else None,
         overrides,
         policy,
+        custom_instruction,
+        redact_terms,
+        preserve_terms,
         settings,
     )
 
@@ -115,6 +137,9 @@ async def _detect(
     request_id: str | None,
     overrides: list[EntityOverride],
     policy,
+    custom_instruction: str | None,
+    redact_terms: list[str] | None,
+    preserve_terms: list[str] | None,
     settings: Settings,
 ) -> tuple[AnonymizeResponse, list[LayoutLine], int, str]:
     """Reuse cached detection when the file matches; otherwise run the full
@@ -122,7 +147,9 @@ async def _detect(
     if request_id:
         entry = request_cache.get(request_id)
         if entry is not None and entry.file_sha256 == file_hash:
-            result = await rerun_with_overrides(request_id, overrides, policy=policy)
+            result = await rerun_with_overrides(
+                request_id, overrides, policy=policy, preserve_terms=preserve_terms
+            )
             if result is not None:
                 return result, entry.layout, entry.page_count, entry.source_type
 
@@ -138,6 +165,9 @@ async def _detect(
             extraction_warnings=extracted.warnings,
             overrides=overrides,
             policy=policy,
+            custom_instruction=custom_instruction,
+            redact_terms=redact_terms,
+            preserve_terms=preserve_terms,
             file_sha256=file_hash,
             layout=extracted.layout,
             page_count=len(extracted.pages),

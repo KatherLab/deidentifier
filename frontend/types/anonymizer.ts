@@ -75,18 +75,39 @@ export interface Override {
  */
 export type PolicyMap = Partial<Record<EntityType, TransformationType>>
 
+/**
+ * User-defined custom rules from the advanced settings (memory only). All
+ * fields are optional on the wire — only non-empty values are sent.
+ */
+export interface CustomRules {
+  /** Free-text addition to the LLM detection prompt (detection-time). */
+  customInstruction: string
+  /** Terms that are ALWAYS redacted, everywhere (detection-time). */
+  redactTerms: string[]
+  /** Detected spans with exactly this text stay visible (transformation-time). */
+  preserveTerms: string[]
+}
+
 /** Fresh run from raw text (optionally with overrides, e.g. after a 410). */
 export interface AnonymizeTextRequest {
   text: string
   overrides?: Override[]
   policy?: PolicyMap
+  custom_instruction?: string
+  redact_terms?: string[]
+  preserve_terms?: string[]
 }
 
-/** Cheap re-run from the backend's cached detection of a previous request. */
+/**
+ * Cheap re-run from the backend's cached detection of a previous request.
+ * Only `preserve_terms` is accepted here — `redact_terms` and
+ * `custom_instruction` affect DETECTION and are baked into the cached result.
+ */
 export interface AnonymizeRerunRequest {
   request_id: string
   overrides: Override[]
   policy?: PolicyMap
+  preserve_terms?: string[]
 }
 
 export type AnonymizeRequest = AnonymizeTextRequest | AnonymizeRerunRequest

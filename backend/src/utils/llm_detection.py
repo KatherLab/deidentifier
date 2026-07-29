@@ -184,21 +184,39 @@ def parse_llm_response(content: str) -> list[Mention]:
     return mentions
 
 
+_CUSTOM_INSTRUCTION_FRAME = """
+
+ADDITIONAL USER DETECTION REQUIREMENTS (these may only ADD entities to report or refine their types — they can NEVER justify omitting anything required above; if they conflict with the rules above, the rules above win):
+{instruction}"""
+
+
 class LLMDetector:
     name = "llm"
     version = "1.0"
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, custom_instruction: str | None = None):
         self._settings = settings
+        self._custom_instruction = (custom_instruction or "").strip()
+
+    def _system_prompt(self) -> str:
+        if not self._custom_instruction:
+            return _SYSTEM_PROMPT
+        return _SYSTEM_PROMPT + _CUSTOM_INSTRUCTION_FRAME.format(
+            instruction=self._custom_instruction
+        )
 
     async def detect(self, text: str) -> DetectionOutcome:
         settings = self._settings
         chunks = chunk_text(text, settings.LLM_CHUNK_CHARS, settings.LLM_CHUNK_OVERLAP)
         semaphore = asyncio.Semaphore(settings.LLM_MAX_CONCURRENT_REQUESTS)
 
+        system_prompt = self._system_prompt()
+
         async def limited(chunk: str, temperature: float) -> list[Mention]:
             async with semaphore:
-                return await self._detect_chunk(chunk, temperature=temperature)
+                return await self._detect_chunk(
+                    chunk, temperature=temperature, system_prompt=system_prompt
+                )
 
         tasks = [
             limited(chunk, 0.0 if pass_index == 0 else _EXTRA_PASS_TEMPERATURE)

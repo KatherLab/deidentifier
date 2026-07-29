@@ -208,6 +208,39 @@ def test_custom_policy_carries_into_override_rerun(client):
     assert "geb. 1980" in second.json()["anonymized_text"]
 
 
+def test_redact_terms_deterministically_redacted(client):
+    response = client.post(
+        "/api/v1/anonymize",
+        json={
+            "text": "Der Patient wurde auf Station B4 im Westflügel behandelt. Station B4 ist voll.",
+            "redact_terms": ["Station B4", "Westflügel"],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "Station B4" not in body["anonymized_text"]
+    assert "Westflügel" not in body["anonymized_text"]
+    assert body["anonymized_text"].count("[PII]") == 3  # both occurrences + Westflügel
+    term_entities = [e for e in body["entities"] if e["detector"] == "user_terms"]
+    assert len(term_entities) == 3
+    assert all(e["metadata"].get("user_term") for e in term_entities)
+
+
+def test_preserve_terms_keep_detected_entities(client):
+    response = client.post(
+        "/api/v1/anonymize",
+        json={"text": SAMPLE_TEXT, "preserve_terms": ["Musterstraße 12"]},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "Musterstraße 12" in body["anonymized_text"]
+    preserved = next(e for e in body["entities"] if e["text"] == "Musterstraße 12")
+    assert preserved["status"] == "PRESERVED"
+    assert preserved["metadata"].get("preserved_by_term") is True
+    # Everything else stays redacted.
+    assert "Max Mustermann" not in body["anonymized_text"]
+
+
 def test_invalid_policy_rejected(client):
     response = client.post(
         "/api/v1/anonymize",

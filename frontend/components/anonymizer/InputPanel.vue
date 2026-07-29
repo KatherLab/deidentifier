@@ -92,7 +92,7 @@
           aria-hidden="true"
         />
         Erweiterte Einstellungen
-        <StatusBadge v-if="session.policyCustomized" label="angepasst" color="purple" />
+        <StatusBadge v-if="session.advancedCustomized" label="angepasst" color="purple" />
       </button>
       <div v-if="advancedOpen" id="advanced-settings" class="border-t border-default px-4 py-4">
         <PolicyEditor />

@@ -29,6 +29,7 @@ def apply_policy(
     spans: list[EntitySpan],
     policy: dict[EntityType, TransformationType] | None = None,
     overrides: list[EntityOverride] | None = None,
+    preserve_terms: list[str] | None = None,
 ) -> tuple[str, list[AppliedEntity], list[str]]:
     """Return (anonymized text, applied entities with source offsets, warnings).
 
@@ -36,6 +37,7 @@ def apply_policy(
     overrides produce warnings instead of being silently dropped.
     """
     active_policy = policy if policy is not None else DEFAULT_POLICY
+    preserve_set = {_normalize(term) for term in (preserve_terms or []) if term.strip()}
     override_map: dict[tuple[int, int], EntityOverride] = {
         (o.start, o.end): o for o in (overrides or [])
     }
@@ -55,6 +57,12 @@ def apply_policy(
             transformation = override.transformation or active_policy.get(
                 span.entity_type, TransformationType.TYPE_MASK
             )
+        elif preserve_set and _normalize(span.text) in preserve_set:
+            # User "never redact" terms; explicit per-span overrides still win.
+            span = span.model_copy(
+                update={"metadata": {**span.metadata, "preserved_by_term": True}}
+            )
+            transformation = TransformationType.PRESERVE
         else:
             transformation = active_policy.get(span.entity_type, TransformationType.TYPE_MASK)
         replacement: str | None

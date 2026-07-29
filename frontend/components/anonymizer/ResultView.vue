@@ -332,7 +332,14 @@ async function downloadRedactedPdf() {
   exportingPdf.value = true
   try {
     await downloadFromApi(
-      () => anonymizeApi.exportPdf(file, requestId, overrides, session.policyOverrides),
+      () =>
+        anonymizeApi.exportPdf(
+          file,
+          requestId,
+          overrides,
+          session.policyOverrides,
+          session.customRules,
+        ),
       'anonymisiert.pdf',
     )
   } catch (err) {

@@ -67,7 +67,10 @@ async def _handle_json(request: Request, settings: Settings) -> AnonymizeRespons
     # Override re-run from cached detection results.
     if payload.text is None:
         response = await rerun_with_overrides(
-            payload.request_id or "", payload.overrides, policy=payload.policy
+            payload.request_id or "",
+            payload.overrides,
+            policy=payload.policy,
+            preserve_terms=payload.preserve_terms,
         )
         if response is None:
             raise HTTPException(
@@ -78,13 +81,25 @@ async def _handle_json(request: Request, settings: Settings) -> AnonymizeRespons
 
     _check_text_limits(payload.text, settings)
     return await _run(
-        payload.text, settings, "paste", overrides=payload.overrides or None, policy=payload.policy
+        payload.text,
+        settings,
+        "paste",
+        overrides=payload.overrides or None,
+        policy=payload.policy,
+        custom_instruction=payload.custom_instruction,
+        redact_terms=payload.redact_terms,
+        preserve_terms=payload.preserve_terms,
     )
 
 
 async def _handle_upload(request: Request, settings: Settings) -> AnonymizeResponse:
     form = await request.form()
     policy = _parse_policy_form(form.get("policy"))
+    custom_instruction = form.get("custom_instruction")
+    if not isinstance(custom_instruction, str) or not custom_instruction.strip():
+        custom_instruction = None
+    redact_terms = _parse_terms_form(form.get("redact_terms"))
+    preserve_terms = _parse_terms_form(form.get("preserve_terms"))
     upload = form.get("file")
     if not isinstance(upload, UploadFile):
         raise HTTPException(status_code=400, detail="Multipart field 'file' is required.")
@@ -115,6 +130,9 @@ async def _handle_upload(request: Request, settings: Settings) -> AnonymizeRespo
         extraction_ms=extraction_ms,
         extraction_warnings=extracted.warnings,
         policy=policy,
+        custom_instruction=custom_instruction,
+        redact_terms=redact_terms,
+        preserve_terms=preserve_terms,
         file_sha256=hashlib.sha256(data).hexdigest(),
         layout=extracted.layout,
         page_count=len(extracted.pages),
@@ -129,6 +147,9 @@ async def _run(
     extraction_warnings: list[str] | None = None,
     overrides=None,
     policy=None,
+    custom_instruction: str | None = None,
+    redact_terms: list[str] | None = None,
+    preserve_terms: list[str] | None = None,
     file_sha256: str | None = None,
     layout=None,
     page_count: int = 0,
@@ -142,6 +163,9 @@ async def _run(
             extraction_warnings=extraction_warnings,
             overrides=overrides,
             policy=policy,
+            custom_instruction=custom_instruction,
+            redact_terms=redact_terms,
+            preserve_terms=preserve_terms,
             file_sha256=file_sha256,
             layout=layout,
             page_count=page_count,
@@ -164,6 +188,22 @@ def _parse_policy_form(raw) -> dict | None:
         return TypeAdapter(dict[EntityType, TransformationType]).validate_python(json.loads(raw))
     except Exception:
         raise HTTPException(status_code=422, detail="Invalid 'policy' payload.") from None
+
+
+def _parse_terms_form(raw) -> list[str] | None:
+    """Parse a multipart terms field (JSON array of strings) if present."""
+    import json
+
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        payload = json.loads(raw)
+        if not isinstance(payload, list) or len(payload) > 100:
+            raise ValueError
+        terms = [str(term)[:200] for term in payload if str(term).strip()]
+        return terms or None
+    except (json.JSONDecodeError, ValueError):
+        raise HTTPException(status_code=422, detail="Invalid terms payload.") from None
 
 
 def _check_text_limits(text: str, settings: Settings) -> None:

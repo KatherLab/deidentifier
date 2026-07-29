@@ -13,6 +13,7 @@ import { DEFAULT_POLICY, policyDeviations } from '@/utils/policy'
 import type {
   AnonymizeResponse,
   AnonymizedEntity,
+  CustomRules,
   DetectorStatus,
   EntityType,
   ExternalEndpoint,
@@ -47,6 +48,16 @@ export const useSessionStore = defineStore('session', () => {
    * the backend (as the request-level `policy` field on every request).
    */
   const policy = ref<Record<EntityType, TransformationType>>({ ...DEFAULT_POLICY })
+
+  /**
+   * Custom rules (advanced settings, "Eigene Regeln"). Memory only — never
+   * persisted. `customInstruction` and `redactTerms` affect DETECTION and thus
+   * only apply to the next full run; `preserveTerms` applies at transformation
+   * time and is also sent on cached re-runs.
+   */
+  const customInstruction = ref('')
+  const redactTerms = ref<string[]>([])
+  const preserveTerms = ref<string[]>([])
 
   /** Accumulated per-entity overrides, keyed by `${start}:${end}`. */
   const overrides = ref<Map<string, Override>>(new Map())
@@ -111,12 +122,36 @@ export const useSessionStore = defineStore('session', () => {
   /** True when the user changed any policy entry (badge in advanced settings). */
   const policyCustomized = computed(() => policyOverrides.value !== null)
 
+  /** The custom rules to send with requests (trimmed), or null when empty. */
+  const customRules = computed<CustomRules | null>(() => {
+    const instruction = customInstruction.value.trim()
+    if (
+      instruction.length === 0 &&
+      redactTerms.value.length === 0 &&
+      preserveTerms.value.length === 0
+    ) {
+      return null
+    }
+    return {
+      customInstruction: instruction,
+      redactTerms: [...redactTerms.value],
+      preserveTerms: [...preserveTerms.value],
+    }
+  })
+
+  /** True when policy OR custom rules deviate from the defaults (badge). */
+  const advancedCustomized = computed(() => policyCustomized.value || customRules.value !== null)
+
   function setPolicyTransformation(type: EntityType, transformation: TransformationType): void {
     policy.value = { ...policy.value, [type]: transformation }
   }
 
-  function resetPolicy(): void {
+  /** Reset ALL advanced settings: policy AND custom rules ("Zurücksetzen"). */
+  function resetAdvancedSettings(): void {
     policy.value = { ...DEFAULT_POLICY }
+    customInstruction.value = ''
+    redactTerms.value = []
+    preserveTerms.value = []
   }
 
   /** The pending override for an entity, if any. */
@@ -193,6 +228,7 @@ export const useSessionStore = defineStore('session', () => {
         current.request_id,
         [...overrides.value.values()],
         policyOverrides.value,
+        customRules.value,
       )
       if (token !== pdfPreviewToken) return
       if (pdfPreviewUrl.value !== null) URL.revokeObjectURL(pdfPreviewUrl.value)
@@ -242,15 +278,28 @@ export const useSessionStore = defineStore('session', () => {
     try {
       let response: AnonymizeResponse
       try {
+        // Cached path: only preserve_terms may be sent — redact terms and the
+        // custom instruction are already baked into the cached detection.
         response = (
-          await anonymizeApi.rerunWithOverrides(requestId, allOverrides, policyOverrides.value)
+          await anonymizeApi.rerunWithOverrides(
+            requestId,
+            allOverrides,
+            policyOverrides.value,
+            preserveTerms.value,
+          )
         ).data
       } catch (err) {
         if (!isExpiredResultError(err)) throw err
         // Cache expired — re-detect from the original text with the same
-        // overrides; the response carries a fresh request_id.
+        // overrides (full custom rules apply again); the response carries a
+        // fresh request_id.
         response = (
-          await anonymizeApi.anonymizeText(sourceText, allOverrides, policyOverrides.value)
+          await anonymizeApi.anonymizeText(
+            sourceText,
+            allOverrides,
+            policyOverrides.value,
+            customRules.value,
+          )
         ).data
       }
       result.value = response
@@ -311,13 +360,15 @@ export const useSessionStore = defineStore('session', () => {
 
   /** Anonymize pasted text. Rejects with the API error (caller shows a toast). */
   async function submitText(text: string): Promise<void> {
-    await run(() => anonymizeApi.anonymizeText(text, undefined, policyOverrides.value))
+    await run(() =>
+      anonymizeApi.anonymizeText(text, undefined, policyOverrides.value, customRules.value),
+    )
     sourceFile.value = null
   }
 
   /** Anonymize an uploaded file. Rejects with the API error (caller shows a toast). */
   async function submitFile(file: File): Promise<void> {
-    await run(() => anonymizeApi.anonymizeFile(file, policyOverrides.value))
+    await run(() => anonymizeApi.anonymizeFile(file, policyOverrides.value, customRules.value))
     sourceFile.value = file
     // For PDF sources, load the redacted-PDF preview right away (not awaited —
     // the text result is already usable while the preview renders).
@@ -351,8 +402,13 @@ export const useSessionStore = defineStore('session', () => {
     policy,
     policyOverrides,
     policyCustomized,
+    customInstruction,
+    redactTerms,
+    preserveTerms,
+    customRules,
+    advancedCustomized,
     setPolicyTransformation,
-    resetPolicy,
+    resetAdvancedSettings,
     pdfPreviewUrl,
     pdfPreviewBlob,
     pdfPreviewLoading,

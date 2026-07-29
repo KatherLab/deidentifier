@@ -43,6 +43,18 @@ const GENERIC_OPTIONS: PolicyOption[] = [
   { value: 'PRESERVE', label: 'Beibehalten' },
 ]
 
+/**
+ * Explanation of each transformation with a concrete example, shown in the
+ * policy editor under the select for the CURRENTLY chosen value.
+ */
+export const TRANSFORMATION_HINTS: Record<TransformationType, string> = {
+  TYPE_MASK: 'Wird durch einen Platzhalter ersetzt, z. B. [ADRESSE]',
+  CONSISTENT_TAG: 'Gleiche Person erhält im ganzen Dokument dieselbe Nummer, z. B. [PERSON_1]',
+  GENERALIZE: 'Nur das Jahr bleibt sichtbar, z. B. 01.02.1980 → 1980',
+  PRESERVE: 'Bleibt unverändert sichtbar (reduziert den Schutz)',
+  REMOVE: 'Wird durch [GESCHWÄRZT] ersetzt',
+}
+
 /** Allowed transformations per entity type (policy editor dropdowns). */
 export const POLICY_OPTIONS: Record<EntityType, PolicyOption[]> = {
   PERSON_NAME: [

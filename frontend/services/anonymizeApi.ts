@@ -4,6 +4,7 @@ import type {
   AnonymizeRerunRequest,
   AnonymizeResponse,
   AnonymizeTextRequest,
+  CustomRules,
   Override,
   PolicyMap,
 } from '@/types/anonymizer'
@@ -13,43 +14,77 @@ function hasPolicyEntries(policy?: PolicyMap | null): policy is PolicyMap {
   return policy != null && Object.keys(policy).length > 0
 }
 
+/**
+ * Append the custom-rule form fields to a multipart request. Backend contract:
+ * `custom_instruction` is a plain string, the term lists are JSON-stringified
+ * arrays — each field only present when non-empty.
+ */
+function appendCustomRules(formData: FormData, rules?: CustomRules | null): void {
+  if (!rules) return
+  if (rules.customInstruction.length > 0) {
+    formData.append('custom_instruction', rules.customInstruction)
+  }
+  if (rules.redactTerms.length > 0) {
+    formData.append('redact_terms', JSON.stringify(rules.redactTerms))
+  }
+  if (rules.preserveTerms.length > 0) {
+    formData.append('preserve_terms', JSON.stringify(rules.preserveTerms))
+  }
+}
+
 export const anonymizeApi = {
   /**
    * Anonymize pasted text (JSON body). Pass `overrides` to re-run from the
    * full text with user overrides applied (used when the cached detection of
    * a previous request has expired — 410). `policy` carries the deviations
-   * from the default policy (advanced settings), if any.
+   * from the default policy (advanced settings), if any; `rules` the custom
+   * rules (extra redact/preserve terms + LLM instruction), if any.
    */
   anonymizeText(
     text: string,
     overrides?: Override[],
     policy?: PolicyMap | null,
+    rules?: CustomRules | null,
   ): Promise<AxiosResponse<AnonymizeResponse>> {
     const body: AnonymizeTextRequest = { text }
     if (overrides && overrides.length > 0) body.overrides = overrides
     if (hasPolicyEntries(policy)) body.policy = policy
+    if (rules) {
+      if (rules.customInstruction.length > 0) body.custom_instruction = rules.customInstruction
+      if (rules.redactTerms.length > 0) body.redact_terms = rules.redactTerms
+      if (rules.preserveTerms.length > 0) body.preserve_terms = rules.preserveTerms
+    }
     return api.post<AnonymizeResponse>('/anonymize', body)
   },
 
   /**
    * Cheap re-run from the backend's cached detection (no re-detection).
    * Returns the SAME request_id; rejects with 410 if the cache has expired.
+   * Only `preserveTerms` can be sent here — redact terms and the custom
+   * instruction affect detection and are baked into the cached result.
    */
   rerunWithOverrides(
     requestId: string,
     overrides: Override[],
     policy?: PolicyMap | null,
+    preserveTerms?: string[] | null,
   ): Promise<AxiosResponse<AnonymizeResponse>> {
     const body: AnonymizeRerunRequest = { request_id: requestId, overrides }
     if (hasPolicyEntries(policy)) body.policy = policy
+    if (preserveTerms && preserveTerms.length > 0) body.preserve_terms = preserveTerms
     return api.post<AnonymizeResponse>('/anonymize', body)
   },
 
   /** Anonymize an uploaded file (multipart/form-data, field `file`). */
-  anonymizeFile(file: File, policy?: PolicyMap | null): Promise<AxiosResponse<AnonymizeResponse>> {
+  anonymizeFile(
+    file: File,
+    policy?: PolicyMap | null,
+    rules?: CustomRules | null,
+  ): Promise<AxiosResponse<AnonymizeResponse>> {
     const formData = new FormData()
     formData.append('file', file)
     if (hasPolicyEntries(policy)) formData.append('policy', JSON.stringify(policy))
+    appendCustomRules(formData, rules)
     return api.post<AnonymizeResponse>('/anonymize', formData)
   },
 
@@ -64,12 +99,14 @@ export const anonymizeApi = {
     requestId: string,
     overrides: Override[],
     policy?: PolicyMap | null,
+    rules?: CustomRules | null,
   ): Promise<AxiosResponse<Blob>> {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('request_id', requestId)
     if (overrides.length > 0) formData.append('overrides', JSON.stringify(overrides))
     if (hasPolicyEntries(policy)) formData.append('policy', JSON.stringify(policy))
+    appendCustomRules(formData, rules)
     return api.post<Blob>('/export/pdf', formData, { responseType: 'blob' })
   },
 }

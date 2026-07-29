@@ -26,6 +26,12 @@ class AnonymizeTextRequest(BaseModel):
     # Partial per-type policy from the UI's advanced settings; overlays the
     # default policy. Sent with every request (stateless, like overrides).
     policy: dict[EntityType, TransformationType] | None = None
+    # Custom rules (advanced settings). redact_terms and custom_instruction
+    # affect detection and only apply to fresh runs; preserve_terms applies at
+    # transformation time and is honored on re-runs too.
+    custom_instruction: str | None = Field(default=None, max_length=2000)
+    redact_terms: list[str] = Field(default_factory=list, max_length=100)
+    preserve_terms: list[str] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def _text_or_request_id(self) -> "AnonymizeTextRequest":
