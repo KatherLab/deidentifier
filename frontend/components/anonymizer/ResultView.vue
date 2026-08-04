@@ -95,6 +95,25 @@
                 <Archive class="h-4 w-4 shrink-0 text-content-subtle" aria-hidden="true" />
                 Alle Dokumente (.zip)
               </button>
+              <!-- Export option (does not close the menu): keep original
+                   filenames instead of "anonymisiert.*". -->
+              <div class="my-1 border-t border-default" role="separator"></div>
+              <label
+                class="flex cursor-pointer items-start gap-2 rounded-card px-3 py-2 transition-colors hover:bg-surface-muted"
+              >
+                <input
+                  type="checkbox"
+                  class="mt-0.5 h-3.5 w-3.5 shrink-0 accent-primary"
+                  :checked="settings.keepFilenames"
+                  @change="settings.setKeepFilenames(($event.target as HTMLInputElement).checked)"
+                />
+                <span class="text-sm text-content">
+                  Dateinamen beibehalten
+                  <span class="block text-xs text-content-subtle">
+                    Vorsicht: Dateinamen können personenbezogene Daten enthalten.
+                  </span>
+                </span>
+              </label>
             </div>
           </div>
           <BaseButton size="sm" variant="secondary" @click="session.reset()">
@@ -613,9 +632,24 @@ async function copyAnonymized() {
   }
 }
 
+/** Base name derived from the ORIGINAL upload (pasted text has none). */
+const exportBase = computed<string | null>(() => {
+  const entry = doc.value
+  if (!entry || entry.file === null) return null
+  const base = entry.name.replace(/\.[^.]+$/, '')
+  return base.length > 0 ? base : null
+})
+
+/** "anonymisiert.<ext>" by default; the original base name when opted in. */
+function exportFilename(extension: 'txt' | 'pdf'): string {
+  return settings.keepFilenames && exportBase.value !== null
+    ? `${exportBase.value}.${extension}`
+    : `anonymisiert.${extension}`
+}
+
 function downloadAnonymized() {
   if (!result.value) return
-  downloadBlob(result.value.anonymized_text, 'anonymisiert.txt', 'text/plain;charset=utf-8')
+  downloadBlob(result.value.anonymized_text, exportFilename('txt'), 'text/plain;charset=utf-8')
 }
 
 /**
@@ -639,7 +673,7 @@ async function downloadRedactedPdf() {
   const requestId = entry?.result?.request_id
   if (!entry || !file || requestId === undefined || exportingPdf.value) return
   if (entry.pdfPreviewBlob !== null && !entry.pdfPreviewLoading) {
-    downloadBlob(entry.pdfPreviewBlob, 'anonymisiert.pdf')
+    downloadBlob(entry.pdfPreviewBlob, exportFilename('pdf'))
     return
   }
   const overrides = [...entry.overrides.values()]
@@ -655,7 +689,7 @@ async function downloadRedactedPdf() {
           entry.rules,
           entry.redactAreas,
         ),
-      'anonymisiert.pdf',
+      exportFilename('pdf'),
     )
   } catch (err) {
     toast.error(await extractPdfExportErrorMessage(err))
@@ -696,12 +730,15 @@ async function downloadAllDocuments() {
       used.add(candidate)
       return candidate
     }
+    // ZIP entries always carry the base name (needed to tell 100 files
+    // apart); the opt-in only drops the ".anonymisiert" infix.
+    const infix = settings.keepFilenames ? '' : '.anonymisiert'
     for (const entry of doneDocuments.value) {
       if (!entry.result) continue
       const base = entry.name.replace(/\.[^.]+$/, '') || 'dokument'
-      files[uniqueName(`${base}.anonymisiert.txt`)] = strToU8(entry.result.anonymized_text)
+      files[uniqueName(`${base}${infix}.txt`)] = strToU8(entry.result.anonymized_text)
       if (entry.pdfPreviewBlob !== null && !entry.pdfPreviewLoading) {
-        files[uniqueName(`${base}.anonymisiert.pdf`)] = new Uint8Array(
+        files[uniqueName(`${base}${infix}.pdf`)] = new Uint8Array(
           await entry.pdfPreviewBlob.arrayBuffer(),
         )
       }

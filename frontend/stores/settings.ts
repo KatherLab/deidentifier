@@ -6,12 +6,21 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
 const EXPERT_MODE_KEY = 'expertMode'
+const KEEP_FILENAMES_KEY = 'keepFilenames'
 
-function readExpertMode(): boolean {
+function readFlag(key: string): boolean {
   try {
-    return localStorage.getItem(EXPERT_MODE_KEY) === '1'
+    return localStorage.getItem(key) === '1'
   } catch {
     return false
+  }
+}
+
+function writeFlag(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, value ? '1' : '0')
+  } catch {
+    /* localStorage unavailable — the preference just won't persist */
   }
 }
 
@@ -21,16 +30,24 @@ export const useSettingsStore = defineStore('settings', () => {
    * character offsets, warning categories) and unlocks the free multi-panel
    * combination on the result view. Off = the calm default UI.
    */
-  const expertMode = ref(readExpertMode())
+  const expertMode = ref(readFlag(EXPERT_MODE_KEY))
 
   function setExpertMode(value: boolean): void {
     expertMode.value = value
-    try {
-      localStorage.setItem(EXPERT_MODE_KEY, value ? '1' : '0')
-    } catch {
-      /* localStorage unavailable — the preference just won't persist */
-    }
+    writeFlag(EXPERT_MODE_KEY, value)
   }
 
-  return { expertMode, setExpertMode }
+  /**
+   * Keep the ORIGINAL filenames on export instead of "anonymisiert.*".
+   * Opt-in: filenames themselves frequently contain PII (patient names), so
+   * the safe default renames everything.
+   */
+  const keepFilenames = ref(readFlag(KEEP_FILENAMES_KEY))
+
+  function setKeepFilenames(value: boolean): void {
+    keepFilenames.value = value
+    writeFlag(KEEP_FILENAMES_KEY, value)
+  }
+
+  return { expertMode, setExpertMode, keepFilenames, setKeepFilenames }
 })

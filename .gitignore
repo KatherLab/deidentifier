@@ -1,6 +1,7 @@
 # Reference clone — not part of this repository
 llmaixweb/
 LLMAIx/
+testfiles/
 
 # Python
 __pycache__/
