@@ -162,10 +162,18 @@ def _covered(needle: str, found: set[str]) -> bool:
 
 
 def _char_rects(textpage, start: int, count: int) -> list[tuple[float, float, float, float]]:
-    """Merge the char boxes of a match into per-line rectangles."""
+    """Merge the char boxes of a match into per-line rectangles.
+
+    Loose char boxes are uniform full line-height cells (ascent to descent for
+    every character), so bars stay level regardless of descenders (y, g, p) —
+    tight glyph boxes would dip for those letters and even split one word into
+    bars of different heights."""
     rects: list[list[float]] = []
     for index in range(start, start + count):
-        box = textpage.get_charbox(index)
+        try:
+            box = textpage.get_charbox(index, loose=True)
+        except Exception:
+            box = textpage.get_charbox(index)
         if box is None:
             continue
         left, bottom, right, top = box
