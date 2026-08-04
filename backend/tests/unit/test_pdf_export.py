@@ -320,3 +320,79 @@ def test_verify_rebuilt_catches_surviving_pii():
     with pytest.raises(ExportError) as excinfo:
         _verify_rebuilt(buffer.getvalue(), entities)
     assert "Verification failed" in str(excinfo.value)
+
+
+def test_short_entity_true_redaction_whole_word():
+    """An age like '28' must be redacted as a whole word — gone standalone,
+    but '2028' elsewhere must remain untouched (and not trip verification)."""
+    import re
+
+    import pypdfium2 as pdfium
+
+    source = "Age: 28\nFollow-up in 2028 is planned."
+    pdf = make_pdf(["Age: 28", "Follow-up in 2028 is planned."])
+    entities = [
+        AppliedEntity(
+            start=source.index("28"),
+            end=source.index("28") + 2,
+            text="28",
+            entity_type=EntityType.AGE,
+            confidence=0.9,
+            detector="test",
+            transformation=TransformationType.TYPE_MASK,
+            replacement="[ALTER]",
+            status=SpanStatus.REDACTED,
+        )
+    ]
+    output = redact_native_pdf(pdf, entities, native_settings())
+    document = pdfium.PdfDocument(output)
+    text = document[0].get_textpage().get_text_range()
+    document.close()
+    assert not re.search(r"(?<!\w)28(?!\w)", text), "standalone 28 must be gone"
+    assert "2028" in text, "embedded occurrences must be preserved"
+
+
+def test_short_entity_raster_fails_closed_when_only_embedded():
+    """If the short needle only exists inside a longer number, word-bounded
+    matching must NOT black out the substring — and the export fails closed."""
+    from backend.src.utils.pdf_export import _redact_native_raster
+
+    pdf = make_pdf(["Kontrolle im Jahr 2028 geplant."])
+    entities = [
+        AppliedEntity(
+            start=0,
+            end=2,
+            text="28",
+            entity_type=EntityType.AGE,
+            confidence=0.9,
+            detector="test",
+            transformation=TransformationType.TYPE_MASK,
+            replacement="[ALTER]",
+            status=SpanStatus.REDACTED,
+        )
+    ]
+    with pytest.raises(ExportError):
+        _redact_native_raster(pdf, entities, native_settings())
+
+
+def test_rebuild_verification_tolerates_embedded_short_needles():
+    from pypdf import PdfReader  # noqa: F401
+
+    source = "Alter: 28, Kontrolle 2028"
+    layout = [LayoutLine(page_number=1, x1=100, y1=100, x2=800, y2=120, start=0, end=len(source))]
+    entities = [
+        AppliedEntity(
+            start=7,
+            end=9,
+            text="28",
+            entity_type=EntityType.AGE,
+            confidence=0.9,
+            detector="test",
+            transformation=TransformationType.TYPE_MASK,
+            replacement="[ALTER]",
+            status=SpanStatus.REDACTED,
+        )
+    ]
+    # "2028" remains in the rebuilt text; word-bounded verification must pass.
+    output = rebuild_scanned_pdf(source, layout, entities, page_count=1)
+    assert output.startswith(b"%PDF")

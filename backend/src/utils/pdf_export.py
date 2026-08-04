@@ -29,7 +29,11 @@ logger = get_safe_logger(__name__)
 
 _PAGE_A4 = (595.28, 841.89)
 _RECONSTRUCTION_NOTICE = "Maschinell rekonstruiertes und anonymisiertes Dokument"
-_MIN_SEARCH_LENGTH = 3
+_MIN_SEARCH_LENGTH = 2
+# Needles up to this length (e.g. an age "28") are matched as WHOLE WORDS:
+# substring search would black out every embedded occurrence ("2028"), while
+# dropping them entirely would leak the entity in the exported PDF.
+_SHORT_NEEDLE_MAX = 3
 
 
 class ExportError(Exception):
@@ -80,11 +84,14 @@ def _redact_native_true(data: bytes, entities: list[AppliedEntity], settings: Se
     try:
         for page in document:
             for needle in needles:
-                rects = []
-                for variant in _needle_variants(needle):
-                    rects = page.search_for(variant)
-                    if rects:
-                        break
+                if len(needle) <= _SHORT_NEEDLE_MAX:
+                    rects = _short_word_rects(page, needle)
+                else:
+                    rects = []
+                    for variant in _needle_variants(needle):
+                        rects = page.search_for(variant)
+                        if rects:
+                            break
                 if not rects:
                     continue
                 found.add(needle)
@@ -127,6 +134,26 @@ def _redact_native_true(data: bytes, entities: list[AppliedEntity], settings: Se
     return output
 
 
+def _short_word_rects(page, needle: str) -> list:
+    """Whole-word rects for short needles via the page's word list."""
+    import pymupdf
+
+    rects = []
+    for x0, y0, x1, y1, word, *_ in page.get_text("words"):
+        if word.strip(".,;:()[]{}\"'") == needle:
+            rects.append(pymupdf.Rect(x0, y0, x1, y1))
+    return rects
+
+
+def _needle_survives(needle: str, text: str, collapsed: str) -> bool:
+    """Word-bounded check for short needles (so '2028' never counts as a
+    surviving '28'), substring check otherwise."""
+    if len(needle) <= _SHORT_NEEDLE_MAX:
+        pattern = rf"(?<!\w){re.escape(needle)}(?!\w)"
+        return bool(re.search(pattern, text) or re.search(pattern, collapsed))
+    return needle in text or re.sub(r"\s+", " ", needle) in collapsed
+
+
 def _verify_native(output: bytes, needles: list[str]) -> None:
     """Mandatory: re-extract the redacted PDF and assert no redacted string
     survived anywhere in the remaining text layer."""
@@ -139,7 +166,7 @@ def _verify_native(output: bytes, needles: list[str]) -> None:
         document.close()
     collapsed = re.sub(r"\s+", " ", text)
     for needle in needles:
-        if needle in text or re.sub(r"\s+", " ", needle) in collapsed:
+        if _needle_survives(needle, text, collapsed):
             raise ExportError(
                 "Verification failed: a redacted string is still present in the "
                 "redacted PDF's text layer."
@@ -174,7 +201,10 @@ def _redact_native_raster(data: bytes, entities: list[AppliedEntity], settings: 
             boxes: list[tuple[float, float, float, float, str | None]] = []
             for needle in needles:
                 replacement = replacements.get(needle)
-                for start, count in _search_all(textpage, needle):
+                matches = _search_all(textpage, needle)
+                if len(needle) <= _SHORT_NEEDLE_MAX:
+                    matches = [m for m in matches if _pdfium_word_bounded(textpage, m)]
+                for start, count in matches:
                     found.add(needle)
                     for rect in _char_rects(textpage, start, count):
                         boxes.append((*rect, replacement))
@@ -229,6 +259,13 @@ def _redact_native_raster(data: bytes, entities: list[AppliedEntity], settings: 
         resolution=72 * scale,
     )
     return buffer.getvalue()
+
+
+def _pdfium_word_bounded(textpage, match: tuple[int, int]) -> bool:
+    start, count = match
+    before = textpage.get_text_range(start - 1, 1) if start > 0 else ""
+    after = textpage.get_text_range(start + count, 1) or ""
+    return not (before[-1:].isalnum() or after[:1].isalnum())
 
 
 def _search_all(textpage, needle: str) -> list[tuple[int, int]]:
@@ -420,7 +457,7 @@ def _verify_rebuilt(output: bytes, entities: list[AppliedEntity]) -> None:
     extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
     collapsed = re.sub(r"\s+", " ", extracted)
     for needle in redacted_texts(entities):
-        if needle in extracted or re.sub(r"\s+", " ", needle) in collapsed:
+        if _needle_survives(needle, extracted, collapsed):
             raise ExportError(
                 "Verification failed: a redacted string is still present in the "
                 "rebuilt PDF; the export was aborted."
