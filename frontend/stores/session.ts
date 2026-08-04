@@ -350,6 +350,21 @@ export const useSessionStore = defineStore('session', () => {
     return rerunOverrides(previous)
   }
 
+  /**
+   * Manually redact an arbitrary text region (mouse selection in the source
+   * review). The offsets are Unicode CODE POINTS into `source_text`; because
+   * they don't match a detected entity, the backend turns the override into a
+   * user-defined span (detector `user_manual`, `metadata.user_manual`) on the
+   * re-run. Removing the override again (resetEntityOverride) undoes it.
+   */
+  function addManualRedaction(start: number, end: number): Promise<void> {
+    if (!result.value) return Promise.resolve()
+    const previous = new Map(overrides.value)
+    const text = Array.from(result.value.source_text).slice(start, end).join('')
+    overrides.value.set(overrideKey({ start, end }), { start, end, text, transformation: 'REMOVE' })
+    return rerunOverrides(previous)
+  }
+
   /** Remove any override for this entity and re-run with the remaining ones. */
   function resetEntityOverride(entity: AnonymizedEntity): Promise<void> {
     const key = overrideKey(entity)
@@ -427,6 +442,7 @@ export const useSessionStore = defineStore('session', () => {
     selectEntity,
     overrideFor,
     applyEntityOverride,
+    addManualRedaction,
     resetEntityOverride,
     reset,
   }

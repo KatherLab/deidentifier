@@ -138,6 +138,77 @@ def test_override_rerun_preserves_entity(client):
     assert "Max Mustermann" not in body["anonymized_text"]
 
 
+def test_manual_selection_becomes_redaction(client):
+    first = client.post("/api/v1/anonymize", json={"text": SAMPLE_TEXT}).json()
+    # "Aufnahme" is not a detected entity — the user selects it manually.
+    start = SAMPLE_TEXT.index("Aufnahme")
+    second = client.post(
+        "/api/v1/anonymize",
+        json={
+            "request_id": first["request_id"],
+            "overrides": [
+                {
+                    "start": start,
+                    "end": start + len("Aufnahme"),
+                    "text": "Aufnahme",
+                    "transformation": "REMOVE",
+                }
+            ],
+        },
+    )
+    assert second.status_code == 200
+    body = second.json()
+    assert "Aufnahme am" not in body["anonymized_text"]
+    assert "[GESCHWÄRZT] am" in body["anonymized_text"]
+    manual = next(e for e in body["entities"] if e["detector"] == "user_manual")
+    assert manual["metadata"].get("user_manual") is True
+    assert manual["status"] == "REDACTED"
+    # Detected entities stay redacted as before.
+    assert "Max Mustermann" not in body["anonymized_text"]
+
+
+def test_manual_selection_with_stale_text_is_ignored_with_warning(client):
+    first = client.post("/api/v1/anonymize", json={"text": SAMPLE_TEXT}).json()
+    second = client.post(
+        "/api/v1/anonymize",
+        json={
+            "request_id": first["request_id"],
+            "overrides": [{"start": 0, "end": 7, "text": "FALSCH!", "transformation": "REMOVE"}],
+        },
+    )
+    assert second.status_code == 200
+    body = second.json()
+    assert any("manual selection" in w for w in body["warnings"])
+    assert body["anonymized_text"].startswith("Patient")  # nothing mangled
+
+
+def test_manual_selection_overlapping_detected_entity(client):
+    first = client.post("/api/v1/anonymize", json={"text": SAMPLE_TEXT}).json()
+    # Select a region that contains the detected name plus surrounding text.
+    start = SAMPLE_TEXT.index("Patient: Max Mustermann")
+    end = start + len("Patient: Max Mustermann")
+    second = client.post(
+        "/api/v1/anonymize",
+        json={
+            "request_id": first["request_id"],
+            "overrides": [
+                {
+                    "start": start,
+                    "end": end,
+                    "text": "Patient: Max Mustermann",
+                    "transformation": "REMOVE",
+                }
+            ],
+        },
+    )
+    assert second.status_code == 200
+    body = second.json()
+    # The larger manual region wins the overlap and is fully removed.
+    assert "Max Mustermann" not in body["anonymized_text"]
+    assert "Patient:" not in body["anonymized_text"]
+    assert "[GESCHWÄRZT]" in body["anonymized_text"]
+
+
 def test_override_rerun_with_expired_id(client):
     response = client.post("/api/v1/anonymize", json={"request_id": "no-such-id", "overrides": []})
     assert response.status_code == 410

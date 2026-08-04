@@ -12,6 +12,8 @@ import type { AnonymizedEntity, ValidationWarning } from '@/types/anonymizer'
 export interface HighlightSegment {
   /** Stable key for v-for rendering. */
   key: string
+  /** Code point offset of the segment's first character in the source text. */
+  start: number
   /** The segment's text (joined code points). */
   text: string
   /** Index into the response's `entities` array, or null for plain text. */
@@ -89,6 +91,7 @@ export function buildHighlightSegments(
     }
     raw.push({
       key: `${start}-${end}`,
+      start,
       text: codePoints.slice(start, end).join(''),
       entityIndex,
       warning: inWarning,

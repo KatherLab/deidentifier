@@ -119,7 +119,8 @@
           @close="session.selectEntity(null)"
         />
         <p v-else class="shrink-0 border-t border-default px-4 py-2.5 text-xs text-content-subtle">
-          Klicken Sie auf eine markierte Stelle, um Details und Aktionen anzuzeigen.
+          Klicken Sie auf eine markierte Stelle für Details – oder markieren Sie beliebigen Text, um
+          ihn manuell zu schwärzen.
         </p>
       </section>
 

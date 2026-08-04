@@ -13,12 +13,12 @@
             :title="entity.text"
             >{{ entity.text }}</span
           >
-          <StatusBadge :label="entityTypeLabel(entity.entity_type)" color="blue" />
+          <StatusBadge :label="typeBadgeLabel" color="blue" />
           <StatusBadge
             :label="entityStatusLabel(entity.status)"
             :color="entityStatusPillColor(entity.status)"
           />
-          <StatusBadge v-if="isOverridden" label="Geändert" color="purple" />
+          <StatusBadge v-if="isOverridden && !isUserManual" label="Geändert" color="purple" />
           <span
             v-if="entity.replacement !== null"
             class="font-mono text-xs text-content-muted"
@@ -31,45 +31,48 @@
           </span>
         </div>
 
-        <!-- Actions row. -->
+        <!-- Actions row. Manual redactions only offer "Zurücksetzen" — the
+             transformation toggle and type change don't apply to them. -->
         <div class="flex flex-wrap items-center gap-2">
-          <BaseButton
-            v-if="entity.status !== 'PRESERVED'"
-            size="sm"
-            variant="secondary"
-            :disabled="rerunning"
-            @click="setTransformation('PRESERVE')"
-          >
-            Beibehalten
-          </BaseButton>
-          <BaseButton
-            v-else
-            size="sm"
-            variant="secondary"
-            :disabled="rerunning"
-            @click="setTransformation('TYPE_MASK')"
-          >
-            Schwärzen
-          </BaseButton>
-          <label :for="typeSelectId" class="sr-only">Entitätstyp</label>
-          <select
-            :id="typeSelectId"
-            v-model="selectedType"
-            :disabled="rerunning"
-            class="rounded-card border border-strong bg-surface px-2 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-          >
-            <option v-for="(label, type) in ENTITY_TYPE_LABELS" :key="type" :value="type">
-              {{ label }}
-            </option>
-          </select>
-          <BaseButton
-            size="sm"
-            variant="secondary"
-            :disabled="rerunning || selectedType === entity.entity_type"
-            @click="applyType"
-          >
-            Typ ändern
-          </BaseButton>
+          <template v-if="!isUserManual">
+            <BaseButton
+              v-if="entity.status !== 'PRESERVED'"
+              size="sm"
+              variant="secondary"
+              :disabled="rerunning"
+              @click="setTransformation('PRESERVE')"
+            >
+              Beibehalten
+            </BaseButton>
+            <BaseButton
+              v-else
+              size="sm"
+              variant="secondary"
+              :disabled="rerunning"
+              @click="setTransformation('TYPE_MASK')"
+            >
+              Schwärzen
+            </BaseButton>
+            <label :for="typeSelectId" class="sr-only">Entitätstyp</label>
+            <select
+              :id="typeSelectId"
+              v-model="selectedType"
+              :disabled="rerunning"
+              class="rounded-card border border-strong bg-surface px-2 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            >
+              <option v-for="(label, type) in ENTITY_TYPE_LABELS" :key="type" :value="type">
+                {{ label }}
+              </option>
+            </select>
+            <BaseButton
+              size="sm"
+              variant="secondary"
+              :disabled="rerunning || selectedType === entity.entity_type"
+              @click="applyType"
+            >
+              Typ ändern
+            </BaseButton>
+          </template>
           <BaseButton
             v-if="hasOverride"
             size="sm"
@@ -133,6 +136,12 @@ const confidenceLabel = computed(() => `${Math.round(props.entity.confidence * 1
 const rerunning = computed(() => session.rerunning)
 const hasOverride = computed(() => session.overrideFor(props.entity) !== undefined)
 const isOverridden = computed(() => props.entity.metadata?.overridden === true || hasOverride.value)
+
+/** Manually redacted selection (backend-created span, detector `user_manual`). */
+const isUserManual = computed(() => props.entity.metadata?.user_manual === true)
+const typeBadgeLabel = computed(() =>
+  isUserManual.value ? 'Manuelle Schwärzung' : entityTypeLabel(props.entity.entity_type),
+)
 
 // The type dropdown follows the currently selected entity.
 const selectedType = ref<EntityType>(props.entity.entity_type)

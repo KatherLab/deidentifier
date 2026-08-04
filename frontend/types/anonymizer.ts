@@ -37,6 +37,8 @@ export type WarningSeverity = 'INFO' | 'WARNING' | 'HIGH'
 export interface EntityMetadata {
   /** True when this entity's transformation/type was overridden by the user. */
   overridden?: boolean
+  /** True for user-defined spans created via manual selection (detector `user_manual`). */
+  user_manual?: boolean
   [key: string]: unknown
 }
 

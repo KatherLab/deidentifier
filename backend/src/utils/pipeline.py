@@ -11,7 +11,13 @@ import uuid
 
 from ..core.config import Settings
 from ..schemas.anonymize import AnonymizeResponse, EntityOverride, TimingMs
-from ..schemas.entities import EntitySpan, ValidationResult, ValidationSeverity, ValidationWarning
+from ..schemas.entities import (
+    EntitySpan,
+    EntityType,
+    ValidationResult,
+    ValidationSeverity,
+    ValidationWarning,
+)
 from .cache import CachedDetection, request_cache
 from .detection import build_detectors, validate_spans
 from .leakage import compute_status, validate_output
@@ -133,9 +139,13 @@ async def _finalize(
 ) -> AnonymizeResponse:
     active_policy = merge_policy(policy)
     t1 = time.perf_counter()
+    manual_spans, manual_warnings = _manual_spans(text, resolved, overrides)
+    if manual_spans:
+        resolved, _ = resolve_spans(resolved + manual_spans)
     anonymized, applied, override_warnings = apply_policy(
         text, resolved, policy=active_policy, overrides=overrides, preserve_terms=preserve_terms
     )
+    override_warnings = manual_warnings + override_warnings
     t2 = time.perf_counter()
     validation = await validate_output(
         anonymized, applied, policy=active_policy, detector_warnings=detector_warnings
@@ -175,3 +185,36 @@ async def _finalize(
             total=round(extraction_ms + detection_ms + (t3 - t1) * 1000, 2),
         ),
     )
+
+
+def _manual_spans(
+    text: str,
+    resolved: list[EntitySpan],
+    overrides: list[EntityOverride] | None,
+) -> tuple[list[EntitySpan], list[str]]:
+    """Overrides that match no detected span are user-defined manual
+    selections from the review UI: they become first-class spans (validated
+    against the source, then merged through the regular overlap resolution).
+    The override itself then matches the new span and carries the chosen
+    transformation."""
+    existing = {(span.start, span.end) for span in resolved}
+    spans: list[EntitySpan] = []
+    warnings: list[str] = []
+    for override in overrides or []:
+        if (override.start, override.end) in existing:
+            continue
+        if override.end <= len(text) and text[override.start : override.end] == override.text:
+            spans.append(
+                EntitySpan(
+                    start=override.start,
+                    end=override.end,
+                    text=override.text,
+                    entity_type=override.entity_type or EntityType.OTHER_PII,
+                    confidence=1.0,
+                    detector="user_manual",
+                    metadata={"user_manual": True},
+                )
+            )
+        else:
+            warnings.append("A manual selection no longer matches the source text and was ignored.")
+    return spans, warnings
