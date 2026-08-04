@@ -23,6 +23,9 @@ import re
 from ..core.config import Settings
 from ..schemas.entities import AppliedEntity, SpanStatus
 from .extraction import LayoutLine
+from .safe_logging import get_safe_logger
+
+logger = get_safe_logger(__name__)
 
 _PAGE_A4 = (595.28, 841.89)
 _RECONSTRUCTION_NOTICE = "Maschinell rekonstruiertes und anonymisiertes Dokument"
@@ -42,10 +45,108 @@ def redacted_texts(entities: list[AppliedEntity]) -> list[str]:
     return sorted((t for t in unique if len(t) >= _MIN_SEARCH_LENGTH), key=len, reverse=True)
 
 
-# --- Native PDFs: rasterize + exact char-box blackout ------------------------
+# --- Native PDFs -------------------------------------------------------------
+#
+# Primary path: TRUE redaction with PyMuPDF — the redacted text is removed
+# from the content stream (and image pixels under the boxes erased), the rest
+# of the document stays a genuine vector PDF with a selectable, searchable
+# text layer. Verified by re-extraction; any failure falls back to the
+# rasterize+blackout path, which physically cannot carry a text layer.
 
 
 def redact_native_pdf(data: bytes, entities: list[AppliedEntity], settings: Settings) -> bytes:
+    try:
+        return _redact_native_true(data, entities, settings)
+    except Exception as exc:
+        logger.warning(
+            "true_redaction_fallback",
+            reason=type(exc).__name__,
+        )
+        return _redact_native_raster(data, entities, settings)
+
+
+def _redact_native_true(data: bytes, entities: list[AppliedEntity], settings: Settings) -> bytes:
+    import pymupdf
+
+    needles = redacted_texts(entities)
+    replacements = {
+        e.text.strip(): e.replacement
+        for e in entities
+        if e.status == SpanStatus.GENERALIZED and e.replacement
+    }
+    found: set[str] = set()
+
+    document = pymupdf.open(stream=data, filetype="pdf")
+    try:
+        for page in document:
+            for needle in needles:
+                rects = []
+                for variant in _needle_variants(needle):
+                    rects = page.search_for(variant)
+                    if rects:
+                        break
+                if not rects:
+                    continue
+                found.add(needle)
+                replacement = replacements.get(needle)
+                for rect in rects:
+                    if replacement:
+                        page.add_redact_annot(
+                            rect,
+                            text=replacement,
+                            fill=(1, 1, 1),
+                            text_color=(0, 0, 0),
+                            fontsize=max(min(rect.height * 0.8, 12.0), 6.0),
+                        )
+                    else:
+                        page.add_redact_annot(rect, fill=(0, 0, 0))
+            # Remove the text AND erase image pixels under the boxes (a
+            # "native" PDF can embed scanned fragments containing PII).
+            page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_PIXELS)
+            for annot in list(page.annots() or []):
+                page.delete_annot(annot)
+
+        missing = [n for n in needles if n not in found and not _covered(n, found)]
+        if missing:
+            raise ExportError(
+                f"{len(missing)} redacted item(s) could not be located in the PDF text "
+                "layer; the redacted PDF was NOT generated."
+            )
+
+        # Scrub metadata, XMP, embedded/attached files, JavaScript, hidden text.
+        try:
+            document.scrub()
+        except Exception:
+            document.set_metadata({})
+            document.del_xml_metadata()
+        output = document.tobytes(garbage=4, deflate=True)
+    finally:
+        document.close()
+
+    _verify_native(output, needles)
+    return output
+
+
+def _verify_native(output: bytes, needles: list[str]) -> None:
+    """Mandatory: re-extract the redacted PDF and assert no redacted string
+    survived anywhere in the remaining text layer."""
+    import pymupdf
+
+    document = pymupdf.open(stream=output, filetype="pdf")
+    try:
+        text = "\n".join(page.get_text() for page in document)
+    finally:
+        document.close()
+    collapsed = re.sub(r"\s+", " ", text)
+    for needle in needles:
+        if needle in text or re.sub(r"\s+", " ", needle) in collapsed:
+            raise ExportError(
+                "Verification failed: a redacted string is still present in the "
+                "redacted PDF's text layer."
+            )
+
+
+def _redact_native_raster(data: bytes, entities: list[AppliedEntity], settings: Settings) -> bytes:
     import pypdfium2 as pdfium
     from PIL import ImageDraw, ImageFont
 

@@ -91,7 +91,7 @@ def native_settings() -> Settings:
     return Settings()
 
 
-def test_native_redaction_produces_textless_pdf_with_black_boxes():
+def test_native_true_redaction_keeps_text_layer_minus_redacted():
     import pypdfium2 as pdfium
 
     source_lines = [
@@ -99,34 +99,76 @@ def test_native_redaction_produces_textless_pdf_with_black_boxes():
         "Der Befund war unauffaellig und die Therapie komplikationslos.",
     ]
     pdf = make_pdf(source_lines)
-
-    # Locate the name's box in the original for the pixel check.
-    document = pdfium.PdfDocument(pdf)
-    page = document[0]
-    page_width, page_height = page.get_size()
-    textpage = page.get_textpage()
-    searcher = textpage.search("Max Mustermann", match_case=True)
-    index, count = searcher.get_next()
-    left, bottom, right, top = textpage.get_charbox(index)
-    document.close()
-
     entities = entities_for("\n".join(source_lines), [("Max Mustermann", "[PERSON_1]")])
     output = redact_native_pdf(pdf, entities, native_settings())
 
-    # 1. The output has no text layer at all (rasterized).
-    redacted = pdfium.PdfDocument(output)
-    assert len(redacted) == 1
-    out_textpage = redacted[0].get_textpage()
-    assert out_textpage.get_text_range().strip() == ""
+    document = pdfium.PdfDocument(output)
+    page = document[0]
+    text = page.get_textpage().get_text_range()
+    # 1. Clinical text remains selectable; the redacted name is truly gone.
+    assert "Befund" in text and "komplikationslos" in text
+    assert "Max Mustermann" not in text
+    # 2. A visible black redaction bar exists on the rendered page.
+    image = page.render(scale=2.0).to_pil().convert("L")
+    dark = sum(1 for value in image.getdata() if value < 60)
+    assert dark > 500, "expected a visible black redaction bar"
+    document.close()
 
-    # 2. The pixels where the name was are black.
-    scale = native_settings().VISION_OCR_RENDER_SCALE
-    image = redacted[0].render(scale=scale).to_pil().convert("RGB")
-    x = int((left + 5) * scale)
-    y = int((page_height - top + 3) * scale)
-    pixel = image.getpixel((x, y))
-    assert sum(pixel) < 90, f"expected black-ish pixel, got {pixel}"
-    redacted.close()
+
+def test_native_true_redaction_scrubs_metadata():
+    import pymupdf
+
+    pdf = make_pdf(["Patient: Max Mustermann."])
+    entities = entities_for("Patient: Max Mustermann.", [("Max Mustermann", "[PERSON_1]")])
+    output = redact_native_pdf(pdf, entities, native_settings())
+    document = pymupdf.open(stream=output, filetype="pdf")
+    metadata = {k: v for k, v in (document.metadata or {}).items() if v}
+    document.close()
+    assert not metadata.get("author")
+    assert not metadata.get("title")
+
+
+def test_native_raster_fallback_when_true_redaction_fails(monkeypatch):
+    import pypdfium2 as pdfium
+
+    import backend.src.utils.pdf_export as pdf_export
+
+    def boom(data, entities, settings):
+        raise RuntimeError("simulated pymupdf failure")
+
+    monkeypatch.setattr(pdf_export, "_redact_native_true", boom)
+    source = "Patient: Max Mustermann."
+    pdf = make_pdf([source])
+    entities = entities_for(source, [("Max Mustermann", "[PERSON_1]")])
+    output = redact_native_pdf(pdf, entities, native_settings())
+    # The fallback output is rasterized: no text layer at all.
+    document = pdfium.PdfDocument(output)
+    assert document[0].get_textpage().get_text_range().strip() == ""
+    document.close()
+
+
+def test_native_true_redaction_generalized_dob_is_selectable_text():
+    import pypdfium2 as pdfium
+
+    source = "Patient geboren am 01.02.1980 in Dresden"
+    pdf = make_pdf([source])
+    entity = AppliedEntity(
+        start=19,
+        end=29,
+        text="01.02.1980",
+        entity_type=EntityType.DATE_OF_BIRTH,
+        confidence=0.9,
+        detector="test",
+        transformation=TransformationType.GENERALIZE,
+        replacement="1980",
+        status=SpanStatus.GENERALIZED,
+    )
+    output = redact_native_pdf(pdf, [entity], native_settings())
+    document = pdfium.PdfDocument(output)
+    text = document[0].get_textpage().get_text_range()
+    document.close()
+    assert "01.02.1980" not in text
+    assert "1980" in text  # the generalized replacement is real, selectable text
 
 
 def test_native_generalized_dob_shows_year_not_black_bar():
@@ -155,7 +197,9 @@ def test_native_generalized_dob_shows_year_not_black_bar():
         replacement="1980",
         status=SpanStatus.GENERALIZED,
     )
-    output = redact_native_pdf(pdf, [entity], native_settings())
+    from backend.src.utils.pdf_export import _redact_native_raster
+
+    output = _redact_native_raster(pdf, [entity], native_settings())
 
     scale = native_settings().VISION_OCR_RENDER_SCALE
     redacted = pdfium.PdfDocument(output)

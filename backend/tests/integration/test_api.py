@@ -236,7 +236,7 @@ def test_export_pdf_native_with_cached_detection(client):
     assert response.headers["content-type"] == "application/pdf"
     assert "anonymisiert.pdf" in response.headers["content-disposition"]
     assert response.content.startswith(b"%PDF")
-    # Rasterized output: no text layer to leak.
+    # True redaction: the text layer survives minus the redacted strings.
     import io
 
     from pypdf import PdfReader
@@ -244,7 +244,8 @@ def test_export_pdf_native_with_cached_detection(client):
     extracted = "".join(
         p.extract_text() or "" for p in PdfReader(io.BytesIO(response.content)).pages
     )
-    assert extracted.strip() == ""
+    assert "Max Mustermann" not in extracted
+    assert "komplikationslos" in extracted  # clinical text stays selectable
 
 
 def test_custom_policy_overlays_defaults(client):
