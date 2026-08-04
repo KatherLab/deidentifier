@@ -1,15 +1,16 @@
 <template>
   <!--
-    Processing state: centered progress card of the first still-running
-    document (streamed from the backend). Shown only until the FIRST document
-    of the batch finishes — then the app switches to the result view and the
-    rest keep processing in the background.
+    Processing state: shown only until the FIRST document of the batch
+    finishes — then the app switches to the result view and the rest keep
+    processing in the background. Multi-document batches get the combined
+    batch progress card; single-document runs keep the classic progress card
+    of the one running document (streamed from the backend).
   -->
-  <section v-if="loading && session.loadingDocument" class="flex flex-col items-center gap-3 py-10">
+  <section v-if="loading && session.documents.length > 1" class="flex flex-col items-center py-10">
+    <BatchProgress />
+  </section>
+  <section v-else-if="loading && session.loadingDocument" class="flex flex-col items-center py-10">
     <ProcessingCard :document="session.loadingDocument" />
-    <p v-if="session.documents.length > 1" class="text-xs text-content-subtle" aria-live="polite">
-      {{ session.documents.length }} Dokumente werden parallel verarbeitet …
-    </p>
   </section>
 
   <section v-else class="space-y-6">
@@ -151,6 +152,7 @@ import { computed, ref } from 'vue'
 import { ChevronDown, FileText, UploadCloud, X } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import BatchProgress from '@/components/anonymizer/BatchProgress.vue'
 import PolicyEditor from '@/components/anonymizer/PolicyEditor.vue'
 import ProcessingCard from '@/components/anonymizer/ProcessingCard.vue'
 import { useSessionStore } from '@/stores/session'

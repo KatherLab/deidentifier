@@ -14,7 +14,7 @@
  * across requests on its own. All entity/preview/export actions operate on
  * the ACTIVE document, so components keep their existing call sites.
  */
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { anonymizeApi } from '@/services/anonymizeApi'
 import { anonymizeFileStream, anonymizeTextStream } from '@/services/anonymizeStream'
@@ -108,6 +108,17 @@ export function overrideKey(entity: { start: number; end: number }): string {
  */
 export function documentProgressPercent(doc: SessionDocument): number | null {
   return doc.progress === null ? null : doc.progressMaxPercent
+}
+
+/**
+ * A document's contribution to the batch-overall percent: settled documents
+ * (done OR error) count as 100, queued ones as 0, processing ones as their
+ * monotonic stream percent.
+ */
+export function documentBatchPercent(doc: SessionDocument): number {
+  if (doc.status === 'done' || doc.status === 'error') return 100
+  if (doc.status === 'processing') return doc.progressMaxPercent
+  return 0
 }
 
 /** [base, span] of a stage in the overall percent scale. */
@@ -213,6 +224,38 @@ export const useSessionStore = defineStore('session', () => {
       documents.value[0] ??
       null,
   )
+
+  /** Settled documents of the batch (done OR error = "abgeschlossen"). */
+  const batchSettledCount = computed(
+    () => documents.value.filter((doc) => doc.status === 'done' || doc.status === 'error').length,
+  )
+
+  /** Failed documents of the batch. */
+  const batchFailedCount = computed(
+    () => documents.value.filter((doc) => doc.status === 'error').length,
+  )
+
+  /**
+   * Floor keeping the batch-overall percent monotonically non-decreasing (a
+   * retry resets one document's contribution to 0). Reset with the batch.
+   */
+  const batchPercentFloor = ref(0)
+
+  /**
+   * Overall batch progress (0–100): mean over ALL documents where each
+   * contributes its monotonic percent (queued = 0, settled = 100). Never
+   * decreases within a batch.
+   */
+  const batchOverallPercent = computed(() => {
+    const docs = documents.value
+    if (docs.length === 0) return 0
+    const mean = docs.reduce((sum, doc) => sum + documentBatchPercent(doc), 0) / docs.length
+    return Math.max(mean, batchPercentFloor.value)
+  })
+
+  watch(batchOverallPercent, (value) => {
+    if (value > batchPercentFloor.value) batchPercentFloor.value = value
+  })
 
   // ---------------------------------------------------------------------
   // Status endpoint / banners
@@ -487,6 +530,7 @@ export const useSessionStore = defineStore('session', () => {
     for (const doc of documents.value) cleanupDocument(doc)
     documents.value = []
     activeDocumentId.value = null
+    batchPercentFloor.value = 0
     phase.value = 'idle'
   }
 
@@ -727,6 +771,9 @@ export const useSessionStore = defineStore('session', () => {
     activeDocumentId,
     activeDocument,
     loadingDocument,
+    batchSettledCount,
+    batchFailedCount,
+    batchOverallPercent,
     selectDocument,
     retryDocument,
     removeDocument,

@@ -1,7 +1,23 @@
 <template>
   <section class="space-y-5">
     <!-- Document switcher (batch runs only). -->
-    <DocumentBar v-if="session.documents.length > 1" />
+    <template v-if="session.documents.length > 1">
+      <DocumentBar />
+      <!-- Slim strip while documents still process in the background;
+           disappears once every document is settled (done or error). -->
+      <div v-if="session.batchSettledCount < session.documents.length" class="space-y-1.5">
+        <ProgressBar
+          thin
+          class="w-full"
+          :percent="session.batchOverallPercent"
+          label="Gesamtfortschritt der Verarbeitung im Hintergrund"
+        />
+        <p class="text-xs text-content-subtle" aria-live="polite">
+          Verarbeitung im Hintergrund: {{ session.batchSettledCount }} von
+          {{ session.documents.length }} abgeschlossen
+        </p>
+      </div>
+    </template>
 
     <!-- Active document DONE: full result header + panels. -->
     <template v-if="doc && doc.status === 'done' && result">
@@ -254,6 +270,7 @@ import { computed, ref } from 'vue'
 import { Check, Copy, Download, FileDown, FileX } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import ProgressBar from '@/components/common/ProgressBar.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import DocumentBar from '@/components/anonymizer/DocumentBar.vue'
 import EntityHighlights from '@/components/anonymizer/EntityHighlights.vue'
