@@ -71,6 +71,46 @@ export interface Override {
 }
 
 /**
+ * A user-drawn blackout region on a PDF page (area-redaction editor).
+ * Coordinates are normalized to 0–1000 of the page width/height with a
+ * TOP-LEFT origin. Applied at PDF export only — text outputs are unaffected.
+ */
+export interface RedactArea {
+  /** 1-based page number. */
+  page: number
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+
+/** Bounding box of an embedded image on a page (normalized, top-left origin). */
+export interface PageImageBox {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+
+/** One rendered PDF page for the area-redaction editor. */
+export interface PdfPageRender {
+  page: number
+  /** Page size in PDF points (aspect ratio; coordinates stay normalized). */
+  width: number
+  height: number
+  /** PNG data URL of the rendered page. */
+  image: string
+  /** Embedded-image bounds — offered as one-click redaction suggestions. */
+  image_boxes: PageImageBox[]
+}
+
+export interface PdfPagesResponse {
+  pages: PdfPageRender[]
+  /** True when the document has more pages than the backend render cap. */
+  truncated: boolean
+}
+
+/**
  * Request-level policy: entity type → transformation, overlaying the backend
  * defaults. Only DEVIATIONS from the defaults need to be sent; omitted types
  * keep their default transformation.

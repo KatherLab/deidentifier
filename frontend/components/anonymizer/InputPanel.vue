@@ -14,14 +14,6 @@
   </section>
 
   <section v-else class="space-y-6">
-    <!-- Local-processing notice -->
-    <p
-      class="rounded-card px-4 py-3 text-sm bg-blue-50 border border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
-    >
-      Dokumente werden lokal von dieser Installation verarbeitet. Das Ergebnis ist kein Nachweis
-      rechtssicherer Anonymisierung.
-    </p>
-
     <!-- Drag-and-drop zone (multiple files → one document per file) -->
     <div
       class="rounded-modal border-2 border-dashed p-8 text-center transition-colors cursor-pointer"
@@ -141,8 +133,12 @@
     </section>
 
     <!-- Submit -->
-    <div class="flex items-center gap-3">
+    <div class="space-y-2">
       <BaseButton size="lg" :disabled="!canSubmit" @click="submit">{{ submitLabel }}</BaseButton>
+      <p class="text-xs text-content-subtle">
+        Dokumente werden lokal von dieser Installation verarbeitet. Das Ergebnis ist kein Nachweis
+        rechtssicherer Anonymisierung.
+      </p>
     </div>
   </section>
 </template>

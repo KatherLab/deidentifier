@@ -25,7 +25,9 @@
             :title="`Ersetzt durch ${entity.replacement}`"
             >→ {{ entity.replacement }}</span
           >
-          <span class="text-xs text-content-subtle">
+          <!-- Diagnostics (transformation, detector, confidence, offsets):
+               expert-only. -->
+          <span v-if="settings.expertMode" class="text-xs text-content-subtle">
             {{ transformationLabel(entity.transformation) }} · {{ entity.detector }} ·
             {{ confidenceLabel }} · Zeichen {{ entity.start }}–{{ entity.end }}
           </span>
@@ -53,25 +55,19 @@
             >
               Schwärzen
             </BaseButton>
-            <label :for="typeSelectId" class="sr-only">Entitätstyp</label>
+            <label :for="typeSelectId" class="sr-only">Entitätstyp ändern</label>
+            <!-- Changing the type applies immediately (re-run with override). -->
             <select
               :id="typeSelectId"
               v-model="selectedType"
               :disabled="rerunning"
               class="rounded-card border border-strong bg-surface px-2 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              @change="applyType"
             >
               <option v-for="(label, type) in ENTITY_TYPE_LABELS" :key="type" :value="type">
                 {{ label }}
               </option>
             </select>
-            <BaseButton
-              size="sm"
-              variant="secondary"
-              :disabled="rerunning || selectedType === entity.entity_type"
-              @click="applyType"
-            >
-              Typ ändern
-            </BaseButton>
           </template>
           <BaseButton
             v-if="hasOverride"
@@ -106,6 +102,7 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { useSessionStore } from '@/stores/session'
+import { useSettingsStore } from '@/stores/settings'
 import { useToast } from '@/composables/useToast'
 import { extractApiErrorMessage } from '@/utils/errors'
 import {
@@ -128,6 +125,7 @@ const emit = defineEmits<{
 }>()
 
 const session = useSessionStore()
+const settings = useSettingsStore()
 const toast = useToast()
 
 const typeSelectId = 'entity-type-select'
@@ -161,9 +159,12 @@ async function setTransformation(transformation: TransformationType) {
 }
 
 async function applyType() {
+  if (selectedType.value === props.entity.entity_type) return
   try {
     await session.applyEntityOverride(props.entity, { entity_type: selectedType.value })
   } catch (err) {
+    // The override was rolled back — the dropdown must follow.
+    selectedType.value = props.entity.entity_type
     toast.error(extractApiErrorMessage(err))
   }
 }

@@ -33,7 +33,9 @@ import type {
   EntityType,
   ExternalEndpoint,
   Override,
+  PdfPageRender,
   PolicyMap,
+  RedactArea,
   StatusResponse,
   StreamProgressEvent,
   TransformationType,
@@ -87,6 +89,13 @@ export interface SessionDocument {
   pdfPreviewToken: number
   /** Object URL for the ORIGINAL uploaded PDF (lazy, "Original" panel). */
   originalPreviewUrl: string | null
+  /** User-drawn blackout regions (PDF export only, normalized coordinates). */
+  redactAreas: RedactArea[]
+  /** Rendered pages for the area editor (lazy; data URLs, memory only). */
+  pdfPages: PdfPageRender[] | null
+  pdfPagesTruncated: boolean
+  pdfPagesLoading: boolean
+  pdfPagesError: string | null
   /** Active result panels in ACTIVATION order (restored on document switch). */
   activePanels: ResultPanelId[]
   /** Policy deviations captured at submit — used for ALL re-runs/exports. */
@@ -174,7 +183,6 @@ export const useSessionStore = defineStore('session', () => {
   const preserveTerms = ref<string[]>([])
 
   const status = ref<StatusResponse | null>(null)
-  const externalBannerDismissed = ref(false)
 
   // ---------------------------------------------------------------------
   // Active-document views (existing component API, delegating to the entry)
@@ -266,10 +274,6 @@ export const useSessionStore = defineStore('session', () => {
     () => status.value?.external_endpoints.filter((endpoint) => !endpoint.local) ?? [],
   )
 
-  const showExternalBanner = computed(
-    () => externalEndpoints.value.length > 0 && !externalBannerDismissed.value,
-  )
-
   /** Detectors that are enabled but not ready (e.g. LLM not configured). */
   const notReadyDetectors = computed<DetectorStatus[]>(
     () => status.value?.detectors.filter((detector) => detector.enabled && !detector.ready) ?? [],
@@ -282,10 +286,6 @@ export const useSessionStore = defineStore('session', () => {
       // Backend not reachable yet — errors surface on submit instead.
       status.value = null
     }
-  }
-
-  function dismissExternalBanner(): void {
-    externalBannerDismissed.value = true
   }
 
   // ---------------------------------------------------------------------
@@ -359,6 +359,11 @@ export const useSessionStore = defineStore('session', () => {
       pdfPreviewError: null,
       pdfPreviewToken: 0,
       originalPreviewUrl: null,
+      redactAreas: [],
+      pdfPages: null,
+      pdfPagesTruncated: false,
+      pdfPagesLoading: false,
+      pdfPagesError: null,
       activePanels: ['source'],
       policy: batchPolicy,
       rules: batchRules,
@@ -439,9 +444,9 @@ export const useSessionStore = defineStore('session', () => {
       doc.result = response
       doc.overrides = new Map()
       doc.selectedEntityIndex = null
-      // Default panel selection: PDF sources start with the redacted preview
-      // alongside the source review.
-      doc.activePanels = isPdfResult(response) ? ['source', 'pdf'] : ['source']
+      // Default panel selection: source review + result side by side (the
+      // result is the redacted PDF for PDF sources, the text otherwise).
+      doc.activePanels = isPdfResult(response) ? ['source', 'pdf'] : ['source', 'anonymized']
       doc.status = 'done'
       maybeAdvancePhase(doc)
       // For PDF sources, load the redacted-PDF preview right away (not
@@ -506,6 +511,10 @@ export const useSessionStore = defineStore('session', () => {
     doc.pdfPreviewError = null
     if (doc.originalPreviewUrl !== null) URL.revokeObjectURL(doc.originalPreviewUrl)
     doc.originalPreviewUrl = null
+    // Rendered pages are data URLs (no revoke needed) — just drop the memory.
+    doc.pdfPages = null
+    doc.pdfPagesLoading = false
+    doc.pdfPagesError = null
   }
 
   /** Remove one document from the batch (revoking its object URLs). */
@@ -602,6 +611,7 @@ export const useSessionStore = defineStore('session', () => {
         [...doc.overrides.values()],
         doc.policy,
         doc.rules,
+        doc.redactAreas,
       )
       if (token !== doc.pdfPreviewToken) return
       if (doc.pdfPreviewUrl !== null) URL.revokeObjectURL(doc.pdfPreviewUrl)
@@ -619,6 +629,77 @@ export const useSessionStore = defineStore('session', () => {
   async function refreshPdfPreview(): Promise<void> {
     const doc = activeDocument.value
     if (doc) await refreshPdfPreviewFor(doc)
+  }
+
+  // ---------------------------------------------------------------------
+  // Area redaction (user-drawn blackout regions; PDF export only)
+  // ---------------------------------------------------------------------
+
+  const redactAreas = computed<RedactArea[]>(() => activeDocument.value?.redactAreas ?? [])
+  const pdfPages = computed<PdfPageRender[] | null>(() => activeDocument.value?.pdfPages ?? null)
+  const pdfPagesTruncated = computed(() => activeDocument.value?.pdfPagesTruncated ?? false)
+  const pdfPagesLoading = computed(() => activeDocument.value?.pdfPagesLoading ?? false)
+  const pdfPagesError = computed(() => activeDocument.value?.pdfPagesError ?? null)
+
+  /** Lazily render the ACTIVE document's pages for the area editor. */
+  async function loadPdfPages(): Promise<void> {
+    const doc = activeDocument.value
+    if (!doc || doc.file === null || doc.pdfPages !== null || doc.pdfPagesLoading) return
+    doc.pdfPagesLoading = true
+    doc.pdfPagesError = null
+    try {
+      const { data } = await anonymizeApi.renderPdfPages(doc.file)
+      doc.pdfPages = data.pages
+      doc.pdfPagesTruncated = data.truncated
+    } catch (err) {
+      doc.pdfPagesError = extractApiErrorMessage(err)
+    } finally {
+      doc.pdfPagesLoading = false
+    }
+  }
+
+  /** Add one drawn area and refresh the redacted-PDF preview. */
+  function addRedactArea(area: RedactArea): void {
+    const doc = activeDocument.value
+    if (!doc) return
+    doc.redactAreas.push(area)
+    void refreshPdfPreviewFor(doc)
+  }
+
+  /** Remove one area (by index) and refresh the redacted-PDF preview. */
+  function removeRedactArea(index: number): void {
+    const doc = activeDocument.value
+    if (!doc || index < 0 || index >= doc.redactAreas.length) return
+    doc.redactAreas.splice(index, 1)
+    void refreshPdfPreviewFor(doc)
+  }
+
+  /**
+   * Add every embedded-image bounding box as an area ("Alle Bilder
+   * schwärzen"). Boxes that were already added are skipped; returns the
+   * number of NEW areas.
+   */
+  function addImageAreas(): number {
+    const doc = activeDocument.value
+    if (!doc || doc.pdfPages === null) return 0
+    let added = 0
+    for (const page of doc.pdfPages) {
+      for (const box of page.image_boxes) {
+        const exists = doc.redactAreas.some(
+          (area) =>
+            area.page === page.page &&
+            Math.abs(area.x0 - box.x0) < 1 &&
+            Math.abs(area.y0 - box.y0) < 1 &&
+            Math.abs(area.x1 - box.x1) < 1 &&
+            Math.abs(area.y1 - box.y1) < 1,
+        )
+        if (exists) continue
+        doc.redactAreas.push({ page: page.page, ...box })
+        added += 1
+      }
+    }
+    if (added > 0) void refreshPdfPreviewFor(doc)
+    return added
   }
 
   // ---------------------------------------------------------------------
@@ -804,12 +885,19 @@ export const useSessionStore = defineStore('session', () => {
     refreshPdfPreview,
     originalPreviewUrl,
     ensureOriginalPreviewUrl,
+    redactAreas,
+    pdfPages,
+    pdfPagesTruncated,
+    pdfPagesLoading,
+    pdfPagesError,
+    loadPdfPages,
+    addRedactArea,
+    removeRedactArea,
+    addImageAreas,
     status,
     externalEndpoints,
-    showExternalBanner,
     notReadyDetectors,
     fetchStatus,
-    dismissExternalBanner,
     submitText,
     submitFiles,
     selectEntity,

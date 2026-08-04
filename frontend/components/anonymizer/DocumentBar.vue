@@ -1,10 +1,12 @@
 <template>
   <!--
-    Horizontal document switcher (batch runs only): one chip per document with
-    a status indicator. Clicking switches the active document — also while
-    other documents are still processing.
+    Document switcher (batch runs only). Small batches get one chip per
+    document; larger ones a compact prev/next + dropdown control that scales
+    to hundreds of documents. Switching is possible while other documents are
+    still processing.
   -->
   <nav
+    v-if="session.documents.length <= COMPACT_THRESHOLD"
     class="flex flex-wrap gap-1.5 rounded-card border border-default bg-surface-sunken p-1.5"
     aria-label="Dokumente des Stapels"
   >
@@ -59,16 +61,69 @@
       <span class="sr-only">{{ statusText(doc) }}</span>
     </button>
   </nav>
+
+  <nav v-else class="flex items-center gap-2" aria-label="Dokumente des Stapels">
+    <BaseButton
+      variant="icon"
+      tone="gray"
+      :disabled="activeIndex <= 0"
+      aria-label="Vorheriges Dokument"
+      @click="step(-1)"
+    >
+      <ChevronLeft class="h-4 w-4" aria-hidden="true" />
+    </BaseButton>
+    <label for="document-select" class="sr-only">Dokument wählen</label>
+    <select
+      id="document-select"
+      :value="session.activeDocumentId"
+      class="min-w-0 max-w-lg flex-1 rounded-card border border-strong bg-surface px-2 py-1.5 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      @change="onSelect"
+    >
+      <option v-for="doc in session.documents" :key="doc.id" :value="doc.id">
+        {{ statusGlyph(doc) }} {{ doc.name }}
+      </option>
+    </select>
+    <BaseButton
+      variant="icon"
+      tone="gray"
+      :disabled="activeIndex >= session.documents.length - 1"
+      aria-label="Nächstes Dokument"
+      @click="step(1)"
+    >
+      <ChevronRight class="h-4 w-4" aria-hidden="true" />
+    </BaseButton>
+    <span class="shrink-0 text-xs tabular-nums text-content-subtle" aria-live="polite">
+      {{ activeIndex + 1 }} / {{ session.documents.length }}
+    </span>
+  </nav>
 </template>
 
 <script setup lang="ts">
-import { Clock, X } from '@lucide/vue'
+import { computed } from 'vue'
+import { ChevronLeft, ChevronRight, Clock, X } from '@lucide/vue'
+import BaseButton from '@/components/common/BaseButton.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { documentProgressPercent, useSessionStore } from '@/stores/session'
 import type { SessionDocument } from '@/stores/session'
 import { validationStatusLabel } from '@/utils/entityLabels'
 
+/** Above this batch size, chips would wall up — switch to the dropdown. */
+const COMPACT_THRESHOLD = 10
+
 const session = useSessionStore()
+
+const activeIndex = computed(() =>
+  session.documents.findIndex((doc) => doc.id === session.activeDocumentId),
+)
+
+function step(direction: -1 | 1): void {
+  const target = session.documents[activeIndex.value + direction]
+  if (target) session.selectDocument(target.id)
+}
+
+function onSelect(event: Event): void {
+  session.selectDocument((event.target as HTMLSelectElement).value)
+}
 
 /** Rounded stream percent for a processing chip (null → spinner only). */
 function processingPercent(doc: SessionDocument): number | null {
@@ -85,6 +140,29 @@ function doneDotClass(doc: SessionDocument): string {
       return 'bg-amber-500 dark:bg-amber-400'
     default:
       return 'bg-red-500 dark:bg-red-400'
+  }
+}
+
+/** Compact status prefix for dropdown options (plain text — no icons there). */
+function statusGlyph(doc: SessionDocument): string {
+  switch (doc.status) {
+    case 'queued':
+      return '·'
+    case 'processing': {
+      const percent = processingPercent(doc)
+      return percent === null ? '…' : `${percent} %`
+    }
+    case 'error':
+      return '✗'
+    default:
+      switch (doc.result?.validation.status) {
+        case 'PASS':
+          return '✓'
+        case 'REVIEW_REQUIRED':
+          return '⚠'
+        default:
+          return '✗'
+      }
   }
 }
 

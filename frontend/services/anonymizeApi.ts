@@ -6,7 +6,9 @@ import type {
   AnonymizeTextRequest,
   CustomRules,
   Override,
+  PdfPagesResponse,
   PolicyMap,
+  RedactArea,
 } from '@/types/anonymizer'
 
 /** True when a policy carries at least one deviation worth sending. */
@@ -101,6 +103,7 @@ export const anonymizeApi = {
     overrides: Override[],
     policy?: PolicyMap | null,
     rules?: CustomRules | null,
+    areas?: RedactArea[] | null,
   ): Promise<AxiosResponse<Blob>> {
     const formData = new FormData()
     formData.append('file', file)
@@ -108,6 +111,18 @@ export const anonymizeApi = {
     if (overrides.length > 0) formData.append('overrides', JSON.stringify(overrides))
     if (hasPolicyEntries(policy)) formData.append('policy', JSON.stringify(policy))
     appendCustomRules(formData, rules)
+    if (areas && areas.length > 0) formData.append('redact_areas', JSON.stringify(areas))
     return api.post<Blob>('/export/pdf', formData, { responseType: 'blob' })
+  },
+
+  /**
+   * Render the pages of a PDF as PNGs for the area-redaction editor (the
+   * original file is re-sent; the server stores nothing). Includes
+   * embedded-image bounding boxes as one-click redaction suggestions.
+   */
+  renderPdfPages(file: File): Promise<AxiosResponse<PdfPagesResponse>> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post<PdfPagesResponse>('/export/pdf/pages', formData)
   },
 }

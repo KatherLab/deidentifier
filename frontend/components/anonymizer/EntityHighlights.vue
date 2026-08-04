@@ -1,7 +1,9 @@
 <template>
   <div class="flex min-h-0 flex-col">
-    <!-- Compact legend: colored dot + label per status, never color alone. -->
+    <!-- Compact legend: colored dot + label per status, never color alone.
+         Only statuses that actually occur in the document are listed. -->
     <div
+      v-if="legend.length > 0"
       class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-default bg-surface-muted px-4 py-2 text-xs text-content-muted"
       aria-label="Legende"
     >
@@ -29,6 +31,7 @@
           ]"
           :title="markTitle(segment.entityIndex)"
           :aria-label="`Entität: ${markTypeLabel(segment.entityIndex)}, ${entityStatusLabel(entityAt(segment.entityIndex).status)}${isOverridden(segment.entityIndex) ? ', geändert' : ''}`"
+          :data-entity-index="segment.entityIndex"
           @click="emit('select', segment.entityIndex)"
         >
           <!--
@@ -93,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { EyeOff } from '@lucide/vue'
 import { buildHighlightSegments } from '@/utils/textSegments'
 import { getPillClass } from '@/utils/statusStyles'
@@ -165,15 +168,30 @@ function badgeText(index: number): string {
 }
 
 const legend = computed(() => {
-  const statuses = Object.keys(ENTITY_STATUS_LABELS) as EntityStatus[]
-  return [
-    ...statuses.map((status) => ({
+  const present = new Set(props.entities.map((entity) => entity.status))
+  const items = (Object.keys(ENTITY_STATUS_LABELS) as EntityStatus[])
+    .filter((status) => present.has(status))
+    .map((status) => ({
       label: ENTITY_STATUS_LABELS[status],
       dotClass: ENTITY_DOT_CLASSES[status],
-    })),
-    { label: 'Warnung', dotClass: WARNING_DOT_CLASS },
-  ]
+    }))
+  if (props.warnings.length > 0) items.push({ label: 'Warnung', dotClass: WARNING_DOT_CLASS })
+  return items
 })
+
+// Keep the selected mark visible when the selection comes from outside the
+// text (entity-summary type stepping in ResultView).
+watch(
+  () => props.selectedIndex,
+  (index) => {
+    if (index === null) return
+    void nextTick(() => {
+      textContainer.value
+        ?.querySelector(`[data-entity-index="${index}"]`)
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    })
+  },
+)
 
 // ---------------------------------------------------------------------------
 // Manual selection-to-redact.
