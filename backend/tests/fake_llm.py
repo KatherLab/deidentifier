@@ -17,9 +17,13 @@ class FakeLLM:
         entities: list[dict],
         recheck_findings: list[dict] | None = None,
         vision_text: str = "",
+        recheck_risk: str = "low",
+        recheck_concerns: list[dict] | None = None,
     ):
         self.entities = entities
         self.recheck_findings = recheck_findings or []
+        self.recheck_risk = recheck_risk
+        self.recheck_concerns = recheck_concerns or []
         self.vision_text = vision_text
         self.requests: list[dict] = []
         # Concurrency instrumentation (threading server): the highest number
@@ -79,9 +83,16 @@ class FakeLLM:
                     fake.requests.append(body)
                 if FakeLLM._is_vision(body):
                     content = fake.vision_text
+                elif FakeLLM._is_recheck(body):
+                    content = json.dumps(
+                        {
+                            "entities": fake.recheck_findings,
+                            "risk": fake.recheck_risk,
+                            "concerns": fake.recheck_concerns,
+                        }
+                    )
                 else:
-                    entities = fake.recheck_findings if FakeLLM._is_recheck(body) else fake.entities
-                    content = json.dumps({"entities": entities})
+                    content = json.dumps({"entities": fake.entities})
                 payload = json.dumps(
                     {
                         "id": "fake",

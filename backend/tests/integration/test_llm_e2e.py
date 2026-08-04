@@ -289,3 +289,49 @@ async def test_llm_concurrency_cap_is_global_across_documents():
     assert len(server.detection_requests()) == 4  # 2 docs x 2 passes
     assert server.max_in_flight <= 2, f"cap violated: {server.max_in_flight} in flight"
     assert server.max_in_flight == 2  # and parallelism was actually used
+
+
+async def test_recheck_risk_assessment_forces_review():
+    """A medium/high holistic risk judgment must surface as warnings and set
+    the status to REVIEW_REQUIRED even without concrete leftover strings."""
+    with FakeLLM(
+        entities=[],
+        recheck_risk="high",
+        recheck_concerns=[
+            {
+                "category": "indirect_identification",
+                "description": "Kombination aus seltenem Beruf und kleinem Ort kann identifizierend sein.",
+            }
+        ],
+    ) as server:
+        settings = make_settings(server.base_url)
+        response = await run_anonymization("Unauffälliger Befundtext.", settings, "paste")
+
+    assert response.validation.status == "REVIEW_REQUIRED"
+    categories = {w.category for w in response.validation.warnings}
+    assert "recheck_risk" in categories
+    assert "recheck_indirect_identification" in categories
+    risk_warning = next(w for w in response.validation.warnings if w.category == "recheck_risk")
+    assert "hoch" in risk_warning.message
+
+
+async def test_recheck_low_risk_stays_pass():
+    with FakeLLM(entities=[], recheck_risk="low", recheck_concerns=[]) as server:
+        settings = make_settings(server.base_url)
+        response = await run_anonymization("Unauffälliger Befundtext.", settings, "paste")
+    assert response.validation.status == "PASS"
+
+
+async def test_recheck_low_risk_concern_is_informational():
+    with FakeLLM(
+        entities=[],
+        recheck_risk="low",
+        recheck_concerns=[
+            {"category": "ocr_quality", "description": "Einzelne Passagen wirken verrauscht."}
+        ],
+    ) as server:
+        settings = make_settings(server.base_url)
+        response = await run_anonymization("Unauffälliger Befundtext.", settings, "paste")
+    # INFO-level note: visible but does not force review.
+    assert response.validation.status == "PASS"
+    assert any(w.category == "recheck_ocr_quality" for w in response.validation.warnings)
