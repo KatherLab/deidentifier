@@ -118,6 +118,7 @@ def build_detectors(
     settings: Settings,
     custom_instruction: str | None = None,
     redact_terms: list[str] | None = None,
+    progress=None,
 ) -> list[SpanDetector]:
     """Instantiate configured detectors.
 
@@ -143,7 +144,9 @@ def build_detectors(
                     "configured; the document was NOT anonymized.",
                     status_code=503,
                 )
-            detectors.append(LLMDetector(settings, custom_instruction=custom_instruction))
+            detectors.append(
+                LLMDetector(settings, custom_instruction=custom_instruction, progress=progress)
+            )
         else:
             raise DetectorError(
                 f"Detector '{name}' is not available in this build; "

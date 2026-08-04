@@ -53,14 +53,16 @@ class ExtractedDocument(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-async def extract_document(data: bytes, filename: str, settings: Settings) -> ExtractedDocument:
+async def extract_document(
+    data: bytes, filename: str, settings: Settings, progress=None
+) -> ExtractedDocument:
     suffix = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if suffix == "txt":
         return extract_txt(data)
     if suffix == "docx":
         return extract_docx(data)
     if suffix == "pdf":
-        return await extract_pdf(data, filename, settings)
+        return await extract_pdf(data, filename, settings, progress=progress)
     raise ExtractionError("Unsupported file type; allowed: .txt, .docx, .pdf", status_code=415)
 
 
@@ -150,7 +152,9 @@ def _docx_warnings(data: bytes) -> list[str]:
 # --- PDF ---------------------------------------------------------------------
 
 
-async def extract_pdf(data: bytes, filename: str, settings: Settings) -> ExtractedDocument:
+async def extract_pdf(
+    data: bytes, filename: str, settings: Settings, progress=None
+) -> ExtractedDocument:
     if has_embedded_text(
         data,
         min_chars=settings.DOCLING_MIN_EXTRACTED_CHARS_PDF,
@@ -200,7 +204,7 @@ async def extract_pdf(data: bytes, filename: str, settings: Settings) -> Extract
         from ..services.vision_llm_ocr import VisionOCRError, VisionOCRService
 
         try:
-            page_lines = await VisionOCRService(settings).process_pdf(data)
+            page_lines = await VisionOCRService(settings).process_pdf(data, progress=progress)
         except VisionOCRError as exc:
             raise ExtractionError(str(exc), status_code=exc.status_code) from exc
 

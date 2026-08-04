@@ -10,16 +10,17 @@ import type {
 } from '@/types/anonymizer'
 
 /** True when a policy carries at least one deviation worth sending. */
-function hasPolicyEntries(policy?: PolicyMap | null): policy is PolicyMap {
+export function hasPolicyEntries(policy?: PolicyMap | null): policy is PolicyMap {
   return policy != null && Object.keys(policy).length > 0
 }
 
 /**
  * Append the custom-rule form fields to a multipart request. Backend contract:
  * `custom_instruction` is a plain string, the term lists are JSON-stringified
- * arrays — each field only present when non-empty.
+ * arrays — each field only present when non-empty. Also used by the streaming
+ * variants in `services/anonymizeStream.ts`.
  */
-function appendCustomRules(formData: FormData, rules?: CustomRules | null): void {
+export function appendCustomRules(formData: FormData, rules?: CustomRules | null): void {
   if (!rules) return
   if (rules.customInstruction.length > 0) {
     formData.append('custom_instruction', rules.customInstruction)

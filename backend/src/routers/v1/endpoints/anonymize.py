@@ -1,11 +1,15 @@
 """The anonymization endpoint. Accepts pasted text or override re-runs (JSON)
 and file uploads (multipart) on the same route, dispatched by content type."""
 
+import asyncio
 import hashlib
+import json
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from starlette.datastructures import UploadFile
 
@@ -52,18 +56,27 @@ async def anonymize(
 
 
 async def _handle_json(request: Request, settings: Settings) -> AnonymizeResponse:
+    payload = await _parse_json(request)
+    return await _process_json(payload, settings)
+
+
+async def _parse_json(request: Request) -> AnonymizeTextRequest:
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body.") from None
     try:
-        payload = AnonymizeTextRequest(**body)
+        return AnonymizeTextRequest(**body)
     except (ValidationError, TypeError):
         raise HTTPException(
             status_code=422,
             detail="Provide 'text' (non-empty string) or 'request_id' with 'overrides'.",
         ) from None
 
+
+async def _process_json(
+    payload: AnonymizeTextRequest, settings: Settings, progress=None
+) -> AnonymizeResponse:
     # Override re-run from cached detection results.
     if payload.text is None:
         response = await rerun_with_overrides(
@@ -89,10 +102,26 @@ async def _handle_json(request: Request, settings: Settings) -> AnonymizeRespons
         custom_instruction=payload.custom_instruction,
         redact_terms=payload.redact_terms,
         preserve_terms=payload.preserve_terms,
+        progress=progress,
     )
 
 
+@dataclass
+class _UploadInput:
+    data: bytes
+    filename: str
+    policy: dict | None = None
+    custom_instruction: str | None = None
+    redact_terms: list[str] | None = None
+    preserve_terms: list[str] | None = field(default=None)
+
+
 async def _handle_upload(request: Request, settings: Settings) -> AnonymizeResponse:
+    upload_input = await _parse_upload(request, settings)
+    return await _process_upload(upload_input, settings)
+
+
+async def _parse_upload(request: Request, settings: Settings) -> _UploadInput:
     form = await request.form()
     policy = _parse_policy_form(form.get("policy"))
     custom_instruction = form.get("custom_instruction")
@@ -114,10 +143,24 @@ async def _handle_upload(request: Request, settings: Settings) -> AnonymizeRespo
             status_code=413,
             detail=f"File exceeds the {settings.APP_MAX_UPLOAD_MB} MB limit.",
         )
+    return _UploadInput(
+        data=data,
+        filename=upload.filename or "",
+        policy=policy,
+        custom_instruction=custom_instruction,
+        redact_terms=redact_terms,
+        preserve_terms=preserve_terms,
+    )
 
+
+async def _process_upload(
+    upload_input: _UploadInput, settings: Settings, progress=None
+) -> AnonymizeResponse:
     started = time.perf_counter()
     try:
-        extracted = await extract_document(data, upload.filename or "", settings)
+        extracted = await extract_document(
+            upload_input.data, upload_input.filename, settings, progress=progress
+        )
     except ExtractionError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
     extraction_ms = (time.perf_counter() - started) * 1000
@@ -129,13 +172,14 @@ async def _handle_upload(request: Request, settings: Settings) -> AnonymizeRespo
         extracted.source_type,
         extraction_ms=extraction_ms,
         extraction_warnings=extracted.warnings,
-        policy=policy,
-        custom_instruction=custom_instruction,
-        redact_terms=redact_terms,
-        preserve_terms=preserve_terms,
-        file_sha256=hashlib.sha256(data).hexdigest(),
+        policy=upload_input.policy,
+        custom_instruction=upload_input.custom_instruction,
+        redact_terms=upload_input.redact_terms,
+        preserve_terms=upload_input.preserve_terms,
+        file_sha256=hashlib.sha256(upload_input.data).hexdigest(),
         layout=extracted.layout,
         page_count=len(extracted.pages),
+        progress=progress,
     )
 
 
@@ -153,6 +197,7 @@ async def _run(
     file_sha256: str | None = None,
     layout=None,
     page_count: int = 0,
+    progress=None,
 ) -> AnonymizeResponse:
     try:
         return await run_anonymization(
@@ -169,9 +214,76 @@ async def _run(
             file_sha256=file_sha256,
             layout=layout,
             page_count=page_count,
+            progress=progress,
         )
     except DetectorError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+
+
+@router.post("/anonymize/stream")
+async def anonymize_stream(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> StreamingResponse:
+    """Like /anonymize, but streams NDJSON progress events followed by the
+    result: {"event":"progress","stage":...,"done":n,"total":m} lines, then
+    {"event":"result","data":{...}} or {"event":"error","status":...,"detail":...}.
+    Inputs are parsed before streaming starts, so malformed requests fail with
+    regular HTTP errors. A client disconnect cancels the pipeline."""
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("application/json"):
+        payload = await _parse_json(request)
+
+        async def run(progress) -> AnonymizeResponse:
+            return await _process_json(payload, settings, progress=progress)
+    elif content_type.startswith("multipart/form-data"):
+        upload_input = await _parse_upload(request, settings)
+
+        async def run(progress) -> AnonymizeResponse:
+            return await _process_upload(upload_input, settings, progress=progress)
+    else:
+        raise HTTPException(
+            status_code=415,
+            detail="Send application/json with 'text' or multipart/form-data with 'file'.",
+        )
+
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def progress(stage: str, done: int, total: int) -> None:
+        queue.put_nowait({"event": "progress", "stage": stage, "done": done, "total": total})
+
+    async def worker() -> None:
+        try:
+            response = await run(progress)
+            await queue.put({"event": "result", "data": response.model_dump(mode="json")})
+        except HTTPException as exc:
+            await queue.put({"event": "error", "status": exc.status_code, "detail": exc.detail})
+        except Exception:
+            logger.error("anonymize_stream_failed", error_type="unhandled")
+            await queue.put({"event": "error", "status": 500, "detail": "Internal server error."})
+        finally:
+            await queue.put(None)
+
+    task = asyncio.create_task(worker())
+
+    async def stream():
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield json.dumps(item, ensure_ascii=False) + "\n"
+        finally:
+            # Client disconnect (or completion): stop the pipeline.
+            task.cancel()
+
+    return StreamingResponse(
+        stream(),
+        media_type="application/x-ndjson",
+        # X-Accel-Buffering disables nginx response buffering so progress
+        # events reach the browser immediately.
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-store"},
+    )
 
 
 def _parse_policy_form(raw) -> dict | None:

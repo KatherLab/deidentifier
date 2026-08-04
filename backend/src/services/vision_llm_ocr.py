@@ -79,16 +79,24 @@ class VisionOCRService:
                 "VISION_OCR_EXTRA_BODY is not valid JSON.", status_code=500
             ) from exc
 
-    async def process_pdf(self, data: bytes) -> list[list[TranscribedLine]]:
+    async def process_pdf(self, data: bytes, progress=None) -> list[list[TranscribedLine]]:
         """Return the parsed transcription (lines with boxes) per page, in order."""
         images = self._render_pages(data)
         if not images:
             raise VisionOCRError("The PDF contains no pages.", status_code=422)
         semaphore = asyncio.Semaphore(self._settings.VISION_OCR_MAX_CONCURRENT_PAGES)
+        completed = 0
+        if progress:
+            progress("ocr", 0, len(images))
 
         async def limited(page_number: int, png: bytes) -> list[TranscribedLine]:
+            nonlocal completed
             async with semaphore:
-                return parse_transcription(await self._transcribe_page(page_number, png))
+                lines = parse_transcription(await self._transcribe_page(page_number, png))
+            completed += 1
+            if progress:
+                progress("ocr", completed, len(images))
+            return lines
 
         return list(
             await asyncio.gather(

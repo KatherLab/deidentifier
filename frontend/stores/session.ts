@@ -7,6 +7,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { anonymizeApi } from '@/services/anonymizeApi'
+import { anonymizeFileStream, anonymizeTextStream } from '@/services/anonymizeStream'
 import { statusApi } from '@/services/statusApi'
 import { extractPdfExportErrorMessage, isExpiredResultError } from '@/utils/errors'
 import { DEFAULT_POLICY, policyDeviations } from '@/utils/policy'
@@ -20,6 +21,7 @@ import type {
   Override,
   PolicyMap,
   StatusResponse,
+  StreamProgressEvent,
   TransformationType,
 } from '@/types/anonymizer'
 
@@ -34,6 +36,59 @@ export const useSessionStore = defineStore('session', () => {
   const phase = ref<SessionPhase>('idle')
   const result = ref<AnonymizeResponse | null>(null)
   const selectedEntityIndex = ref<number | null>(null)
+
+  /**
+   * Live progress of the current FRESH run (streamed from
+   * /anonymize/stream). Null before the first event arrives (indeterminate
+   * bar) and outside of runs. Override re-runs don't stream and never set it.
+   */
+  const progress = ref<StreamProgressEvent | null>(null)
+  /**
+   * Highest overall percent seen in the current run — kept as a max so the
+   * bar is monotonically non-decreasing even if stage math would dip.
+   */
+  const progressMaxPercent = ref(0)
+  /** True once any OCR event arrived (scanned PDF → OCR gets its own span). */
+  let progressSawOcr = false
+
+  /**
+   * Overall progress percent (0–100) of the current run, or null while
+   * indeterminate. Stage weights: with OCR (scanned PDF) ocr spans 0–45%,
+   * detection 45–90%, recheck 90–100%; without OCR detection spans 0–85% and
+   * recheck 85–100%.
+   */
+  const progressPercent = computed<number | null>(() =>
+    progress.value === null ? null : progressMaxPercent.value,
+  )
+
+  /** [base, span] of a stage in the overall percent scale. */
+  function stageSpan(stage: StreamProgressEvent['stage'], sawOcr: boolean): [number, number] {
+    if (sawOcr) {
+      if (stage === 'ocr') return [0, 45]
+      if (stage === 'detection') return [45, 45]
+      return [90, 10]
+    }
+    if (stage === 'detection') return [0, 85]
+    return [85, 15]
+  }
+
+  /** onProgress callback for the streaming endpoints. */
+  function onStreamProgress(event: StreamProgressEvent): void {
+    if (event.stage === 'ocr') progressSawOcr = true
+    progress.value = event
+    const [base, span] = stageSpan(event.stage, progressSawOcr)
+    const fraction = Math.min(event.done / Math.max(event.total, 1), 1)
+    progressMaxPercent.value = Math.min(
+      Math.max(progressMaxPercent.value, base + span * fraction),
+      100,
+    )
+  }
+
+  function clearProgress(): void {
+    progress.value = null
+    progressMaxPercent.value = 0
+    progressSawOcr = false
+  }
 
   /**
    * The ORIGINAL uploaded file of the current result (memory only — NEVER
@@ -242,11 +297,11 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
-  async function run(request: () => ReturnType<typeof anonymizeApi.anonymizeText>): Promise<void> {
+  async function run(request: () => Promise<AnonymizeResponse>): Promise<void> {
     phase.value = 'loading'
+    clearProgress()
     try {
-      const { data } = await request()
-      result.value = data
+      result.value = await request()
       selectedEntityIndex.value = null
       overrides.value = new Map()
       // A new result invalidates any previous document previews.
@@ -256,6 +311,8 @@ export const useSessionStore = defineStore('session', () => {
     } catch (err) {
       phase.value = 'idle'
       throw err
+    } finally {
+      clearProgress()
     }
   }
 
@@ -373,17 +430,25 @@ export const useSessionStore = defineStore('session', () => {
     return rerunOverrides(previous)
   }
 
-  /** Anonymize pasted text. Rejects with the API error (caller shows a toast). */
+  /**
+   * Anonymize pasted text via the STREAMING endpoint (live progress).
+   * Rejects with the API error (caller shows a toast).
+   */
   async function submitText(text: string): Promise<void> {
     await run(() =>
-      anonymizeApi.anonymizeText(text, undefined, policyOverrides.value, customRules.value),
+      anonymizeTextStream(text, policyOverrides.value, customRules.value, onStreamProgress),
     )
     sourceFile.value = null
   }
 
-  /** Anonymize an uploaded file. Rejects with the API error (caller shows a toast). */
+  /**
+   * Anonymize an uploaded file via the STREAMING endpoint (live progress).
+   * Rejects with the API error (caller shows a toast).
+   */
   async function submitFile(file: File): Promise<void> {
-    await run(() => anonymizeApi.anonymizeFile(file, policyOverrides.value, customRules.value))
+    await run(() =>
+      anonymizeFileStream(file, policyOverrides.value, customRules.value, onStreamProgress),
+    )
     sourceFile.value = file
     // For PDF sources, load the redacted-PDF preview right away (not awaited —
     // the text result is already usable while the preview renders).
@@ -402,11 +467,14 @@ export const useSessionStore = defineStore('session', () => {
     sourceFile.value = null
     clearPdfPreview()
     clearOriginalPreview()
+    clearProgress()
     phase.value = 'idle'
   }
 
   return {
     phase,
+    progress,
+    progressPercent,
     result,
     sourceFile,
     selectedEntityIndex,

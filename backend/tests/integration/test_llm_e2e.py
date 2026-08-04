@@ -189,6 +189,49 @@ async def test_scanned_pdf_ocr_to_anonymized_text():
     assert any("OCR" in w for w in response.warnings)
 
 
+async def test_stream_endpoint_emits_progress_then_result():
+    import json as jsonlib
+
+    from fastapi.testclient import TestClient
+
+    from backend.src.core.config import get_settings
+    from backend.src.main import app
+
+    entities = [{"text": "Johann Schmidt", "type": "PERSON_NAME", "role": "patient"}]
+    with FakeLLM(entities) as server:
+        import os
+
+        os.environ["DETECTORS"] = "rules,llm"
+        os.environ["OPENAI_API_BASE"] = f"{server.base_url}/v1"
+        os.environ["LLM_MODEL"] = "fake"
+        get_settings.cache_clear()
+        try:
+            with TestClient(app) as client:
+                with client.stream(
+                    "POST",
+                    "/api/v1/anonymize/stream",
+                    json={"text": "Patient Johann Schmidt wurde entlassen."},
+                ) as response:
+                    assert response.status_code == 200
+                    assert response.headers["x-accel-buffering"] == "no"
+                    events = [jsonlib.loads(line) for line in response.iter_lines() if line]
+        finally:
+            for key in ("DETECTORS", "OPENAI_API_BASE", "LLM_MODEL"):
+                os.environ.pop(key, None)
+            os.environ["DETECTORS"] = "mock,rules"
+            get_settings.cache_clear()
+
+    kinds = [event["event"] for event in events]
+    assert "progress" in kinds
+    assert kinds[-1] == "result"
+    detection_events = [e for e in events if e["event"] == "progress" and e["stage"] == "detection"]
+    assert detection_events and detection_events[-1]["done"] == detection_events[-1]["total"]
+    recheck_events = [e for e in events if e["event"] == "progress" and e["stage"] == "recheck"]
+    assert recheck_events
+    result = events[-1]["data"]
+    assert "[PERSON_1]" in result["anonymized_text"]
+
+
 async def test_override_rerun_notes_skipped_recheck():
     entities = [{"text": "Johann Schmidt", "type": "PERSON_NAME", "role": "patient"}]
     with FakeLLM(entities) as server:

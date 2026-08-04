@@ -114,6 +114,19 @@ export interface AnonymizeRerunRequest {
 
 export type AnonymizeRequest = AnonymizeTextRequest | AnonymizeRerunRequest
 
+/** Pipeline stage reported by the NDJSON anonymize stream. */
+export type ProgressStage = 'ocr' | 'detection' | 'recheck'
+
+/**
+ * One `progress` line of POST /anonymize/stream. `done`/`total` are stage
+ * units (OCR: pages; detection: chunk passes; recheck: chunks).
+ */
+export interface StreamProgressEvent {
+  stage: ProgressStage
+  done: number
+  total: number
+}
+
 export interface ValidationWarning {
   category: string
   message: string

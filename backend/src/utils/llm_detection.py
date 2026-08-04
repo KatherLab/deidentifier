@@ -194,9 +194,15 @@ class LLMDetector:
     name = "llm"
     version = "1.0"
 
-    def __init__(self, settings: Settings, custom_instruction: str | None = None):
+    def __init__(
+        self,
+        settings: Settings,
+        custom_instruction: str | None = None,
+        progress=None,
+    ):
         self._settings = settings
         self._custom_instruction = (custom_instruction or "").strip()
+        self._progress = progress
 
     def _system_prompt(self) -> str:
         if not self._custom_instruction:
@@ -211,12 +217,21 @@ class LLMDetector:
         semaphore = asyncio.Semaphore(settings.LLM_MAX_CONCURRENT_REQUESTS)
 
         system_prompt = self._system_prompt()
+        total = settings.LLM_DETECTION_PASSES * len(chunks)
+        completed = 0
+        if self._progress:
+            self._progress("detection", 0, total)
 
         async def limited(chunk: str, temperature: float) -> list[Mention]:
+            nonlocal completed
             async with semaphore:
-                return await self._detect_chunk(
+                mentions = await self._detect_chunk(
                     chunk, temperature=temperature, system_prompt=system_prompt
                 )
+            completed += 1
+            if self._progress:
+                self._progress("detection", completed, total)
+            return mentions
 
         tasks = [
             limited(chunk, 0.0 if pass_index == 0 else _EXTRA_PASS_TEMPERATURE)
@@ -350,7 +365,7 @@ _YEAR_ONLY = re.compile(r"(?:19|20)\d{2}")
 
 
 async def recheck_output(
-    anonymized: str, settings: Settings, policy=None
+    anonymized: str, settings: Settings, policy=None, progress=None
 ) -> list[ValidationWarning]:
     """Independent LLM audit of the anonymized output (warnings only).
 
@@ -364,12 +379,23 @@ async def recheck_output(
     detector = LLMDetector(settings)
     semaphore = asyncio.Semaphore(settings.LLM_MAX_CONCURRENT_REQUESTS)
 
+    completed = 0
+    total = 0
+
     async def limited(chunk: str) -> list[Mention]:
+        nonlocal completed
         async with semaphore:
-            return await detector._detect_chunk(chunk, system_prompt=_RECHECK_SYSTEM_PROMPT)
+            mentions = await detector._detect_chunk(chunk, system_prompt=_RECHECK_SYSTEM_PROMPT)
+        completed += 1
+        if progress:
+            progress("recheck", completed, total)
+        return mentions
 
     try:
         chunks = chunk_text(anonymized, settings.LLM_CHUNK_CHARS, settings.LLM_CHUNK_OVERLAP)
+        total = len(chunks)
+        if progress:
+            progress("recheck", 0, total)
         mention_lists = await asyncio.gather(*(limited(chunk) for chunk in chunks))
         mentions: list[Mention] = [m for mention_list in mention_lists for m in mention_list]
     except DetectorError:

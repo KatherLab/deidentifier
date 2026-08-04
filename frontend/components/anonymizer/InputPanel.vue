@@ -1,5 +1,40 @@
 <template>
-  <section class="space-y-6">
+  <!-- Processing state: centered progress card (streamed from the backend). -->
+  <section v-if="loading" class="flex justify-center py-10">
+    <div
+      class="w-full max-w-lg space-y-4 rounded-modal border border-default bg-surface p-8 text-center shadow-sm"
+    >
+      <FileText class="mx-auto h-10 w-10 text-content-subtle" aria-hidden="true" />
+      <p class="text-sm font-medium text-content break-all">{{ processingName }}</p>
+
+      <!-- Progress bar: determinate fill once events arrive, shimmer before. -->
+      <div
+        class="h-2.5 w-full overflow-hidden rounded-full bg-surface-sunken"
+        role="progressbar"
+        aria-label="Fortschritt der Anonymisierung"
+        :aria-valuemin="0"
+        :aria-valuemax="100"
+        :aria-valuenow="roundedPercent ?? undefined"
+        :aria-valuetext="stageLabel"
+      >
+        <div
+          v-if="percent !== null"
+          class="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+          :style="{ width: `${percent}%` }"
+        ></div>
+        <div v-else class="progress-shimmer h-full w-1/3 rounded-full bg-primary"></div>
+      </div>
+
+      <p class="text-sm text-content-muted" aria-live="polite">
+        <span v-if="roundedPercent !== null" class="font-semibold text-content"
+          >{{ roundedPercent }} %</span
+        >
+        {{ stageLabel }}
+      </p>
+    </div>
+  </section>
+
+  <section v-else class="space-y-6">
     <!-- Local-processing notice -->
     <p
       class="rounded-card px-4 py-3 text-sm bg-blue-50 border border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
@@ -101,19 +136,14 @@
 
     <!-- Submit -->
     <div class="flex items-center gap-3">
-      <BaseButton size="lg" :loading="loading" :disabled="!canSubmit" @click="submit">
-        Anonymisieren
-      </BaseButton>
-      <span v-if="loading" class="text-sm text-content-subtle" aria-live="polite">
-        Dokument wird verarbeitet …
-      </span>
+      <BaseButton size="lg" :disabled="!canSubmit" @click="submit"> Anonymisieren </BaseButton>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, UploadCloud } from '@lucide/vue'
+import { ChevronDown, FileText, UploadCloud } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import PolicyEditor from '@/components/anonymizer/PolicyEditor.vue'
@@ -134,6 +164,29 @@ const loading = computed(() => session.phase === 'loading')
 const canSubmit = computed(
   () => !loading.value && (selectedFile.value !== null || pastedText.value.trim().length > 0),
 )
+
+/** Name shown on the processing card (captured when the run starts). */
+const processingName = ref('Dokument')
+
+/** Streamed overall percent (null → indeterminate shimmer). */
+const percent = computed(() => session.progressPercent)
+const roundedPercent = computed(() => (percent.value === null ? null : Math.round(percent.value)))
+
+/** German label for the current pipeline stage. */
+const stageLabel = computed(() => {
+  const progress = session.progress
+  if (progress === null) return 'Dokument wird verarbeitet …'
+  switch (progress.stage) {
+    case 'ocr':
+      return `Texterkennung (OCR): Seite ${progress.done} von ${progress.total}`
+    case 'detection':
+      return `KI-Erkennung läuft: Abschnitt ${progress.done} von ${progress.total}`
+    case 'recheck':
+      return 'Abschließende Prüfung des Ergebnisses …'
+    default:
+      return 'Dokument wird verarbeitet …'
+  }
+})
 
 const fileSizeLabel = computed(() => {
   const size = selectedFile.value?.size ?? 0
@@ -181,6 +234,7 @@ function clearFile() {
 
 async function submit() {
   if (!canSubmit.value) return
+  processingName.value = selectedFile.value?.name ?? 'Eingefügter Text'
   try {
     if (selectedFile.value) {
       await session.submitFile(selectedFile.value)
@@ -196,3 +250,19 @@ async function submit() {
   }
 }
 </script>
+
+<style scoped>
+/* Indeterminate shimmer: a third-width bar sweeping across the track until
+   the first streamed progress event arrives. */
+@keyframes progress-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+.progress-shimmer {
+  animation: progress-shimmer 1.4s ease-in-out infinite;
+}
+</style>

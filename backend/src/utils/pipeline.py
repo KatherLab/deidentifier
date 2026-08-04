@@ -40,11 +40,15 @@ async def run_anonymization(
     file_sha256: str | None = None,
     layout: list | None = None,
     page_count: int = 0,
+    progress=None,
 ) -> AnonymizeResponse:
     """Full run: detection, resolution, transformation, validation."""
     t0 = time.perf_counter()
     detectors = build_detectors(
-        settings, custom_instruction=custom_instruction, redact_terms=redact_terms
+        settings,
+        custom_instruction=custom_instruction,
+        redact_terms=redact_terms,
+        progress=progress,
     )
     all_spans: list[EntitySpan] = []
     detection_warnings: list[str] = []
@@ -87,6 +91,7 @@ async def run_anonymization(
         detection_ms=detection_ms,
         recheck_settings=settings if recheck_enabled else None,
         recheck_skipped_note=False,
+        progress=progress,
     )
 
 
@@ -118,6 +123,7 @@ async def rerun_with_overrides(
         detection_ms=0.0,
         recheck_settings=None,
         recheck_skipped_note=entry.llm_recheck_performed,
+        progress=None,
     )
 
 
@@ -136,6 +142,7 @@ async def _finalize(
     detection_ms: float,
     recheck_settings: Settings | None,
     recheck_skipped_note: bool,
+    progress=None,
 ) -> AnonymizeResponse:
     active_policy = merge_policy(policy)
     t1 = time.perf_counter()
@@ -155,7 +162,9 @@ async def _finalize(
     if recheck_settings is not None:
         from .llm_detection import recheck_output
 
-        extra_warnings = await recheck_output(anonymized, recheck_settings, policy=active_policy)
+        extra_warnings = await recheck_output(
+            anonymized, recheck_settings, policy=active_policy, progress=progress
+        )
     elif recheck_skipped_note:
         extra_warnings = [
             ValidationWarning(
