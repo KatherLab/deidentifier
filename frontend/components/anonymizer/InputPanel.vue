@@ -1,37 +1,15 @@
 <template>
-  <!-- Processing state: centered progress card (streamed from the backend). -->
-  <section v-if="loading" class="flex justify-center py-10">
-    <div
-      class="w-full max-w-lg space-y-4 rounded-modal border border-default bg-surface p-8 text-center shadow-sm"
-    >
-      <FileText class="mx-auto h-10 w-10 text-content-subtle" aria-hidden="true" />
-      <p class="text-sm font-medium text-content break-all">{{ processingName }}</p>
-
-      <!-- Progress bar: determinate fill once events arrive, shimmer before. -->
-      <div
-        class="h-2.5 w-full overflow-hidden rounded-full bg-surface-sunken"
-        role="progressbar"
-        aria-label="Fortschritt der Anonymisierung"
-        :aria-valuemin="0"
-        :aria-valuemax="100"
-        :aria-valuenow="roundedPercent ?? undefined"
-        :aria-valuetext="stageLabel"
-      >
-        <div
-          v-if="percent !== null"
-          class="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-          :style="{ width: `${percent}%` }"
-        ></div>
-        <div v-else class="progress-shimmer h-full w-1/3 rounded-full bg-primary"></div>
-      </div>
-
-      <p class="text-sm text-content-muted" aria-live="polite">
-        <span v-if="roundedPercent !== null" class="font-semibold text-content"
-          >{{ roundedPercent }} %</span
-        >
-        {{ stageLabel }}
-      </p>
-    </div>
+  <!--
+    Processing state: centered progress card of the first still-running
+    document (streamed from the backend). Shown only until the FIRST document
+    of the batch finishes — then the app switches to the result view and the
+    rest keep processing in the background.
+  -->
+  <section v-if="loading && session.loadingDocument" class="flex flex-col items-center gap-3 py-10">
+    <ProcessingCard :document="session.loadingDocument" />
+    <p v-if="session.documents.length > 1" class="text-xs text-content-subtle" aria-live="polite">
+      {{ session.documents.length }} Dokumente werden parallel verarbeitet …
+    </p>
   </section>
 
   <section v-else class="space-y-6">
@@ -43,7 +21,7 @@
       rechtssicherer Anonymisierung.
     </p>
 
-    <!-- Drag-and-drop zone -->
+    <!-- Drag-and-drop zone (multiple files → one document per file) -->
     <div
       class="rounded-modal border-2 border-dashed p-8 text-center transition-colors cursor-pointer"
       :class="
@@ -53,7 +31,7 @@
       "
       role="button"
       tabindex="0"
-      aria-label="Datei auswählen oder hierher ziehen"
+      aria-label="Dateien auswählen oder hierher ziehen"
       @click="openFilePicker"
       @keydown.enter.prevent="openFilePicker"
       @keydown.space.prevent="openFilePicker"
@@ -65,24 +43,49 @@
         ref="fileInput"
         type="file"
         accept=".txt,.pdf,.docx"
+        multiple
         class="hidden"
         @change="onFileChange"
       />
       <div class="flex flex-col items-center gap-2">
         <UploadCloud class="h-10 w-10 text-content-subtle" aria-hidden="true" />
-        <template v-if="!selectedFile">
+        <template v-if="selectedFiles.length === 0">
           <p class="text-sm font-medium text-content">
-            Datei hierher ziehen oder klicken, um auszuwählen
+            Dateien hierher ziehen oder klicken, um auszuwählen
           </p>
-          <p class="text-xs text-content-subtle">PDF, DOCX oder TXT</p>
+          <p class="text-xs text-content-subtle">
+            PDF, DOCX oder TXT – mehrere Dateien werden parallel verarbeitet
+          </p>
         </template>
         <template v-else>
-          <p class="text-sm font-medium text-content break-all">
-            {{ selectedFile.name }}
-            <span class="text-content-subtle font-normal">({{ fileSizeLabel }})</span>
+          <ul class="w-full max-w-md space-y-1 text-left">
+            <li
+              v-for="(file, index) in selectedFiles"
+              :key="`${file.name}-${index}`"
+              class="flex items-center gap-2 rounded-card bg-surface px-3 py-1.5 text-sm"
+            >
+              <FileText class="h-4 w-4 shrink-0 text-content-subtle" aria-hidden="true" />
+              <span class="min-w-0 flex-1 truncate font-medium text-content" :title="file.name">
+                {{ file.name }}
+              </span>
+              <span class="shrink-0 text-xs text-content-subtle">{{
+                fileSizeLabel(file.size)
+              }}</span>
+              <button
+                type="button"
+                class="shrink-0 rounded-card p-0.5 text-content-subtle transition-colors hover:text-content"
+                :aria-label="`${file.name} entfernen`"
+                @click.stop="removeFile(index)"
+              >
+                <X class="h-4 w-4" aria-hidden="true" />
+              </button>
+            </li>
+          </ul>
+          <p class="text-xs text-content-subtle">
+            Weitere Dateien hierher ziehen oder klicken, um sie hinzuzufügen
           </p>
-          <BaseButton variant="link" tone="gray" @click.stop="clearFile">
-            Datei entfernen
+          <BaseButton variant="link" tone="gray" @click.stop="clearFiles">
+            Alle entfernen
           </BaseButton>
         </template>
       </div>
@@ -102,17 +105,19 @@
         id="paste-text"
         v-model="pastedText"
         rows="10"
-        :disabled="selectedFile !== null || loading"
+        :disabled="selectedFiles.length > 0 || loading"
         placeholder="Text hier einfügen …"
         class="w-full rounded-card border border-strong bg-surface p-3 text-sm text-content placeholder:text-content-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
       ></textarea>
-      <p v-if="selectedFile" class="mt-1 text-xs text-content-subtle">
-        Es wird die ausgewählte Datei verarbeitet. Entfernen Sie die Datei, um stattdessen
+      <p v-if="selectedFiles.length > 0" class="mt-1 text-xs text-content-subtle">
+        Es werden die ausgewählten Dateien verarbeitet. Entfernen Sie die Dateien, um stattdessen
         eingefügten Text zu anonymisieren.
       </p>
     </div>
 
-    <!-- Advanced settings: default-policy editor (collapsed by default). -->
+    <!-- Advanced settings: default-policy editor (collapsed by default). The
+         settings are captured ONCE at submit and apply to every document of
+         the batch. -->
     <section class="rounded-card border border-default bg-surface">
       <button
         type="button"
@@ -136,64 +141,46 @@
 
     <!-- Submit -->
     <div class="flex items-center gap-3">
-      <BaseButton size="lg" :disabled="!canSubmit" @click="submit"> Anonymisieren </BaseButton>
+      <BaseButton size="lg" :disabled="!canSubmit" @click="submit">{{ submitLabel }}</BaseButton>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, FileText, UploadCloud } from '@lucide/vue'
+import { ChevronDown, FileText, UploadCloud, X } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import PolicyEditor from '@/components/anonymizer/PolicyEditor.vue'
+import ProcessingCard from '@/components/anonymizer/ProcessingCard.vue'
 import { useSessionStore } from '@/stores/session'
 import { useToast } from '@/composables/useToast'
-import { extractApiErrorMessage } from '@/utils/errors'
 
 const session = useSessionStore()
 const toast = useToast()
 
 const fileInput = ref<HTMLInputElement | null>(null)
-const selectedFile = ref<File | null>(null)
+const selectedFiles = ref<File[]>([])
 const pastedText = ref('')
 const dragActive = ref(false)
 const advancedOpen = ref(false)
 
 const loading = computed(() => session.phase === 'loading')
 const canSubmit = computed(
-  () => !loading.value && (selectedFile.value !== null || pastedText.value.trim().length > 0),
+  () => !loading.value && (selectedFiles.value.length > 0 || pastedText.value.trim().length > 0),
 )
 
-/** Name shown on the processing card (captured when the run starts). */
-const processingName = ref('Dokument')
+const submitLabel = computed(() =>
+  selectedFiles.value.length > 1
+    ? `${selectedFiles.value.length} Dokumente anonymisieren`
+    : 'Anonymisieren',
+)
 
-/** Streamed overall percent (null → indeterminate shimmer). */
-const percent = computed(() => session.progressPercent)
-const roundedPercent = computed(() => (percent.value === null ? null : Math.round(percent.value)))
-
-/** German label for the current pipeline stage. */
-const stageLabel = computed(() => {
-  const progress = session.progress
-  if (progress === null) return 'Dokument wird verarbeitet …'
-  switch (progress.stage) {
-    case 'ocr':
-      return `Texterkennung (OCR): Seite ${progress.done} von ${progress.total}`
-    case 'detection':
-      return `KI-Erkennung läuft: Abschnitt ${progress.done} von ${progress.total}`
-    case 'recheck':
-      return 'Abschließende Prüfung des Ergebnisses …'
-    default:
-      return 'Dokument wird verarbeitet …'
-  }
-})
-
-const fileSizeLabel = computed(() => {
-  const size = selectedFile.value?.size ?? 0
+function fileSizeLabel(size: number): string {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
-})
+}
 
 function openFilePicker() {
   if (loading.value) return
@@ -202,67 +189,54 @@ function openFilePicker() {
 
 const ACCEPTED_EXTENSIONS = ['.txt', '.pdf', '.docx']
 
-function acceptFile(file: File) {
-  const name = file.name.toLowerCase()
-  const isAccepted =
-    ACCEPTED_EXTENSIONS.some((extension) => name.endsWith(extension)) || file.type === 'text/plain'
-  if (!isAccepted) {
-    toast.error('Dateityp nicht unterstützt. Erlaubt sind .txt, .pdf und .docx.')
-    return
+function acceptFiles(files: Iterable<File>) {
+  for (const file of files) {
+    const name = file.name.toLowerCase()
+    const isAccepted =
+      ACCEPTED_EXTENSIONS.some((extension) => name.endsWith(extension)) ||
+      file.type === 'text/plain'
+    if (!isAccepted) {
+      toast.error(`Dateityp nicht unterstützt: ${file.name}. Erlaubt sind .txt, .pdf und .docx.`)
+      continue
+    }
+    selectedFiles.value.push(file)
   }
-  selectedFile.value = file
 }
 
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (file) acceptFile(file)
-  // Allow re-selecting the same file later.
+  if (input.files) acceptFiles(input.files)
+  // Allow re-selecting the same files later.
   input.value = ''
 }
 
 function onDrop(event: DragEvent) {
   dragActive.value = false
   if (loading.value) return
-  const file = event.dataTransfer?.files?.[0]
-  if (file) acceptFile(file)
+  if (event.dataTransfer?.files) acceptFiles(event.dataTransfer.files)
 }
 
-function clearFile() {
-  selectedFile.value = null
+function removeFile(index: number) {
+  selectedFiles.value.splice(index, 1)
 }
 
-async function submit() {
+function clearFiles() {
+  selectedFiles.value = []
+}
+
+/**
+ * Start the batch: one document per selected file (all processed in
+ * parallel), or a single document for pasted text. Processing errors surface
+ * per document in the result view — no toast handling needed here.
+ */
+function submit() {
   if (!canSubmit.value) return
-  processingName.value = selectedFile.value?.name ?? 'Eingefügter Text'
-  try {
-    if (selectedFile.value) {
-      await session.submitFile(selectedFile.value)
-    } else {
-      await session.submitText(pastedText.value)
-    }
-    // Clear the inputs only after a successful run, so a failed request
-    // doesn't wipe the user's document.
-    selectedFile.value = null
-    pastedText.value = ''
-  } catch (err) {
-    toast.error(extractApiErrorMessage(err))
+  if (selectedFiles.value.length > 0) {
+    session.submitFiles([...selectedFiles.value])
+  } else {
+    session.submitText(pastedText.value)
   }
+  selectedFiles.value = []
+  pastedText.value = ''
 }
 </script>
-
-<style scoped>
-/* Indeterminate shimmer: a third-width bar sweeping across the track until
-   the first streamed progress event arrives. */
-@keyframes progress-shimmer {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(300%);
-  }
-}
-.progress-shimmer {
-  animation: progress-shimmer 1.4s ease-in-out infinite;
-}
-</style>

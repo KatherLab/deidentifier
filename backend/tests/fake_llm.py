@@ -7,7 +7,8 @@ system prompt) return the configured entity list; re-check/audit requests
 
 import json
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
 class FakeLLM:
@@ -21,7 +22,13 @@ class FakeLLM:
         self.recheck_findings = recheck_findings or []
         self.vision_text = vision_text
         self.requests: list[dict] = []
-        self._server: HTTPServer | None = None
+        # Concurrency instrumentation (threading server): the highest number
+        # of requests that were in flight simultaneously.
+        self.max_in_flight = 0
+        self.response_delay = 0.0
+        self._in_flight = 0
+        self._lock = threading.Lock()
+        self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
 
     @property
@@ -54,9 +61,22 @@ class FakeLLM:
 
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self):
+                with fake._lock:
+                    fake._in_flight += 1
+                    fake.max_in_flight = max(fake.max_in_flight, fake._in_flight)
+                try:
+                    self._respond()
+                finally:
+                    with fake._lock:
+                        fake._in_flight -= 1
+
+            def _respond(self):
                 length = int(self.headers.get("content-length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")
-                fake.requests.append(body)
+                if fake.response_delay:
+                    time.sleep(fake.response_delay)
+                with fake._lock:
+                    fake.requests.append(body)
                 if FakeLLM._is_vision(body):
                     content = fake.vision_text
                 else:
@@ -85,7 +105,7 @@ class FakeLLM:
             def log_message(self, *args):
                 pass
 
-        self._server = HTTPServer(("127.0.0.1", 0), Handler)
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
         return self

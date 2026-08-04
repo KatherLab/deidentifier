@@ -19,6 +19,7 @@ import httpx
 import openai
 
 from ..core.config import Settings
+from ..utils.concurrency import global_semaphore
 
 
 class VisionOCRError(Exception):
@@ -84,7 +85,8 @@ class VisionOCRService:
         images = self._render_pages(data)
         if not images:
             raise VisionOCRError("The PDF contains no pages.", status_code=422)
-        semaphore = asyncio.Semaphore(self._settings.VISION_OCR_MAX_CONCURRENT_PAGES)
+        # Global slots: the page limit is a TOTAL across all documents in flight.
+        semaphore = global_semaphore("vision_ocr", self._settings.VISION_OCR_MAX_CONCURRENT_PAGES)
         completed = 0
         if progress:
             progress("ocr", 0, len(images))

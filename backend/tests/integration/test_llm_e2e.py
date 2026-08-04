@@ -263,3 +263,29 @@ async def test_override_rerun_notes_skipped_recheck():
         assert notes and notes[0].severity == "INFO"
         # INFO alone must not force review status.
         assert second.validation.status == "PASS"
+
+
+async def test_llm_concurrency_cap_is_global_across_documents():
+    """Two documents processed in parallel must share the LLM slots: with a
+    limit of 2 the fake server must never see more than 2 concurrent calls,
+    even though 2 documents x 2 passes = 4 tasks are pending."""
+    import asyncio
+
+    entities = [{"text": "Johann Schmidt", "type": "PERSON_NAME", "role": ""}]
+    with FakeLLM(entities) as server:
+        server.response_delay = 0.15
+        settings = make_settings(
+            server.base_url, LLM_MAX_CONCURRENT_REQUESTS=2, LLM_RECHECK_ENABLED=False
+        )
+        texts = [
+            "Patient Johann Schmidt wurde aufgenommen.",
+            "Johann Schmidt wurde später entlassen.",
+        ]
+        results = await asyncio.gather(
+            *(run_anonymization(text, settings, "paste") for text in texts)
+        )
+
+    assert all("[PERSON_1]" in r.anonymized_text for r in results)
+    assert len(server.detection_requests()) == 4  # 2 docs x 2 passes
+    assert server.max_in_flight <= 2, f"cap violated: {server.max_in_flight} in flight"
+    assert server.max_in_flight == 2  # and parallelism was actually used

@@ -3,13 +3,27 @@
  *
  * Privacy rule: never write document content or results to localStorage /
  * sessionStorage. All state here is in-memory only and disappears on reload.
+ *
+ * Multi-document model: every submit creates a BATCH of documents (one per
+ * dropped file; pasted text is a single-document batch). Each document owns
+ * ALL of its per-run state (result, overrides, previews, selection, panels)
+ * and runs as one independent `/anonymize/stream` request. Up to
+ * MAX_CONCURRENT_STREAMS documents stream at once (browser connection
+ * budget); the rest wait as 'queued' and start as slots free — the backend
+ * enforces global LLM/OCR concurrency limits and interleaves stage work
+ * across requests on its own. All entity/preview/export actions operate on
+ * the ACTIVE document, so components keep their existing call sites.
  */
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { anonymizeApi } from '@/services/anonymizeApi'
 import { anonymizeFileStream, anonymizeTextStream } from '@/services/anonymizeStream'
 import { statusApi } from '@/services/statusApi'
-import { extractPdfExportErrorMessage, isExpiredResultError } from '@/utils/errors'
+import {
+  extractApiErrorMessage,
+  extractPdfExportErrorMessage,
+  isExpiredResultError,
+} from '@/utils/errors'
 import { DEFAULT_POLICY, policyDeviations } from '@/utils/policy'
 import type {
   AnonymizeResponse,
@@ -27,75 +41,109 @@ import type {
 
 export type SessionPhase = 'idle' | 'loading' | 'result'
 
+export type DocumentStatus = 'queued' | 'processing' | 'done' | 'error'
+
+/** The result panels a document can show (up to three at once). */
+export type ResultPanelId = 'source' | 'pdf' | 'original' | 'anonymized'
+
+/** Maximum simultaneous /anonymize/stream requests (browser connection budget). */
+export const MAX_CONCURRENT_STREAMS = 5
+
+/**
+ * One document of the current batch. Owns EVERYTHING that is per-document:
+ * source (file or pasted text), streaming progress, result, overrides,
+ * selection, preview object URLs and the panel activation state — plus the
+ * batch's policy/custom-rules snapshot captured once at submit. Memory only,
+ * never persisted.
+ */
+export interface SessionDocument {
+  id: string
+  /** The ORIGINAL uploaded file (re-sent for PDF export). Null for pasted text. */
+  file: File | null
+  /** The pasted source text (start/retry of text runs). Null for file documents. */
+  text: string | null
+  name: string
+  status: DocumentStatus
+  /** Live progress of the fresh run; null before the first event (indeterminate). */
+  progress: StreamProgressEvent | null
+  /** Highest overall percent seen — kept as a max so the bar never dips. */
+  progressMaxPercent: number
+  /** True once any OCR event arrived (scanned PDF → OCR gets its own span). */
+  progressSawOcr: boolean
+  /** User-facing error message when `status` is 'error'. */
+  error: string | null
+  result: AnonymizeResponse | null
+  /** Accumulated per-entity overrides, keyed by `${start}:${end}`. */
+  overrides: Map<string, Override>
+  selectedEntityIndex: number | null
+  /** True while an override re-run is in flight (result view stays visible). */
+  rerunning: boolean
+  /** Redacted-PDF preview: object URL + backing blob (reused for downloads). */
+  pdfPreviewUrl: string | null
+  pdfPreviewBlob: Blob | null
+  pdfPreviewLoading: boolean
+  pdfPreviewError: string | null
+  /** Bumped on every refresh/cleanup so stale in-flight responses are ignored. */
+  pdfPreviewToken: number
+  /** Object URL for the ORIGINAL uploaded PDF (lazy, "Original" panel). */
+  originalPreviewUrl: string | null
+  /** Active result panels in ACTIVATION order (restored on document switch). */
+  activePanels: ResultPanelId[]
+  /** Policy deviations captured at submit — used for ALL re-runs/exports. */
+  policy: PolicyMap | null
+  /** Custom rules captured at submit — used for ALL re-runs/exports. */
+  rules: CustomRules | null
+  /** Aborts the in-flight stream request on reset. */
+  abort: AbortController | null
+}
+
 /** Stable identity of a detected entity across re-runs (offsets don't move). */
 export function overrideKey(entity: { start: number; end: number }): string {
   return `${entity.start}:${entity.end}`
 }
 
+/**
+ * Overall progress percent (0–100) of a document's run, or null while
+ * indeterminate (no stream event yet).
+ */
+export function documentProgressPercent(doc: SessionDocument): number | null {
+  return doc.progress === null ? null : doc.progressMaxPercent
+}
+
+/** [base, span] of a stage in the overall percent scale. */
+function stageSpan(stage: StreamProgressEvent['stage'], sawOcr: boolean): [number, number] {
+  if (sawOcr) {
+    if (stage === 'ocr') return [0, 45]
+    if (stage === 'detection') return [45, 45]
+    return [90, 10]
+  }
+  if (stage === 'detection') return [0, 85]
+  return [85, 15]
+}
+
+/** True when the response was produced from a PDF (redactable source). */
+function isPdfResult(response: AnonymizeResponse | null): boolean {
+  return response?.source_type === 'pdf' || response?.source_type === 'pdf-ocr'
+}
+
 export const useSessionStore = defineStore('session', () => {
   const phase = ref<SessionPhase>('idle')
-  const result = ref<AnonymizeResponse | null>(null)
-  const selectedEntityIndex = ref<number | null>(null)
 
-  /**
-   * Live progress of the current FRESH run (streamed from
-   * /anonymize/stream). Null before the first event arrives (indeterminate
-   * bar) and outside of runs. Override re-runs don't stream and never set it.
-   */
-  const progress = ref<StreamProgressEvent | null>(null)
-  /**
-   * Highest overall percent seen in the current run — kept as a max so the
-   * bar is monotonically non-decreasing even if stage math would dip.
-   */
-  const progressMaxPercent = ref(0)
-  /** True once any OCR event arrived (scanned PDF → OCR gets its own span). */
-  let progressSawOcr = false
+  /** The documents of the current batch, in submit order. */
+  const documents = ref<SessionDocument[]>([])
+  const activeDocumentId = ref<string | null>(null)
 
-  /**
-   * Overall progress percent (0–100) of the current run, or null while
-   * indeterminate. Stage weights: with OCR (scanned PDF) ocr spans 0–45%,
-   * detection 45–90%, recheck 90–100%; without OCR detection spans 0–85% and
-   * recheck 85–100%.
-   */
-  const progressPercent = computed<number | null>(() =>
-    progress.value === null ? null : progressMaxPercent.value,
+  /** The document whose panels/overrides/previews the result view shows. */
+  const activeDocument = computed<SessionDocument | null>(
+    () => documents.value.find((doc) => doc.id === activeDocumentId.value) ?? null,
   )
 
-  /** [base, span] of a stage in the overall percent scale. */
-  function stageSpan(stage: StreamProgressEvent['stage'], sawOcr: boolean): [number, number] {
-    if (sawOcr) {
-      if (stage === 'ocr') return [0, 45]
-      if (stage === 'detection') return [45, 45]
-      return [90, 10]
-    }
-    if (stage === 'detection') return [0, 85]
-    return [85, 15]
-  }
-
-  /** onProgress callback for the streaming endpoints. */
-  function onStreamProgress(event: StreamProgressEvent): void {
-    if (event.stage === 'ocr') progressSawOcr = true
-    progress.value = event
-    const [base, span] = stageSpan(event.stage, progressSawOcr)
-    const fraction = Math.min(event.done / Math.max(event.total, 1), 1)
-    progressMaxPercent.value = Math.min(
-      Math.max(progressMaxPercent.value, base + span * fraction),
-      100,
-    )
-  }
-
-  function clearProgress(): void {
-    progress.value = null
-    progressMaxPercent.value = 0
-    progressSawOcr = false
-  }
-
   /**
-   * The ORIGINAL uploaded file of the current result (memory only — NEVER
-   * persisted). Needed for the redacted-PDF export, which re-sends the file
-   * because the server stores nothing. Null for pasted-text runs.
+   * Bumped on reset so late completions/errors of aborted streams from a
+   * previous batch can never touch the new batch's state.
    */
-  const sourceFile = ref<File | null>(null)
+  let batchToken = 0
+  let documentIdCounter = 0
 
   /**
    * Editable default policy (advanced settings on the landing page). Memory
@@ -114,48 +162,61 @@ export const useSessionStore = defineStore('session', () => {
   const redactTerms = ref<string[]>([])
   const preserveTerms = ref<string[]>([])
 
-  /** Accumulated per-entity overrides, keyed by `${start}:${end}`. */
-  const overrides = ref<Map<string, Override>>(new Map())
-  /** True while an override re-run is in flight (result view stays visible). */
-  const rerunning = ref(false)
-
-  /**
-   * Redacted-PDF preview of the current result (memory only — NEVER
-   * persisted). `pdfPreviewUrl` is an object URL for the exported PDF blob;
-   * it is revoked whenever it is replaced or cleared.
-   */
-  const pdfPreviewUrl = ref<string | null>(null)
-  /** The exported PDF blob backing `pdfPreviewUrl` (reused for downloads). */
-  const pdfPreviewBlob = ref<Blob | null>(null)
-  const pdfPreviewLoading = ref(false)
-  const pdfPreviewError = ref<string | null>(null)
-  /** Bumped on every refresh/clear so stale in-flight responses are ignored. */
-  let pdfPreviewToken = 0
-
-  /**
-   * Object URL for the ORIGINAL uploaded PDF (the "Original" result panel).
-   * Created lazily on first activation of that panel, revoked on reset/new
-   * result. Memory only — never persisted.
-   */
-  const originalPreviewUrl = ref<string | null>(null)
-
   const status = ref<StatusResponse | null>(null)
   const externalBannerDismissed = ref(false)
 
+  // ---------------------------------------------------------------------
+  // Active-document views (existing component API, delegating to the entry)
+  // ---------------------------------------------------------------------
+
+  const result = computed<AnonymizeResponse | null>(() => activeDocument.value?.result ?? null)
+  const sourceFile = computed<File | null>(() => activeDocument.value?.file ?? null)
+  const selectedEntityIndex = computed<number | null>(
+    () => activeDocument.value?.selectedEntityIndex ?? null,
+  )
+  const rerunning = computed(() => activeDocument.value?.rerunning ?? false)
+  const overrides = computed<Map<string, Override>>(
+    () => activeDocument.value?.overrides ?? new Map(),
+  )
+  const pdfPreviewUrl = computed(() => activeDocument.value?.pdfPreviewUrl ?? null)
+  const pdfPreviewBlob = computed(() => activeDocument.value?.pdfPreviewBlob ?? null)
+  const pdfPreviewLoading = computed(() => activeDocument.value?.pdfPreviewLoading ?? false)
+  const pdfPreviewError = computed(() => activeDocument.value?.pdfPreviewError ?? null)
+  const originalPreviewUrl = computed(() => activeDocument.value?.originalPreviewUrl ?? null)
+  const activePanels = computed<ResultPanelId[]>(() => activeDocument.value?.activePanels ?? [])
+
   const selectedEntity = computed<AnonymizedEntity | null>(() => {
-    if (result.value === null || selectedEntityIndex.value === null) return null
-    return result.value.entities[selectedEntityIndex.value] ?? null
+    const doc = activeDocument.value
+    if (!doc || doc.result === null || doc.selectedEntityIndex === null) return null
+    return doc.result.entities[doc.selectedEntityIndex] ?? null
   })
 
-  /** Entity counts by type, in a stable (first-seen) order. */
+  /** Entity counts by type (active document), in a stable (first-seen) order. */
   const entityCounts = computed<{ type: EntityType; count: number }[]>(() => {
-    if (!result.value) return []
+    const entities = result.value?.entities
+    if (!entities) return []
     const counts = new Map<EntityType, number>()
-    for (const entity of result.value.entities) {
+    for (const entity of entities) {
       counts.set(entity.entity_type, (counts.get(entity.entity_type) ?? 0) + 1)
     }
     return [...counts.entries()].map(([type, count]) => ({ type, count }))
   })
+
+  /**
+   * The document featured on the landing progress card while the batch runs:
+   * the first still-streaming one (all start concurrently up to the cap).
+   */
+  const loadingDocument = computed<SessionDocument | null>(
+    () =>
+      documents.value.find((doc) => doc.status === 'processing') ??
+      documents.value.find((doc) => doc.status === 'queued') ??
+      documents.value[0] ??
+      null,
+  )
+
+  // ---------------------------------------------------------------------
+  // Status endpoint / banners
+  // ---------------------------------------------------------------------
 
   /** External (non-local) endpoints that document content is sent to. */
   const externalEndpoints = computed<ExternalEndpoint[]>(
@@ -170,6 +231,23 @@ export const useSessionStore = defineStore('session', () => {
   const notReadyDetectors = computed<DetectorStatus[]>(
     () => status.value?.detectors.filter((detector) => detector.enabled && !detector.ready) ?? [],
   )
+
+  async function fetchStatus(): Promise<void> {
+    try {
+      status.value = (await statusApi.getStatus()).data
+    } catch {
+      // Backend not reachable yet — errors surface on submit instead.
+      status.value = null
+    }
+  }
+
+  function dismissExternalBanner(): void {
+    externalBannerDismissed.value = true
+  }
+
+  // ---------------------------------------------------------------------
+  // Advanced settings (landing page)
+  // ---------------------------------------------------------------------
 
   /** The deviations from the default policy to send with requests (or null). */
   const policyOverrides = computed<PolicyMap | null>(() => policyDeviations(policy.value))
@@ -209,129 +287,330 @@ export const useSessionStore = defineStore('session', () => {
     preserveTerms.value = []
   }
 
-  /** The pending override for an entity, if any. */
-  function overrideFor(entity: { start: number; end: number }): Override | undefined {
-    return overrides.value.get(overrideKey(entity))
+  // ---------------------------------------------------------------------
+  // Batch lifecycle: submit → queue → parallel streams → result phase
+  // ---------------------------------------------------------------------
+
+  function createDocument(
+    input: { file: File | null; text: string | null; name: string },
+    batchPolicy: PolicyMap | null,
+    batchRules: CustomRules | null,
+  ): SessionDocument {
+    const doc: SessionDocument = {
+      id: `doc-${++documentIdCounter}`,
+      file: input.file,
+      text: input.text,
+      name: input.name,
+      status: 'queued',
+      progress: null,
+      progressMaxPercent: 0,
+      progressSawOcr: false,
+      error: null,
+      result: null,
+      overrides: new Map(),
+      selectedEntityIndex: null,
+      rerunning: false,
+      pdfPreviewUrl: null,
+      pdfPreviewBlob: null,
+      pdfPreviewLoading: false,
+      pdfPreviewError: null,
+      pdfPreviewToken: 0,
+      originalPreviewUrl: null,
+      activePanels: ['source'],
+      policy: batchPolicy,
+      rules: batchRules,
+      abort: null,
+    }
+    // reactive() up front: the queue/stream callbacks hold direct references,
+    // which must be the SAME proxy the components see through `documents`.
+    return reactive(doc)
   }
 
-  async function fetchStatus(): Promise<void> {
-    try {
-      status.value = (await statusApi.getStatus()).data
-    } catch {
-      // Backend not reachable yet — errors surface on submit instead.
-      status.value = null
+  function startBatch(inputs: { file: File | null; text: string | null; name: string }[]): void {
+    if (inputs.length === 0) return
+    // Defensive: a previous batch (should already be reset) is fully dropped.
+    reset()
+    // Policy/custom rules are captured ONCE at submit for the whole batch.
+    const batchPolicy = policyOverrides.value
+    const batchRules = customRules.value
+    documents.value = inputs.map((input) => createDocument(input, batchPolicy, batchRules))
+    activeDocumentId.value = documents.value[0]!.id
+    phase.value = 'loading'
+    pumpQueue()
+  }
+
+  /**
+   * Anonymize dropped/picked files: one document per file, ALL processed
+   * concurrently (capped at MAX_CONCURRENT_STREAMS; the rest queue up).
+   * Errors surface per document in the result view — this never rejects.
+   */
+  function submitFiles(files: File[]): void {
+    startBatch(files.map((file) => ({ file, text: null, name: file.name })))
+  }
+
+  /** Anonymize pasted text — always a single-document batch. */
+  function submitText(text: string): void {
+    startBatch([{ file: null, text, name: 'Eingefügter Text' }])
+  }
+
+  /** Start queued documents while free stream slots exist. */
+  function pumpQueue(): void {
+    const token = batchToken
+    for (const doc of documents.value) {
+      if (doc.status !== 'queued') continue
+      const processing = documents.value.filter((d) => d.status === 'processing').length
+      if (processing >= MAX_CONCURRENT_STREAMS) return
+      void processDocument(doc, token)
     }
   }
 
-  function dismissExternalBanner(): void {
-    externalBannerDismissed.value = true
-  }
-
-  /** True when the response was produced from a PDF (redactable source). */
-  function isPdfResult(response: AnonymizeResponse | null): boolean {
-    return response?.source_type === 'pdf' || response?.source_type === 'pdf-ocr'
+  /** onProgress callback of one document's stream. */
+  function onDocumentProgress(doc: SessionDocument, event: StreamProgressEvent): void {
+    if (event.stage === 'ocr') doc.progressSawOcr = true
+    doc.progress = event
+    const [base, span] = stageSpan(event.stage, doc.progressSawOcr)
+    const fraction = Math.min(event.done / Math.max(event.total, 1), 1)
+    doc.progressMaxPercent = Math.min(Math.max(doc.progressMaxPercent, base + span * fraction), 100)
   }
 
   /**
-   * Lazily create the object URL for the ORIGINAL uploaded PDF (used by the
-   * "Original" panel for PDF sources). Returns null when the original file is
-   * gone or the result is not a PDF.
+   * Run ONE document through /anonymize/stream. Failures are isolated: they
+   * mark only this document as 'error' and never affect the others.
+   */
+  async function processDocument(doc: SessionDocument, token: number): Promise<void> {
+    doc.status = 'processing'
+    doc.error = null
+    doc.progress = null
+    doc.progressMaxPercent = 0
+    doc.progressSawOcr = false
+    const abort = new AbortController()
+    doc.abort = abort
+    const onProgress = (event: StreamProgressEvent) => {
+      if (token === batchToken) onDocumentProgress(doc, event)
+    }
+    try {
+      const response = doc.file
+        ? await anonymizeFileStream(doc.file, doc.policy, doc.rules, onProgress, abort.signal)
+        : await anonymizeTextStream(doc.text ?? '', doc.policy, doc.rules, onProgress, abort.signal)
+      if (token !== batchToken) return // batch was reset while streaming
+      doc.result = response
+      doc.overrides = new Map()
+      doc.selectedEntityIndex = null
+      // Default panel selection: PDF sources start with the redacted preview
+      // alongside the source review.
+      doc.activePanels = isPdfResult(response) ? ['source', 'pdf'] : ['source']
+      doc.status = 'done'
+      maybeAdvancePhase(doc)
+      // For PDF sources, load the redacted-PDF preview right away (not
+      // awaited — the text result is already usable while it renders).
+      void refreshPdfPreviewFor(doc)
+    } catch (err) {
+      if (token !== batchToken) return
+      doc.status = 'error'
+      doc.error = extractApiErrorMessage(err)
+      maybeAdvancePhase(doc)
+    } finally {
+      if (token === batchToken) {
+        doc.abort = null
+        doc.progress = null
+        pumpQueue() // a slot freed up — start the next queued document
+      }
+    }
+  }
+
+  /**
+   * Leave the landing view as soon as the FIRST document finishes
+   * successfully (that one becomes active; the rest keep processing in the
+   * background). If ALL documents settle without a single success, the result
+   * view still opens so the per-document error cards (with retry) are shown.
+   */
+  function maybeAdvancePhase(settled: SessionDocument): void {
+    if (phase.value !== 'loading') return
+    if (settled.status === 'done') {
+      activeDocumentId.value = settled.id
+      phase.value = 'result'
+      return
+    }
+    const allSettled = documents.value.every(
+      (doc) => doc.status === 'done' || doc.status === 'error',
+    )
+    if (allSettled) phase.value = 'result'
+  }
+
+  /** Switch the active document (also while others are still processing). */
+  function selectDocument(id: string): void {
+    if (documents.value.some((doc) => doc.id === id)) activeDocumentId.value = id
+  }
+
+  /** Re-run ONE errored document (keeps its batch policy/rules snapshot). */
+  function retryDocument(id: string): void {
+    const doc = documents.value.find((entry) => entry.id === id)
+    if (!doc || doc.status !== 'error') return
+    doc.status = 'queued'
+    doc.error = null
+    pumpQueue()
+  }
+
+  /** Abort any in-flight work and revoke this document's object URLs. */
+  function cleanupDocument(doc: SessionDocument): void {
+    doc.abort?.abort()
+    doc.abort = null
+    doc.pdfPreviewToken += 1 // ignore any in-flight preview response
+    if (doc.pdfPreviewUrl !== null) URL.revokeObjectURL(doc.pdfPreviewUrl)
+    doc.pdfPreviewUrl = null
+    doc.pdfPreviewBlob = null
+    doc.pdfPreviewLoading = false
+    doc.pdfPreviewError = null
+    if (doc.originalPreviewUrl !== null) URL.revokeObjectURL(doc.originalPreviewUrl)
+    doc.originalPreviewUrl = null
+  }
+
+  /** Remove one document from the batch (revoking its object URLs). */
+  function removeDocument(id: string): void {
+    const index = documents.value.findIndex((doc) => doc.id === id)
+    if (index === -1) return
+    const [doc] = documents.value.splice(index, 1)
+    cleanupDocument(doc!)
+    if (activeDocumentId.value === id) {
+      const neighbor = documents.value[Math.min(index, documents.value.length - 1)]
+      activeDocumentId.value = neighbor?.id ?? null
+    }
+    if (documents.value.length === 0) phase.value = 'idle'
+  }
+
+  /**
+   * Drop the whole batch and return to the input screen: abort in-flight
+   * streams, revoke ALL object URLs, clear every document.
+   */
+  function reset(): void {
+    batchToken += 1
+    for (const doc of documents.value) cleanupDocument(doc)
+    documents.value = []
+    activeDocumentId.value = null
+    phase.value = 'idle'
+  }
+
+  // ---------------------------------------------------------------------
+  // Result panels (per document, restored on switch)
+  // ---------------------------------------------------------------------
+
+  /** Activate a result panel on the ACTIVE document (max 3, oldest evicted). */
+  function activatePanel(id: ResultPanelId): void {
+    const doc = activeDocument.value
+    if (!doc || doc.activePanels.includes(id)) return
+    // The original-PDF object URL is created lazily on first activation.
+    if (id === 'original') ensureOriginalPreviewUrl()
+    doc.activePanels.push(id)
+    if (doc.activePanels.length > 3) doc.activePanels.shift()
+  }
+
+  /** Toggle a result panel on the ACTIVE document (at least one stays on). */
+  function togglePanel(id: ResultPanelId): void {
+    const doc = activeDocument.value
+    if (!doc) return
+    const index = doc.activePanels.indexOf(id)
+    if (index === -1) {
+      activatePanel(id)
+      return
+    }
+    if (doc.activePanels.length === 1) return
+    doc.activePanels.splice(index, 1)
+  }
+
+  // ---------------------------------------------------------------------
+  // Previews (per document; public actions target the ACTIVE document)
+  // ---------------------------------------------------------------------
+
+  /**
+   * Lazily create the object URL for the ACTIVE document's ORIGINAL uploaded
+   * PDF (used by the "Original" panel for PDF sources). Returns null when the
+   * original file is gone or the result is not a PDF.
    */
   function ensureOriginalPreviewUrl(): string | null {
-    if (originalPreviewUrl.value !== null) return originalPreviewUrl.value
-    const file = sourceFile.value
-    if (file === null || !isPdfResult(result.value)) return null
-    originalPreviewUrl.value = URL.createObjectURL(file)
-    return originalPreviewUrl.value
-  }
-
-  /** Revoke the original-document object URL, if any. */
-  function clearOriginalPreview(): void {
-    if (originalPreviewUrl.value !== null) URL.revokeObjectURL(originalPreviewUrl.value)
-    originalPreviewUrl.value = null
-  }
-
-  /** Revoke the preview object URL and drop all preview state. */
-  function clearPdfPreview(): void {
-    pdfPreviewToken += 1
-    if (pdfPreviewUrl.value !== null) URL.revokeObjectURL(pdfPreviewUrl.value)
-    pdfPreviewUrl.value = null
-    pdfPreviewBlob.value = null
-    pdfPreviewLoading.value = false
-    pdfPreviewError.value = null
+    const doc = activeDocument.value
+    if (!doc) return null
+    if (doc.originalPreviewUrl !== null) return doc.originalPreviewUrl
+    if (doc.file === null || !isPdfResult(doc.result)) return null
+    doc.originalPreviewUrl = URL.createObjectURL(doc.file)
+    return doc.originalPreviewUrl
   }
 
   /**
-   * (Re-)export the redacted PDF for the current result with all accumulated
+   * (Re-)export the redacted PDF for ONE document with all its accumulated
    * overrides and show it as an inline preview. No-op for non-PDF results or
    * when the original file is gone. Called automatically after a successful
-   * PDF upload and after every successful override re-run, so the preview
-   * always reflects the user's overrides. Can take up to a minute for scans
-   * on a backend cache miss (hence the dedicated loading state).
+   * PDF run and after every successful override re-run, so the preview always
+   * reflects the user's overrides. Can take up to a minute for scans on a
+   * backend cache miss (hence the dedicated loading state).
    */
-  async function refreshPdfPreview(): Promise<void> {
-    const current = result.value
-    const file = sourceFile.value
+  async function refreshPdfPreviewFor(doc: SessionDocument): Promise<void> {
+    const current = doc.result
+    const file = doc.file
     if (current === null || file === null || !isPdfResult(current)) return
 
-    const token = ++pdfPreviewToken
-    pdfPreviewLoading.value = true
-    pdfPreviewError.value = null
+    const token = ++doc.pdfPreviewToken
+    doc.pdfPreviewLoading = true
+    doc.pdfPreviewError = null
     try {
       const { data } = await anonymizeApi.exportPdf(
         file,
         current.request_id,
-        [...overrides.value.values()],
-        policyOverrides.value,
-        customRules.value,
+        [...doc.overrides.values()],
+        doc.policy,
+        doc.rules,
       )
-      if (token !== pdfPreviewToken) return
-      if (pdfPreviewUrl.value !== null) URL.revokeObjectURL(pdfPreviewUrl.value)
-      pdfPreviewBlob.value = data
-      pdfPreviewUrl.value = URL.createObjectURL(data)
+      if (token !== doc.pdfPreviewToken) return
+      if (doc.pdfPreviewUrl !== null) URL.revokeObjectURL(doc.pdfPreviewUrl)
+      doc.pdfPreviewBlob = data
+      doc.pdfPreviewUrl = URL.createObjectURL(data)
     } catch (err) {
-      if (token !== pdfPreviewToken) return
-      pdfPreviewError.value = await extractPdfExportErrorMessage(err)
+      if (token !== doc.pdfPreviewToken) return
+      doc.pdfPreviewError = await extractPdfExportErrorMessage(err)
     } finally {
-      if (token === pdfPreviewToken) pdfPreviewLoading.value = false
+      if (token === doc.pdfPreviewToken) doc.pdfPreviewLoading = false
     }
   }
 
-  async function run(request: () => Promise<AnonymizeResponse>): Promise<void> {
-    phase.value = 'loading'
-    clearProgress()
-    try {
-      result.value = await request()
-      selectedEntityIndex.value = null
-      overrides.value = new Map()
-      // A new result invalidates any previous document previews.
-      clearPdfPreview()
-      clearOriginalPreview()
-      phase.value = 'result'
-    } catch (err) {
-      phase.value = 'idle'
-      throw err
-    } finally {
-      clearProgress()
-    }
+  /** Refresh the ACTIVE document's redacted-PDF preview. */
+  async function refreshPdfPreview(): Promise<void> {
+    const doc = activeDocument.value
+    if (doc) await refreshPdfPreviewFor(doc)
+  }
+
+  // ---------------------------------------------------------------------
+  // Overrides / re-runs (per document; public actions target the ACTIVE one)
+  // ---------------------------------------------------------------------
+
+  function indexOfEntityKey(entities: AnonymizedEntity[], key: string): number | null {
+    const index = entities.findIndex((entity) => overrideKey(entity) === key)
+    return index === -1 ? null : index
   }
 
   /**
-   * Re-run the current result with all accumulated overrides. Tries the cheap
+   * Re-run ONE document with all its accumulated overrides. Tries the cheap
    * cached path first ({request_id, overrides}); on 410 (cache expired) it
    * automatically retries ONCE with the full source text plus the same
-   * overrides and adopts the new request_id. The result view stays visible
-   * (`rerunning` instead of `phase`); on failure the override map is rolled
-   * back and the error rethrown (caller shows a toast).
+   * overrides and adopts the new request_id. Always uses the document's OWN
+   * request_id, overrides and batch policy/rules — never another document's.
+   * The result view stays visible (`rerunning` instead of `phase`); on
+   * failure the override map is rolled back and the error rethrown (caller
+   * shows a toast).
    */
-  async function rerunOverrides(previousOverrides: Map<string, Override>): Promise<void> {
-    if (!result.value) return
-    const requestId = result.value.request_id
-    const sourceText = result.value.source_text
-    const allOverrides = [...overrides.value.values()]
-    const selectedKey = selectedEntity.value !== null ? overrideKey(selectedEntity.value) : null
+  async function rerunOverridesFor(
+    doc: SessionDocument,
+    previousOverrides: Map<string, Override>,
+  ): Promise<void> {
+    if (!doc.result) return
+    const requestId = doc.result.request_id
+    const sourceText = doc.result.source_text
+    const allOverrides = [...doc.overrides.values()]
+    const selected =
+      doc.selectedEntityIndex === null
+        ? null
+        : (doc.result.entities[doc.selectedEntityIndex] ?? null)
+    const selectedKey = selected === null ? null : overrideKey(selected)
 
-    rerunning.value = true
+    doc.rerunning = true
     try {
       let response: AnonymizeResponse
       try {
@@ -341,8 +620,8 @@ export const useSessionStore = defineStore('session', () => {
           await anonymizeApi.rerunWithOverrides(
             requestId,
             allOverrides,
-            policyOverrides.value,
-            preserveTerms.value,
+            doc.policy,
+            doc.rules?.preserveTerms ?? null,
           )
         ).data
       } catch (err) {
@@ -351,45 +630,48 @@ export const useSessionStore = defineStore('session', () => {
         // overrides (full custom rules apply again); the response carries a
         // fresh request_id.
         response = (
-          await anonymizeApi.anonymizeText(
-            sourceText,
-            allOverrides,
-            policyOverrides.value,
-            customRules.value,
-          )
+          await anonymizeApi.anonymizeText(sourceText, allOverrides, doc.policy, doc.rules)
         ).data
       }
-      result.value = response
+      doc.result = response
       // Re-select the same entity by offsets (indices may shift on re-runs).
-      selectedEntityIndex.value =
+      doc.selectedEntityIndex =
         selectedKey === null ? null : indexOfEntityKey(response.entities, selectedKey)
       // The preview must reflect the new overrides (no-op for non-PDF results).
-      void refreshPdfPreview()
+      void refreshPdfPreviewFor(doc)
     } catch (err) {
-      overrides.value = previousOverrides
+      doc.overrides = previousOverrides
       throw err
     } finally {
-      rerunning.value = false
+      doc.rerunning = false
     }
   }
 
-  function indexOfEntityKey(entities: AnonymizedEntity[], key: string): number | null {
-    const index = entities.findIndex((entity) => overrideKey(entity) === key)
-    return index === -1 ? null : index
+  /** Re-run the ACTIVE document with its accumulated overrides. */
+  async function rerunOverrides(previousOverrides: Map<string, Override>): Promise<void> {
+    const doc = activeDocument.value
+    if (doc) await rerunOverridesFor(doc, previousOverrides)
+  }
+
+  /** The ACTIVE document's pending override for an entity, if any. */
+  function overrideFor(entity: { start: number; end: number }): Override | undefined {
+    return activeDocument.value?.overrides.get(overrideKey(entity))
   }
 
   /**
-   * Set (or merge) an override for one entity and immediately re-run.
-   * A type change intentionally drops any transformation override so the
-   * default policy for the new type applies.
+   * Set (or merge) an override for one entity of the ACTIVE document and
+   * immediately re-run it. A type change intentionally drops any
+   * transformation override so the default policy for the new type applies.
    */
   function applyEntityOverride(
     entity: AnonymizedEntity,
     patch: { transformation?: TransformationType; entity_type?: EntityType },
   ): Promise<void> {
+    const doc = activeDocument.value
+    if (!doc) return Promise.resolve()
     const key = overrideKey(entity)
-    const previous = new Map(overrides.value)
-    const existing = overrides.value.get(key)
+    const previous = new Map(doc.overrides)
+    const existing = doc.overrides.get(key)
     const next: Override = {
       start: entity.start,
       end: entity.end,
@@ -403,78 +685,51 @@ export const useSessionStore = defineStore('session', () => {
       if (existing?.entity_type !== undefined) next.entity_type = existing.entity_type
       if (patch.transformation !== undefined) next.transformation = patch.transformation
     }
-    overrides.value.set(key, next)
-    return rerunOverrides(previous)
+    doc.overrides.set(key, next)
+    return rerunOverridesFor(doc, previous)
   }
 
   /**
-   * Manually redact an arbitrary text region (mouse selection in the source
-   * review). The offsets are Unicode CODE POINTS into `source_text`; because
-   * they don't match a detected entity, the backend turns the override into a
-   * user-defined span (detector `user_manual`, `metadata.user_manual`) on the
-   * re-run. Removing the override again (resetEntityOverride) undoes it.
+   * Manually redact an arbitrary text region of the ACTIVE document (mouse
+   * selection in the source review). The offsets are Unicode CODE POINTS into
+   * `source_text`; because they don't match a detected entity, the backend
+   * turns the override into a user-defined span (detector `user_manual`,
+   * `metadata.user_manual`) on the re-run. Removing the override again
+   * (resetEntityOverride) undoes it.
    */
   function addManualRedaction(start: number, end: number): Promise<void> {
-    if (!result.value) return Promise.resolve()
-    const previous = new Map(overrides.value)
-    const text = Array.from(result.value.source_text).slice(start, end).join('')
-    overrides.value.set(overrideKey({ start, end }), { start, end, text, transformation: 'REMOVE' })
-    return rerunOverrides(previous)
+    const doc = activeDocument.value
+    if (!doc || !doc.result) return Promise.resolve()
+    const previous = new Map(doc.overrides)
+    const text = Array.from(doc.result.source_text).slice(start, end).join('')
+    doc.overrides.set(overrideKey({ start, end }), { start, end, text, transformation: 'REMOVE' })
+    return rerunOverridesFor(doc, previous)
   }
 
   /** Remove any override for this entity and re-run with the remaining ones. */
   function resetEntityOverride(entity: AnonymizedEntity): Promise<void> {
+    const doc = activeDocument.value
+    if (!doc) return Promise.resolve()
     const key = overrideKey(entity)
-    const previous = new Map(overrides.value)
-    if (!overrides.value.delete(key)) return Promise.resolve()
-    return rerunOverrides(previous)
-  }
-
-  /**
-   * Anonymize pasted text via the STREAMING endpoint (live progress).
-   * Rejects with the API error (caller shows a toast).
-   */
-  async function submitText(text: string): Promise<void> {
-    await run(() =>
-      anonymizeTextStream(text, policyOverrides.value, customRules.value, onStreamProgress),
-    )
-    sourceFile.value = null
-  }
-
-  /**
-   * Anonymize an uploaded file via the STREAMING endpoint (live progress).
-   * Rejects with the API error (caller shows a toast).
-   */
-  async function submitFile(file: File): Promise<void> {
-    await run(() =>
-      anonymizeFileStream(file, policyOverrides.value, customRules.value, onStreamProgress),
-    )
-    sourceFile.value = file
-    // For PDF sources, load the redacted-PDF preview right away (not awaited —
-    // the text result is already usable while the preview renders).
-    void refreshPdfPreview()
+    const previous = new Map(doc.overrides)
+    if (!doc.overrides.delete(key)) return Promise.resolve()
+    return rerunOverridesFor(doc, previous)
   }
 
   function selectEntity(index: number | null): void {
-    selectedEntityIndex.value = index
-  }
-
-  /** Drop the current result and return to the input screen. */
-  function reset(): void {
-    result.value = null
-    selectedEntityIndex.value = null
-    overrides.value = new Map()
-    sourceFile.value = null
-    clearPdfPreview()
-    clearOriginalPreview()
-    clearProgress()
-    phase.value = 'idle'
+    const doc = activeDocument.value
+    if (doc) doc.selectedEntityIndex = index
   }
 
   return {
     phase,
-    progress,
-    progressPercent,
+    documents,
+    activeDocumentId,
+    activeDocument,
+    loadingDocument,
+    selectDocument,
+    retryDocument,
+    removeDocument,
     result,
     sourceFile,
     selectedEntityIndex,
@@ -492,6 +747,9 @@ export const useSessionStore = defineStore('session', () => {
     advancedCustomized,
     setPolicyTransformation,
     resetAdvancedSettings,
+    activePanels,
+    activatePanel,
+    togglePanel,
     pdfPreviewUrl,
     pdfPreviewBlob,
     pdfPreviewLoading,
@@ -506,12 +764,13 @@ export const useSessionStore = defineStore('session', () => {
     fetchStatus,
     dismissExternalBanner,
     submitText,
-    submitFile,
+    submitFiles,
     selectEntity,
     overrideFor,
     applyEntityOverride,
     addManualRedaction,
     resetEntityOverride,
+    rerunOverrides,
     reset,
   }
 })

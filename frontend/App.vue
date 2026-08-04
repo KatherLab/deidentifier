@@ -51,7 +51,7 @@
     </header>
 
     <main class="mx-auto px-4 py-8" :class="containerClass">
-      <ResultView v-if="session.phase === 'result' && session.result" :result="session.result" />
+      <ResultView v-if="session.phase === 'result'" />
       <InputPanel v-else />
     </main>
 

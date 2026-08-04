@@ -24,6 +24,7 @@ from ..schemas.entities import (
     ValidationSeverity,
     ValidationWarning,
 )
+from .concurrency import global_semaphore
 from .detection import DetectionOutcome, DetectorError
 from .grounding import Mention, ground_mentions
 from .safe_logging import get_safe_logger
@@ -214,7 +215,8 @@ class LLMDetector:
     async def detect(self, text: str) -> DetectionOutcome:
         settings = self._settings
         chunks = chunk_text(text, settings.LLM_CHUNK_CHARS, settings.LLM_CHUNK_OVERLAP)
-        semaphore = asyncio.Semaphore(settings.LLM_MAX_CONCURRENT_REQUESTS)
+        # Global slots: the limit is a TOTAL across all documents in flight.
+        semaphore = global_semaphore("llm", settings.LLM_MAX_CONCURRENT_REQUESTS)
 
         system_prompt = self._system_prompt()
         total = settings.LLM_DETECTION_PASSES * len(chunks)
@@ -377,7 +379,7 @@ async def recheck_output(
 
     active_policy = merge_policy(policy)
     detector = LLMDetector(settings)
-    semaphore = asyncio.Semaphore(settings.LLM_MAX_CONCURRENT_REQUESTS)
+    semaphore = global_semaphore("llm", settings.LLM_MAX_CONCURRENT_REQUESTS)
 
     completed = 0
     total = 0

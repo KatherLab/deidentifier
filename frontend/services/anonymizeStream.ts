@@ -68,6 +68,7 @@ async function streamAnonymize(
   body: BodyInit,
   headers: HeadersInit | undefined,
   onProgress: OnStreamProgress,
+  signal?: AbortSignal,
 ): Promise<AnonymizeResponse> {
   let response: Response
   try {
@@ -75,8 +76,12 @@ async function streamAnonymize(
       method: 'POST',
       headers,
       body,
+      signal,
     })
-  } catch {
+  } catch (err) {
+    // Deliberate aborts (reset while streaming) keep their AbortError shape so
+    // callers can tell them apart from real failures.
+    if (signal?.aborted) throw err
     // fetch itself failed (backend down, CORS, …) — mimic an axios network
     // error so the "Server nicht erreichbar" message applies.
     throw axiosLikeError()
@@ -153,6 +158,7 @@ export function anonymizeTextStream(
   policy: PolicyMap | null,
   rules: CustomRules | null,
   onProgress: OnStreamProgress,
+  signal?: AbortSignal,
 ): Promise<AnonymizeResponse> {
   const body: AnonymizeTextRequest = { text }
   if (hasPolicyEntries(policy)) body.policy = policy
@@ -161,7 +167,12 @@ export function anonymizeTextStream(
     if (rules.redactTerms.length > 0) body.redact_terms = rules.redactTerms
     if (rules.preserveTerms.length > 0) body.preserve_terms = rules.preserveTerms
   }
-  return streamAnonymize(JSON.stringify(body), { 'Content-Type': 'application/json' }, onProgress)
+  return streamAnonymize(
+    JSON.stringify(body),
+    { 'Content-Type': 'application/json' },
+    onProgress,
+    signal,
+  )
 }
 
 /** Streaming counterpart of `anonymizeApi.anonymizeFile` (fresh runs only). */
@@ -170,11 +181,12 @@ export function anonymizeFileStream(
   policy: PolicyMap | null,
   rules: CustomRules | null,
   onProgress: OnStreamProgress,
+  signal?: AbortSignal,
 ): Promise<AnonymizeResponse> {
   const formData = new FormData()
   formData.append('file', file)
   if (hasPolicyEntries(policy)) formData.append('policy', JSON.stringify(policy))
   appendCustomRules(formData, rules)
   // No explicit headers — the browser sets the multipart boundary itself.
-  return streamAnonymize(formData, undefined, onProgress)
+  return streamAnonymize(formData, undefined, onProgress, signal)
 }
