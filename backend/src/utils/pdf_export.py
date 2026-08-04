@@ -17,10 +17,12 @@ boxes (0–1000 normalized). The result is re-extracted and checked: no
 redacted entity string may survive in the output.
 """
 
+import base64
 import io
 import re
 
 from ..core.config import Settings
+from ..schemas.anonymize import RedactArea
 from ..schemas.entities import AppliedEntity, SpanStatus
 from .extraction import LayoutLine
 from .safe_logging import get_safe_logger
@@ -42,6 +44,20 @@ class ExportError(Exception):
         self.status_code = status_code
 
 
+def _page_areas(
+    areas: list[RedactArea] | None, page_number: int
+) -> list[tuple[float, float, float, float]]:
+    """Absolute-fraction rects (x0, y0, x1, y1 in 0–1, top-left origin) of the
+    user-drawn areas on ONE page (1-based)."""
+    if not areas:
+        return []
+    return [
+        (area.x0 / 1000, area.y0 / 1000, area.x1 / 1000, area.y1 / 1000)
+        for area in areas
+        if area.page == page_number
+    ]
+
+
 def redacted_texts(entities: list[AppliedEntity]) -> list[str]:
     """Unique entity strings that must not appear in any output, longest first
     (so blackout of a full name is preferred over its parts)."""
@@ -58,18 +74,28 @@ def redacted_texts(entities: list[AppliedEntity]) -> list[str]:
 # rasterize+blackout path, which physically cannot carry a text layer.
 
 
-def redact_native_pdf(data: bytes, entities: list[AppliedEntity], settings: Settings) -> bytes:
+def redact_native_pdf(
+    data: bytes,
+    entities: list[AppliedEntity],
+    settings: Settings,
+    areas: list[RedactArea] | None = None,
+) -> bytes:
     try:
-        return _redact_native_true(data, entities, settings)
+        return _redact_native_true(data, entities, settings, areas)
     except Exception as exc:
         logger.warning(
             "true_redaction_fallback",
             reason=type(exc).__name__,
         )
-        return _redact_native_raster(data, entities, settings)
+        return _redact_native_raster(data, entities, settings, areas)
 
 
-def _redact_native_true(data: bytes, entities: list[AppliedEntity], settings: Settings) -> bytes:
+def _redact_native_true(
+    data: bytes,
+    entities: list[AppliedEntity],
+    settings: Settings,
+    areas: list[RedactArea] | None = None,
+) -> bytes:
     import pymupdf
 
     needles = redacted_texts(entities)
@@ -107,6 +133,18 @@ def _redact_native_true(data: bytes, entities: list[AppliedEntity], settings: Se
                         )
                     else:
                         page.add_redact_annot(rect, fill=(0, 0, 0))
+            # User-drawn areas (signatures, logos, stamps): black box over the
+            # region; apply_redactions also removes text and image pixels
+            # underneath. fitz page coordinates share the top-left origin of
+            # the normalized area coordinates.
+            page_width, page_height = page.rect.width, page.rect.height
+            for x0, y0, x1, y1 in _page_areas(areas, page.number + 1):
+                page.add_redact_annot(
+                    pymupdf.Rect(
+                        x0 * page_width, y0 * page_height, x1 * page_width, y1 * page_height
+                    ),
+                    fill=(0, 0, 0),
+                )
             # Remove the text AND erase image pixels under the boxes (a
             # "native" PDF can embed scanned fragments containing PII).
             page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_PIXELS)
@@ -173,7 +211,12 @@ def _verify_native(output: bytes, needles: list[str]) -> None:
             )
 
 
-def _redact_native_raster(data: bytes, entities: list[AppliedEntity], settings: Settings) -> bytes:
+def _redact_native_raster(
+    data: bytes,
+    entities: list[AppliedEntity],
+    settings: Settings,
+    areas: list[RedactArea] | None = None,
+) -> bytes:
     import pypdfium2 as pdfium
     from PIL import ImageDraw, ImageFont
 
@@ -195,7 +238,7 @@ def _redact_native_raster(data: bytes, entities: list[AppliedEntity], settings: 
         raise ExportError("The PDF could not be opened for export.", status_code=415) from exc
     try:
         images = []
-        for page in document:
+        for page_index, page in enumerate(document):
             page_width, page_height = page.get_size()
             textpage = page.get_textpage()
             boxes: list[tuple[float, float, float, float, str | None]] = []
@@ -232,6 +275,18 @@ def _redact_native_raster(data: bytes, entities: list[AppliedEntity], settings: 
                         fill="black",
                         font=font,
                     )
+            # User-drawn areas: black box over the rendered pixels (the
+            # rendered image shares the top-left origin of the coordinates).
+            for x0, y0, x1, y1 in _page_areas(areas, page_index + 1):
+                draw.rectangle(
+                    (
+                        x0 * page_width * scale,
+                        y0 * page_height * scale,
+                        x1 * page_width * scale,
+                        y1 * page_height * scale,
+                    ),
+                    fill="black",
+                )
             images.append(image.convert("RGB"))
             textpage.close()
             page.close()
@@ -328,6 +383,68 @@ def _char_rects(textpage, start: int, count: int) -> list[tuple[float, float, fl
     return [tuple(rect) for rect in rects]
 
 
+# --- Page rendering for the area-redaction editor ----------------------------
+
+_PAGE_RENDER_SCALE = 2.0
+# Render cap: clinical letters are short; huge documents would blow up the
+# JSON response. The UI states when pages were skipped.
+_MAX_RENDER_PAGES = 40
+
+
+def render_pdf_pages(data: bytes) -> tuple[list[dict], bool]:
+    """Render the pages of an uploaded PDF as PNG data URLs for the frontend
+    area-redaction editor, plus the bounding boxes of embedded images
+    (one-click redaction suggestions). Returns (pages, truncated). Nothing is
+    persisted server-side."""
+    import pypdfium2 as pdfium
+    import pypdfium2.raw as pdfium_c
+
+    try:
+        document = pdfium.PdfDocument(data)
+    except Exception as exc:
+        raise ExportError("The PDF could not be opened.", status_code=415) from exc
+
+    pages: list[dict] = []
+    try:
+        total = len(document)
+        if total == 0:
+            raise ExportError("The PDF contains no pages.", status_code=415)
+        for index in range(min(total, _MAX_RENDER_PAGES)):
+            page = document[index]
+            width, height = page.get_size()
+            image = page.render(scale=_PAGE_RENDER_SCALE).to_pil().convert("RGB")
+            buffer = io.BytesIO()
+            image.save(buffer, format="PNG")
+
+            # Embedded-image bounds: pdfium page coordinates have a
+            # bottom-left origin; normalized coordinates are top-left.
+            boxes: list[dict] = []
+            for obj in page.get_objects(filter=(pdfium_c.FPDF_PAGEOBJ_IMAGE,)):
+                left, bottom, right, top = obj.get_bounds()
+                box = {
+                    "x0": max(left / width * 1000, 0.0),
+                    "y0": max((height - top) / height * 1000, 0.0),
+                    "x1": min(right / width * 1000, 1000.0),
+                    "y1": min((height - bottom) / height * 1000, 1000.0),
+                }
+                if box["x1"] > box["x0"] and box["y1"] > box["y0"]:
+                    boxes.append(box)
+
+            pages.append(
+                {
+                    "page": index + 1,
+                    "width": width,
+                    "height": height,
+                    "image": "data:image/png;base64,"
+                    + base64.b64encode(buffer.getvalue()).decode("ascii"),
+                    "image_boxes": boxes,
+                }
+            )
+        return pages, total > _MAX_RENDER_PAGES
+    finally:
+        document.close()
+
+
 # --- Scanned PDFs: layout-faithful rebuild from anonymized text --------------
 
 
@@ -336,6 +453,7 @@ def rebuild_scanned_pdf(
     layout: list[LayoutLine],
     entities: list[AppliedEntity],
     page_count: int,
+    areas: list[RedactArea] | None = None,
 ) -> bytes:
     from reportlab.lib.colors import grey
     from reportlab.pdfgen import canvas
@@ -371,6 +489,18 @@ def rebuild_scanned_pdf(
             for index, wrapped_line in enumerate(wrapped):
                 baseline = height - top - (index + 1) * font_size * _LINE_SPACING + font_size * 0.2
                 pdf.drawString(x, baseline, wrapped_line)
+        # User-drawn areas: black box at the (approximate) original position —
+        # the rebuild is layout-faithful, so the normalized coordinates map
+        # onto the reconstructed page. reportlab's origin is bottom-left.
+        for x0, y0, x1, y1 in _page_areas(areas, page_number):
+            pdf.rect(
+                x0 * width,
+                height - y1 * height,
+                (x1 - x0) * width,
+                (y1 - y0) * height,
+                stroke=0,
+                fill=1,
+            )
         pdf.showPage()
     pdf.save()
     output = buffer.getvalue()

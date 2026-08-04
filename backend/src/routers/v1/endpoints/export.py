@@ -17,7 +17,12 @@ from pydantic import TypeAdapter, ValidationError
 from starlette.datastructures import UploadFile
 
 from ....core.config import Settings, get_settings
-from ....schemas.anonymize import AnonymizeResponse, EntityOverride
+from ....schemas.anonymize import (
+    AnonymizeResponse,
+    EntityOverride,
+    PdfPagesResponse,
+    RedactArea,
+)
 from ....schemas.entities import EntityType, TransformationType
 from ....utils.cache import request_cache
 from ....utils.detection import DetectorError
@@ -26,6 +31,7 @@ from ....utils.pdf_export import (
     ExportError,
     rebuild_scanned_pdf,
     redact_native_pdf,
+    render_pdf_pages,
 )
 from ....utils.pipeline import rerun_with_overrides, run_anonymization
 from ....utils.safe_logging import get_safe_logger
@@ -35,6 +41,38 @@ logger = get_safe_logger(__name__)
 
 _OVERRIDES_ADAPTER = TypeAdapter(list[EntityOverride])
 _POLICY_ADAPTER = TypeAdapter(dict[EntityType, TransformationType])
+_AREAS_ADAPTER = TypeAdapter(list[RedactArea])
+_MAX_REDACT_AREAS = 200
+
+
+def _parse_areas(raw) -> list[RedactArea]:
+    """User-drawn blackout regions (JSON list in the `redact_areas` field)."""
+    if not isinstance(raw, str) or not raw.strip():
+        return []
+    try:
+        payload = json.loads(raw)
+        if not isinstance(payload, list) or len(payload) > _MAX_REDACT_AREAS:
+            raise ValueError
+        return _AREAS_ADAPTER.validate_python(payload)
+    except (json.JSONDecodeError, ValidationError, ValueError):
+        raise HTTPException(status_code=422, detail="Invalid 'redact_areas' payload.") from None
+
+
+async def _read_pdf_upload(form, settings: Settings) -> bytes:
+    """Validate + read the re-sent original PDF (shared by the export routes)."""
+    upload = form.get("file")
+    if not isinstance(upload, UploadFile):
+        raise HTTPException(status_code=400, detail="Multipart field 'file' is required.")
+    if not (upload.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=415, detail="Redacted-PDF export is available for PDF uploads only."
+        )
+    data = await upload.read(settings.max_upload_bytes + 1)
+    if len(data) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=413, detail=f"File exceeds the {settings.APP_MAX_UPLOAD_MB} MB limit."
+        )
+    return data
 
 
 def _parse_terms(raw) -> list[str] | None:
@@ -56,18 +94,7 @@ async def export_pdf(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     form = await request.form()
-    upload = form.get("file")
-    if not isinstance(upload, UploadFile):
-        raise HTTPException(status_code=400, detail="Multipart field 'file' is required.")
-    if not (upload.filename or "").lower().endswith(".pdf"):
-        raise HTTPException(
-            status_code=415, detail="Redacted-PDF export is available for PDF uploads only."
-        )
-    data = await upload.read(settings.max_upload_bytes + 1)
-    if len(data) > settings.max_upload_bytes:
-        raise HTTPException(
-            status_code=413, detail=f"File exceeds the {settings.APP_MAX_UPLOAD_MB} MB limit."
-        )
+    data = await _read_pdf_upload(form, settings)
 
     overrides: list[EntityOverride] = []
     raw_overrides = form.get("overrides")
@@ -90,6 +117,7 @@ async def export_pdf(
         custom_instruction = None
     redact_terms = _parse_terms(form.get("redact_terms"))
     preserve_terms = _parse_terms(form.get("preserve_terms"))
+    redact_areas = _parse_areas(form.get("redact_areas"))
 
     file_hash = hashlib.sha256(data).hexdigest()
     request_id = form.get("request_id")
@@ -107,9 +135,11 @@ async def export_pdf(
 
     try:
         if source_type == "pdf":
-            pdf_bytes = redact_native_pdf(data, result.entities, settings)
+            pdf_bytes = redact_native_pdf(data, result.entities, settings, areas=redact_areas)
         elif source_type == "pdf-ocr":
-            pdf_bytes = rebuild_scanned_pdf(result.source_text, layout, result.entities, page_count)
+            pdf_bytes = rebuild_scanned_pdf(
+                result.source_text, layout, result.entities, page_count, areas=redact_areas
+            )
         else:
             raise HTTPException(
                 status_code=415, detail="Redacted-PDF export is available for PDF uploads only."
@@ -122,6 +152,7 @@ async def export_pdf(
         request_id=result.request_id,
         source_type=source_type,
         entities=len(result.entities),
+        areas=len(redact_areas),
         size=len(pdf_bytes),
     )
     return Response(
@@ -129,6 +160,24 @@ async def export_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="anonymisiert.pdf"'},
     )
+
+
+@router.post("/export/pdf/pages", response_model=PdfPagesResponse)
+async def export_pdf_pages(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> PdfPagesResponse:
+    """Render the pages of a (re-sent) PDF as PNGs for the area-redaction
+    editor, including embedded-image bounding boxes as one-click suggestions.
+    Nothing is persisted server-side."""
+    form = await request.form()
+    data = await _read_pdf_upload(form, settings)
+    try:
+        pages, truncated = render_pdf_pages(data)
+    except ExportError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+    logger.info("export_pdf_pages", pages=len(pages), truncated=truncated)
+    return PdfPagesResponse.model_validate({"pages": pages, "truncated": truncated})
 
 
 async def _detect(

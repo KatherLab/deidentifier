@@ -3,6 +3,7 @@ import io
 import pytest
 
 from backend.src.core.config import Settings
+from backend.src.schemas.anonymize import RedactArea
 from backend.src.schemas.entities import (
     AppliedEntity,
     EntityType,
@@ -17,6 +18,7 @@ from backend.src.utils.pdf_export import (
     rebuild_scanned_pdf,
     redact_native_pdf,
     redacted_texts,
+    render_pdf_pages,
 )
 from backend.tests.pdf_builder import make_pdf
 
@@ -239,6 +241,155 @@ def test_native_redaction_name_parts_covered_by_full_name():
     entities = entities_for(source, [("Max Mustermann", "[PERSON_1]"), ("Max", "[PERSON_1]")])
     output = redact_native_pdf(pdf, entities, native_settings())
     assert output.startswith(b"%PDF")
+
+
+# --- user-drawn area redaction -----------------------------------------------
+#
+# make_pdf places its text at x=72pt, first baseline y=720pt (bottom-left
+# origin, 16pt line spacing) on a 612x792pt page. In normalized top-left
+# coordinates the first line's glyphs span y ≈ 80–95; the box below must stop
+# before the second line (y ≈ 100+) or the redaction covers both.
+
+
+def area_over_first_line() -> RedactArea:
+    return RedactArea(page=1, x0=80, y0=72, x1=800, y1=96)
+
+
+def make_image_pdf() -> tuple[bytes, tuple[float, float, float, float]]:
+    """A native PDF with text and one embedded image at a known position.
+    Returns (pdf_bytes, image rect in pt, top-left origin)."""
+    import pymupdf
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (60, 30), (200, 30, 30)).save(buffer, format="PNG")
+    document = pymupdf.open()
+    page = document.new_page(width=612, height=792)
+    page.insert_text((72, 100), "Report text stays.")
+    rect = (300.0, 200.0, 420.0, 260.0)
+    page.insert_image(pymupdf.Rect(*rect), stream=buffer.getvalue())
+    data = document.tobytes()
+    document.close()
+    return data, rect
+
+
+def _dark_fraction_in_area(pdf_bytes: bytes, area: RedactArea, scale: float = 2.0) -> float:
+    """Fraction of dark pixels inside the area's region of the rendered page."""
+    import pypdfium2 as pdfium
+
+    document = pdfium.PdfDocument(pdf_bytes)
+    page = document[0]
+    width, height = page.get_size()
+    image = page.render(scale=scale).to_pil().convert("L")
+    document.close()
+    crop = image.crop(
+        (
+            int(area.x0 / 1000 * width * scale),
+            int(area.y0 / 1000 * height * scale),
+            int(area.x1 / 1000 * width * scale),
+            int(area.y1 / 1000 * height * scale),
+        )
+    )
+    pixels = list(crop.getdata())
+    return sum(1 for value in pixels if value < 60) / max(len(pixels), 1)
+
+
+def test_native_area_redaction_blacks_out_region_and_removes_text():
+    import pypdfium2 as pdfium
+
+    pdf = make_pdf(["Signature Dr. Demo", "Befund unauffaellig."])
+    area = area_over_first_line()
+    output = redact_native_pdf(pdf, [], native_settings(), areas=[area])
+
+    assert _dark_fraction_in_area(output, area) > 0.8
+    # True redaction also removes the text under the box from the text layer.
+    document = pdfium.PdfDocument(output)
+    text = document[0].get_textpage().get_text_range()
+    document.close()
+    assert "Signature Dr. Demo" not in text
+    assert "unauffaellig" in text
+
+
+def test_native_area_redaction_erases_embedded_image():
+    pdf, (x0, y0, x1, y1) = make_image_pdf()
+    area = RedactArea(
+        page=1,
+        x0=x0 / 612 * 1000 - 5,
+        y0=y0 / 792 * 1000 - 5,
+        x1=x1 / 612 * 1000 + 5,
+        y1=y1 / 792 * 1000 + 5,
+    )
+    output = redact_native_pdf(pdf, [], native_settings(), areas=[area])
+    assert _dark_fraction_in_area(output, area) > 0.8
+
+
+def test_raster_fallback_applies_area(monkeypatch):
+    import backend.src.utils.pdf_export as pdf_export
+
+    def boom(data, entities, settings, areas=None):
+        raise RuntimeError("simulated pymupdf failure")
+
+    monkeypatch.setattr(pdf_export, "_redact_native_true", boom)
+    pdf = make_pdf(["Signature Dr. Demo"])
+    area = area_over_first_line()
+    output = redact_native_pdf(pdf, [], native_settings(), areas=[area])
+    assert _dark_fraction_in_area(output, area, scale=native_settings().VISION_OCR_RENDER_SCALE) > 0.8
+
+
+def test_area_on_other_page_leaves_page_untouched():
+    pdf = make_pdf(["Nothing to hide here."], empty_pages=1)
+    area = RedactArea(page=2, x0=100, y0=100, x1=900, y1=900)
+    output = redact_native_pdf(pdf, [], native_settings(), areas=[area])
+    first_page_area = RedactArea(page=1, x0=100, y0=100, x1=900, y1=900)
+    assert _dark_fraction_in_area(output, first_page_area) < 0.05
+
+
+def test_rebuild_scanned_applies_area():
+    source = "Diagnose: unauffaellig"
+    layout = [LayoutLine(page_number=1, x1=100, y1=100, x2=800, y2=125, start=0, end=len(source))]
+    area = RedactArea(page=1, x0=200, y0=400, x1=600, y1=500)
+    output = rebuild_scanned_pdf(source, layout, [], page_count=1, areas=[area])
+    assert _dark_fraction_in_area(output, area) > 0.8
+
+
+def test_redact_area_rejects_empty_rect():
+    with pytest.raises(ValueError):
+        RedactArea(page=1, x0=500, y0=100, x1=500, y1=200)
+
+
+# --- page rendering (area editor) --------------------------------------------
+
+
+def test_render_pdf_pages_returns_images_and_sizes():
+    import base64
+
+    pdf = make_pdf(["Hello"], empty_pages=1)
+    pages, truncated = render_pdf_pages(pdf)
+    assert truncated is False
+    assert [entry["page"] for entry in pages] == [1, 2]
+    first = pages[0]
+    assert (first["width"], first["height"]) == (612.0, 792.0)
+    prefix = "data:image/png;base64,"
+    assert first["image"].startswith(prefix)
+    raw = base64.b64decode(first["image"][len(prefix) :])
+    assert raw.startswith(b"\x89PNG")
+
+
+def test_render_pdf_pages_reports_embedded_image_boxes():
+    pdf, (x0, y0, x1, y1) = make_image_pdf()
+    pages, _ = render_pdf_pages(pdf)
+    boxes = pages[0]["image_boxes"]
+    assert len(boxes) == 1
+    box = boxes[0]
+    assert box["x0"] == pytest.approx(x0 / 612 * 1000, abs=5)
+    assert box["y0"] == pytest.approx(y0 / 792 * 1000, abs=5)
+    assert box["x1"] == pytest.approx(x1 / 612 * 1000, abs=5)
+    assert box["y1"] == pytest.approx(y1 / 792 * 1000, abs=5)
+
+
+def test_render_pdf_pages_rejects_garbage():
+    with pytest.raises(ExportError):
+        render_pdf_pages(b"not a pdf")
 
 
 # --- scanned rebuild ---------------------------------------------------------
