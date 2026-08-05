@@ -1,0 +1,364 @@
+{
+  "app": {
+    "title": "Anonymiseur de documents médicaux"
+  },
+  "common": {
+    "close": "Fermer",
+    "done": "Terminé",
+    "loading": "Chargement",
+    "reset": "Réinitialiser",
+    "retry": "Réessayer"
+  },
+  "language": {
+    "select": "Choisir la langue",
+    "de": "Deutsch",
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  },
+  "header": {
+    "hints": {
+      "dialog_label": "Informations système",
+      "external_endpoint": "Le contenu des documents est envoyé à un point de terminaison externe : {name} ({host}).",
+      "detector_not_ready": "Le détecteur « {name} » est activé, mais non configuré.",
+      "chip_external": "Point de terminaison externe",
+      "chip_detector": "Détecteur non prêt",
+      "chip_count": "{count} informations"
+    },
+    "settings": {
+      "label": "Paramètres",
+      "expert_mode": "Mode expert",
+      "expert_mode_hint": "Affiche les détails techniques (détecteur, confiance, durées) et permet de combiner librement les vues."
+    },
+    "theme": {
+      "to_light": "Passer au thème clair",
+      "to_dark": "Passer au thème sombre"
+    }
+  },
+  "input": {
+    "dropzone_label": "Sélectionner des fichiers ou les glisser ici",
+    "dropzone_prompt": "Glissez des fichiers ici ou cliquez pour les sélectionner",
+    "dropzone_hint": "PDF, DOCX ou TXT – plusieurs fichiers sont traités en parallèle",
+    "dropzone_add_more": "Glissez d’autres fichiers ici ou cliquez pour les ajouter",
+    "remove_file": "Retirer {name}",
+    "clear_files": "Tout retirer",
+    "size_bytes": "{size} o",
+    "size_kb": "{size} Ko",
+    "size_mb": "{size} Mo",
+    "divider": "ou coller du texte",
+    "paste_label": "Coller du texte",
+    "paste_placeholder": "Collez le texte ici …",
+    "files_take_precedence": "Les fichiers sélectionnés seront traités. Retirez les fichiers pour anonymiser le texte collé à la place.",
+    "advanced": "Paramètres avancés",
+    "advanced_customized": "personnalisé",
+    "submit": "Anonymiser",
+    "submit_many": "Anonymiser {count} documents",
+    "disclaimer": "Les documents sont traités localement par cette installation. Le résultat ne constitue pas une preuve d’anonymisation au sens juridique.",
+    "unsupported_file": "Type de fichier non pris en charge : {name}. Sont autorisés : .txt, .pdf et .docx.",
+    "pasted_text": "Texte collé"
+  },
+  "policy": {
+    "intro": "Définissez ici comment les types de données détectés sont remplacés et ajoutez vos propres règles. Le réglage par défaut masque tout ce qui est détecté.",
+    "customized_title": "Différent du réglage par défaut",
+    "customized_sr": "(différent du réglage par défaut)",
+    "applies_next_run": "Les modifications s’appliquent au prochain traitement.",
+    "options": {
+      "mask": "Masquer",
+      "generalize_year": "Année seulement",
+      "preserve": "Conserver",
+      "remove": "Supprimer {example}",
+      "consistent_tag": "Étiquettes cohérentes"
+    },
+    "hints": {
+      "TYPE_MASK": "Remplacé par un espace réservé, p. ex. {example}",
+      "CONSISTENT_TAG": "La même personne reçoit le même numéro dans tout le document, p. ex. {example}",
+      "GENERALIZE": "Seule l’année reste visible, p. ex. 01.02.1980 → 1980",
+      "PRESERVE": "Reste visible tel quel (réduit la protection)",
+      "REMOVE": "Remplacé par {example}"
+    },
+    "custom_rules": {
+      "title": "Règles personnalisées",
+      "redact_label": "Toujours masquer",
+      "redact_hint": "Ces termes sont toujours masqués, partout – indépendamment de la détection par IA (mots entiers, sans distinction de casse). Exemple : noms d’unités internes.",
+      "preserve_label": "Ne jamais masquer",
+      "preserve_hint": "Les passages détectés dont le libellé correspond exactement restent visibles. Attention : cela réduit la protection.",
+      "chips_placeholder": "Saisissez un terme, ajoutez-le avec Entrée ou une virgule",
+      "instruction_label": "Instruction supplémentaire pour la détection par IA",
+      "instruction_placeholder": "p. ex. : Signale aussi les numéros de chambre et les identifiants d’étude (p. ex. numéros NCT).",
+      "instruction_hint": "Texte libre transmis à la détection par IA. Il ne peut qu’élargir ou préciser la détection – la détection standard et toutes les vérifications déterministes restent toujours actives."
+    },
+    "ocr": {
+      "title": "Reconnaissance de texte (OCR)",
+      "force_label": "Forcer l’OCR",
+      "force_hint": "Relit toujours les PDF téléversés par reconnaissance de texte au lieu d’utiliser une couche de texte existante. Utile pour les numérisations dont la couche de texte est absente ou erronée. Ne concerne que les PDF (pas le texte/DOCX) et ralentit le traitement."
+    },
+    "output_language": {
+      "title": "Langue du résultat",
+      "label": "Langue des espaces réservés",
+      "follow_ui": "Comme l’interface ({language})",
+      "hint": "Détermine les espaces réservés du document anonymisé (p. ex. {example}) et la langue des informations de la contre-vérification par IA. Elle est fixée au lancement de l’anonymisation : changer ensuite la langue de l’interface ne modifie pas les documents terminés."
+    }
+  },
+  "processing": {
+    "queued": "En file d’attente – démarre dès qu’un emplacement de traitement se libère …",
+    "progress_label": "Progression de l’anonymisation",
+    "stage": {
+      "default": "Traitement du document …",
+      "ocr": "Reconnaissance de texte (OCR) : page {done} sur {total}",
+      "detection": "Détection par IA en cours : section {done} sur {total}",
+      "recheck": "Vérification finale du résultat …"
+    }
+  },
+  "batch": {
+    "parallel": "{count} documents sont traités en parallèle",
+    "overall_label": "Progression globale de l’anonymisation",
+    "settled": "{done} sur {total} terminés",
+    "failed": "{count} en échec",
+    "row_progress": "Progression : {name}",
+    "status": {
+      "queued": "En attente",
+      "done": "Terminé",
+      "error": "Erreur",
+      "ocr": "OCR page {done}/{total}",
+      "detection": "Détection par IA {done}/{total}",
+      "recheck": "Vérification …"
+    }
+  },
+  "documents": {
+    "nav_label": "Documents du lot",
+    "previous": "Document précédent",
+    "next": "Document suivant",
+    "select": "Choisir un document",
+    "status": {
+      "queued": "En file d’attente",
+      "processing": "En cours de traitement",
+      "error": "Échec : {message}",
+      "unknown_error": "Erreur inconnue",
+      "done": "Terminé"
+    }
+  },
+  "result": {
+    "background_progress_label": "Progression globale du traitement en arrière-plan",
+    "background_progress": "Traitement en arrière-plan : {done} sur {total} terminés",
+    "rerunning": "Recalcul en cours …",
+    "reset_one": "Nouveau document",
+    "reset_many": "Nouveaux documents",
+    "processed_in": "Traité en {ms} ms",
+    "batch_summary": "{done} sur {total} documents traités",
+    "batch_review": "{count} à vérifier",
+    "batch_failed": "{count} en échec",
+    "failed": "L’anonymisation a échoué.",
+    "status": {
+      "pass": "Vérifié – rien à signaler",
+      "review": "Vérification nécessaire – 1 information | Vérification nécessaire – {count} informations",
+      "fail": "Échec de la vérification"
+    },
+    "export": {
+      "button": "Exporter",
+      "copy": "Copier",
+      "txt": "En fichier texte (.txt)",
+      "pdf": "En PDF",
+      "zip": "Tous les documents (.zip)",
+      "keep_filenames": "Conserver les noms de fichiers",
+      "keep_filenames_hint": "Attention : les noms de fichiers peuvent contenir des données personnelles.",
+      "filename": "anonymise",
+      "document_fallback": "document"
+    },
+    "panels": {
+      "switcher_label": "Choisir les vues",
+      "original": "Original",
+      "source": "Contrôle de la source",
+      "source_simple": "Contrôle",
+      "pdf": "PDF caviardé",
+      "anonymized": "Texte anonymisé",
+      "result": "Résultat"
+    },
+    "original": {
+      "iframe_title": "Document original",
+      "unavailable": "Le fichier original n’est plus disponible."
+    },
+    "source": {
+      "hint": "Cliquez sur un passage surligné pour voir les détails – ou sélectionnez n’importe quel texte pour le masquer manuellement."
+    },
+    "pdf": {
+      "areas": "Masquer des zones",
+      "reconstructed": "Document reconstruit – mise en page approximative, les pixels d’origine sont supprimés.",
+      "generating": "Génération du PDF …",
+      "preview_title": "PDF caviardé (aperçu)",
+      "no_preview": "Aucun aperçu disponible."
+    },
+    "entities": {
+      "section_label": "Entités détectées",
+      "intro": "1 passage détecté : | {count} passages détectés :",
+      "none": "Aucune donnée personnelle détectée.",
+      "cycle_title": "Afficher le passage suivant de type {type}"
+    }
+  },
+  "highlights": {
+    "legend_label": "Légende",
+    "warning_legend": "Avertissement",
+    "warning_title": "Avertissement · données personnelles peut-être non détectées",
+    "mark_label": "Entité : {type}, {status}",
+    "mark_label_overridden": "Entité : {type}, {status}, modifiée",
+    "redact": "Masquer",
+    "redact_label": "Masquer manuellement la sélection"
+  },
+  "detail": {
+    "panel_label": "Détails de l’entité sélectionnée",
+    "changed": "Modifiée",
+    "changed_short": "modifiée",
+    "replaced_by": "Remplacé par {replacement}",
+    "offsets": "Caractères {start}–{end}",
+    "preserve": "Conserver",
+    "redact": "Masquer",
+    "change_type": "Changer le type d’entité",
+    "close": "Fermer les détails"
+  },
+  "areas": {
+    "hint": "Les pages originales sont affichées. Tracez un rectangle sur une zone (p. ex. signature, logo ou tampon) pour la masquer également – un clic sur une zone la supprime. Chaque modification est appliquée immédiatement.",
+    "mark_all_images": "Masquer toutes les images ({count})",
+    "truncated": "Seules les {count} premières pages sont affichées.",
+    "rendering": "Rendu des pages …",
+    "page_alt": "Page {page}",
+    "remove_label": "Supprimer la zone masquée de la page {page}",
+    "remove_title": "Supprimer la zone"
+  },
+  "chips": {
+    "placeholder": "Saisissez un terme, ajoutez-le avec Entrée",
+    "remove": "Retirer {term}",
+    "limit": "{count} termes au maximum."
+  },
+  "entity": {
+    "manual_mark": "Masqué manuellement",
+    "manual_badge": "Masquage manuel",
+    "type": {
+      "PERSON_NAME": "Personne",
+      "DATE_OF_BIRTH": "Date de naissance",
+      "OTHER_DATE": "Date",
+      "AGE": "Âge",
+      "ADDRESS": "Adresse",
+      "PHONE": "Téléphone",
+      "EMAIL": "E-mail",
+      "URL": "URL",
+      "ID_NUMBER": "Numéro d’identification",
+      "ORGANIZATION": "Organisation",
+      "PROFESSION": "Profession",
+      "OTHER_PII": "Autres"
+    },
+    "type_description": {
+      "PERSON_NAME": "Noms de patients, de proches et de soignants",
+      "DATE_OF_BIRTH": "Dates de naissance",
+      "OTHER_DATE": "Dates d’admission, de sortie et de traitement",
+      "AGE": "Âges",
+      "ADDRESS": "Rues, codes postaux, villes",
+      "PHONE": "Numéros de téléphone et de fax",
+      "EMAIL": "Adresses e-mail",
+      "URL": "Adresses Internet",
+      "ID_NUMBER": "Numéros de patient, de dossier et d’assurance",
+      "ORGANIZATION": "Hôpitaux, cabinets, employeurs",
+      "PROFESSION": "Professions",
+      "OTHER_PII": "Autres informations identifiantes (p. ex. le sexe)"
+    },
+    "status": {
+      "REDACTED": "Supprimée",
+      "GENERALIZED": "Généralisée",
+      "TAGGED": "Étiquetée",
+      "PRESERVED": "Conservée"
+    },
+    "transformation": {
+      "TYPE_MASK": "Masque de type",
+      "CONSISTENT_TAG": "Espace réservé cohérent",
+      "GENERALIZE": "Généralisation",
+      "REMOVE": "Suppression",
+      "PRESERVE": "Conservation"
+    },
+    "source_type": {
+      "paste": "Saisie",
+      "txt": "Texte",
+      "pdf": "PDF",
+      "pdf-ocr": "PDF (OCR)",
+      "docx": "DOCX"
+    }
+  },
+  "validation": {
+    "status": {
+      "PASS": "Réussie",
+      "REVIEW_REQUIRED": "Vérification requise",
+      "FAIL": "Échouée"
+    },
+    "severity": {
+      "INFO": "Information",
+      "WARNING": "Avertissement",
+      "HIGH": "Critique"
+    }
+  },
+  "warnings": {
+    "title": "Informations et avertissements",
+    "locate": "Afficher dans le texte",
+    "risk": {
+      "low": "faible",
+      "medium": "moyen",
+      "high": "élevé"
+    },
+    "codes": {
+      "docx_comments": "Le document contient des commentaires, qui ne sont pas extraits.",
+      "docx_tracked_changes": "Le document contient des modifications suivies ; le texte inséré peut être incomplet.",
+      "docx_tracked_deletions": "Le document contient des suppressions suivies, qui ne sont pas extraites.",
+      "docx_text_boxes": "Le document contient des zones de texte, qui ne sont pas extraites.",
+      "pdf_no_page_mapping": "Aucune correspondance de pages n’est disponible pour l’extraction via docling-serve.",
+      "pdf_docling_fallback": "docling-serve a échoué ({reason}) ; l’extraction locale a été utilisée.",
+      "ocr_recognition_errors": "Le texte provient d’une reconnaissance de texte (OCR) ; des erreurs de reconnaissance sont possibles.",
+      "llm_mention_not_located": "L’IA a signalé un passage de type {entity_type} qui n’a pas pu être localisé dans le texte source. Veuillez vérifier le document manuellement.",
+      "invalid_span_rejected": "Un passage invalide du détecteur « {detector} » a été rejeté (décalage incohérent).",
+      "override_not_matched": "Une modification ne correspondait à aucun passage détecté et a été ignorée.",
+      "manual_selection_ignored": "Une sélection manuelle ne correspond plus au texte source et a été ignorée.",
+      "residual_identifier": "Du contenu masqué de type {entity_type} semble subsister dans le résultat.",
+      "revalidation_hit": "Une règle détecte encore un possible passage de type {entity_type} dans le résultat.",
+      "labelled_field": "Un champ étiqueté semble suivi de contenu non masqué.",
+      "llm_recheck_failed": "La contre-vérification par IA n’a pas pu être effectuée. Veuillez vérifier le résultat manuellement.",
+      "llm_recheck_remaining": "La contre-vérification par IA a trouvé un possible passage restant de type {entity_type} dans le résultat.",
+      "llm_recheck_unlocated": "La contre-vérification par IA signale de possibles données personnelles restantes qui n’ont pas pu être localisées.",
+      "llm_recheck_skipped": "La contre-vérification par IA n’a pas été répétée pour ce résultat ajusté.",
+      "recheck_risk": "La contre-vérification par IA évalue le risque restant de ré-identification comme {risk}."
+    }
+  },
+  "errors": {
+    "generic": "L’anonymisation a échoué. Veuillez réessayer.",
+    "expired": "Résultat expiré – recalcul en cours",
+    "too_large": "Fichier trop volumineux.",
+    "unsupported_type": "Type de fichier non pris en charge.",
+    "ocr_unavailable": "Ce moteur OCR n’est pas encore disponible",
+    "scanned_no_ocr": "Ce PDF semble numérisé. L’OCR n’est pas activée.",
+    "llm_unreachable": "Le service de détection par IA est injoignable. Le document n’a PAS été anonymisé.",
+    "backend_unreachable": "Serveur injoignable. Veuillez vérifier que le backend fonctionne.",
+    "pdf_export_failed": "L’export PDF a échoué. Veuillez réessayer.",
+    "pdf_export_detail": "L’export PDF a échoué : {detail}"
+  },
+  "toast": {
+    "copy_success": "Texte anonymisé copié dans le presse-papiers.",
+    "copy_failed": "La copie a échoué. Veuillez sélectionner le texte et le copier manuellement.",
+    "zip_downloaded": "{count} fichiers téléchargés sous forme d’archive ZIP.",
+    "zip_failed": "L’archive ZIP n’a pas pu être créée.",
+    "selection_too_long": "Veuillez faire une sélection plus courte.",
+    "images_already_marked": "Toutes les images détectées sont déjà masquées.",
+    "images_marked": "1 image marquée pour masquage. | {count} images marquées pour masquage."
+  },
+  "placeholders": {
+    "type_mask": {
+      "PERSON_NAME": "[PERSONNE]",
+      "DATE_OF_BIRTH": "[DATE_DE_NAISSANCE]",
+      "OTHER_DATE": "[DATE]",
+      "AGE": "[AGE]",
+      "ADDRESS": "[ADRESSE]",
+      "PHONE": "[TELEPHONE]",
+      "EMAIL": "[E-MAIL]",
+      "URL": "[URL]",
+      "ID_NUMBER": "[ID]",
+      "ORGANIZATION": "[ORGANISATION]",
+      "PROFESSION": "[PROFESSION]",
+      "OTHER_PII": "[PII]"
+    },
+    "redacted": "[CAVIARDE]",
+    "person_tag": "PERSONNE"
+  }
+}

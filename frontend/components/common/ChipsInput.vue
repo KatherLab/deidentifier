@@ -13,7 +13,7 @@
         <button
           type="button"
           class="shrink-0 rounded-full hover:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :aria-label="`${term} entfernen`"
+          :aria-label="t('chips.remove', { term })"
           @click="removeAt(index)"
         >
           <X class="h-3 w-3" aria-hidden="true" />
@@ -24,7 +24,7 @@
         v-model="draft"
         type="text"
         class="min-w-32 flex-1 bg-transparent py-0.5 text-sm text-content placeholder:text-content-subtle focus:outline-none disabled:opacity-50"
-        :placeholder="atLimit ? '' : placeholder"
+        :placeholder="atLimit ? '' : (placeholder ?? t('chips.placeholder'))"
         :maxlength="maxTermLength"
         :disabled="atLimit"
         @keydown.enter.prevent="commitDraft"
@@ -33,7 +33,7 @@
       />
     </div>
     <p v-if="atLimit" class="mt-1 text-xs text-content-subtle">
-      Maximal {{ maxItems }} Begriffe möglich.
+      {{ t('chips.limit', { count: maxItems }) }}
     </p>
   </div>
 </template>
@@ -45,8 +45,11 @@
  * (case-insensitively) and capped at `maxItems` × `maxTermLength` characters.
  */
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 import { getPillClass } from '@/utils/statusStyles'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -60,7 +63,7 @@ const props = withDefaults(
     maxTermLength?: number
   }>(),
   {
-    placeholder: 'Begriff eingeben, mit Enter hinzufügen',
+    placeholder: undefined,
     tone: 'default',
     maxItems: 100,
     maxTermLength: 200,

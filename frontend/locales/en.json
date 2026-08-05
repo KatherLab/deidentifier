@@ -1,0 +1,364 @@
+{
+  "app": {
+    "title": "Medical Document Anonymizer"
+  },
+  "common": {
+    "close": "Close",
+    "done": "Done",
+    "loading": "Loading",
+    "reset": "Reset",
+    "retry": "Try again"
+  },
+  "language": {
+    "select": "Select language",
+    "de": "Deutsch",
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  },
+  "header": {
+    "hints": {
+      "dialog_label": "System notices",
+      "external_endpoint": "Document content is sent to an external endpoint: {name} ({host}).",
+      "detector_not_ready": "Detector “{name}” is enabled but not configured.",
+      "chip_external": "External endpoint",
+      "chip_detector": "Detector not ready",
+      "chip_count": "{count} notices"
+    },
+    "settings": {
+      "label": "Settings",
+      "expert_mode": "Expert mode",
+      "expert_mode_hint": "Shows technical details (detector, confidence, timings) and allows combining the views freely."
+    },
+    "theme": {
+      "to_light": "Switch to light theme",
+      "to_dark": "Switch to dark theme"
+    }
+  },
+  "input": {
+    "dropzone_label": "Select files or drag them here",
+    "dropzone_prompt": "Drag files here or click to select",
+    "dropzone_hint": "PDF, DOCX or TXT – several files are processed in parallel",
+    "dropzone_add_more": "Drag more files here or click to add them",
+    "remove_file": "Remove {name}",
+    "clear_files": "Remove all",
+    "size_bytes": "{size} B",
+    "size_kb": "{size} KB",
+    "size_mb": "{size} MB",
+    "divider": "or paste text",
+    "paste_label": "Paste text",
+    "paste_placeholder": "Paste text here …",
+    "files_take_precedence": "The selected files will be processed. Remove the files to anonymize pasted text instead.",
+    "advanced": "Advanced settings",
+    "advanced_customized": "customized",
+    "submit": "Anonymize",
+    "submit_many": "Anonymize {count} documents",
+    "disclaimer": "Documents are processed locally by this installation. The result does not establish legal anonymization.",
+    "unsupported_file": "File type not supported: {name}. Allowed are .txt, .pdf and .docx.",
+    "pasted_text": "Pasted text"
+  },
+  "policy": {
+    "intro": "Here you decide how detected data types are replaced, and add your own rules. The default setting redacts everything detected.",
+    "customized_title": "Differs from the default",
+    "customized_sr": "(differs from the default)",
+    "applies_next_run": "Changes apply to the next run.",
+    "options": {
+      "mask": "Redact",
+      "generalize_year": "Year only",
+      "preserve": "Keep",
+      "remove": "Remove {example}",
+      "consistent_tag": "Consistent tags"
+    },
+    "hints": {
+      "TYPE_MASK": "Replaced by a placeholder, e.g. {example}",
+      "CONSISTENT_TAG": "The same person gets the same number throughout the document, e.g. {example}",
+      "GENERALIZE": "Only the year stays visible, e.g. 01.02.1980 → 1980",
+      "PRESERVE": "Stays visible unchanged (reduces protection)",
+      "REMOVE": "Replaced by {example}"
+    },
+    "custom_rules": {
+      "title": "Custom rules",
+      "redact_label": "Always redact",
+      "redact_hint": "These terms are redacted always and everywhere – independently of the AI detection (whole words, case-insensitive). Example: internal ward names.",
+      "preserve_label": "Never redact",
+      "preserve_hint": "Detected spans with exactly this wording stay visible. Caution: this reduces protection.",
+      "chips_placeholder": "Type a term, add it with Enter or a comma",
+      "instruction_label": "Additional instruction for the AI detection",
+      "instruction_placeholder": "e.g.: Also report room numbers and study IDs (e.g. NCT numbers).",
+      "instruction_hint": "Free text passed to the AI detection. It can only extend or sharpen detection – the standard detection and all deterministic checks always stay active."
+    },
+    "ocr": {
+      "title": "Text recognition (OCR)",
+      "force_label": "Force OCR",
+      "force_hint": "Always re-reads uploaded PDFs via text recognition instead of using an existing text layer. Useful for scans with a missing or broken text layer. Affects PDF uploads only (not text/DOCX) and makes processing slower."
+    },
+    "output_language": {
+      "title": "Language of the result",
+      "label": "Language of the placeholders",
+      "follow_ui": "Same as the interface ({language})",
+      "hint": "Decides the placeholders in the anonymized document (e.g. {example}) and the language of the AI re-check's notices. It is fixed when anonymization starts: switching the interface language later does not change finished documents."
+    }
+  },
+  "processing": {
+    "queued": "Queued – starts as soon as a processing slot is free …",
+    "progress_label": "Anonymization progress",
+    "stage": {
+      "default": "Processing document …",
+      "ocr": "Text recognition (OCR): page {done} of {total}",
+      "detection": "AI detection running: section {done} of {total}",
+      "recheck": "Final check of the result …"
+    }
+  },
+  "batch": {
+    "parallel": "{count} documents are being processed in parallel",
+    "overall_label": "Overall anonymization progress",
+    "settled": "{done} of {total} completed",
+    "failed": "{count} failed",
+    "row_progress": "Progress: {name}",
+    "status": {
+      "queued": "Waiting",
+      "done": "Done",
+      "error": "Error",
+      "ocr": "OCR page {done}/{total}",
+      "detection": "AI detection {done}/{total}",
+      "recheck": "Checking …"
+    }
+  },
+  "documents": {
+    "nav_label": "Documents in this batch",
+    "previous": "Previous document",
+    "next": "Next document",
+    "select": "Select document",
+    "status": {
+      "queued": "Queued",
+      "processing": "Processing",
+      "error": "Failed: {message}",
+      "unknown_error": "Unknown error",
+      "done": "Completed"
+    }
+  },
+  "result": {
+    "background_progress_label": "Overall progress of background processing",
+    "background_progress": "Processing in the background: {done} of {total} completed",
+    "rerunning": "Recalculating …",
+    "reset_one": "New document",
+    "reset_many": "New documents",
+    "processed_in": "Processed in {ms} ms",
+    "batch_summary": "{done} of {total} documents processed",
+    "batch_review": "{count} need review",
+    "batch_failed": "{count} failed",
+    "failed": "Anonymization failed.",
+    "status": {
+      "pass": "Checked – nothing suspicious",
+      "review": "Review needed – 1 notice | Review needed – {count} notices",
+      "fail": "Validation failed"
+    },
+    "export": {
+      "button": "Export",
+      "copy": "Copy",
+      "txt": "As text file (.txt)",
+      "pdf": "As PDF",
+      "zip": "All documents (.zip)",
+      "keep_filenames": "Keep filenames",
+      "keep_filenames_hint": "Caution: filenames can contain personal data.",
+      "filename": "anonymized",
+      "document_fallback": "document"
+    },
+    "panels": {
+      "switcher_label": "Choose views",
+      "original": "Original",
+      "source": "Source review",
+      "source_simple": "Review",
+      "pdf": "Redacted PDF",
+      "anonymized": "Anonymized text",
+      "result": "Result"
+    },
+    "original": {
+      "iframe_title": "Original document",
+      "unavailable": "The original file is no longer available."
+    },
+    "source": {
+      "hint": "Click a highlighted span for details – or select any text to redact it manually."
+    },
+    "pdf": {
+      "areas": "Redact areas",
+      "reconstructed": "Reconstructed document – layout approximated, the original pixels are discarded.",
+      "generating": "Generating PDF …",
+      "preview_title": "Redacted PDF (preview)",
+      "no_preview": "No preview available."
+    },
+    "entities": {
+      "section_label": "Detected entities",
+      "intro": "1 span detected: | {count} spans detected:",
+      "none": "No personal data detected.",
+      "cycle_title": "Show the next span of type {type}"
+    }
+  },
+  "highlights": {
+    "legend_label": "Legend",
+    "warning_legend": "Warning",
+    "warning_title": "Warning · possibly undetected personal data",
+    "mark_label": "Entity: {type}, {status}",
+    "mark_label_overridden": "Entity: {type}, {status}, changed",
+    "redact": "Redact",
+    "redact_label": "Redact the selection manually"
+  },
+  "detail": {
+    "panel_label": "Details of the selected entity",
+    "changed": "Changed",
+    "changed_short": "changed",
+    "replaced_by": "Replaced by {replacement}",
+    "offsets": "Characters {start}–{end}",
+    "preserve": "Keep",
+    "redact": "Redact",
+    "change_type": "Change entity type",
+    "close": "Close details"
+  },
+  "areas": {
+    "hint": "The original pages are shown. Drag a rectangle over an area (e.g. a signature, logo or stamp) to redact it as well – clicking an area removes it again. Every change is applied immediately.",
+    "mark_all_images": "Redact all images ({count})",
+    "truncated": "Only the first {count} pages are shown.",
+    "rendering": "Rendering pages …",
+    "page_alt": "Page {page}",
+    "remove_label": "Remove the redacted area on page {page}",
+    "remove_title": "Remove area"
+  },
+  "chips": {
+    "placeholder": "Type a term, add it with Enter",
+    "remove": "Remove {term}",
+    "limit": "At most {count} terms are possible."
+  },
+  "entity": {
+    "manual_mark": "Manually redacted",
+    "manual_badge": "Manual redaction",
+    "type": {
+      "PERSON_NAME": "Person",
+      "DATE_OF_BIRTH": "Date of birth",
+      "OTHER_DATE": "Date",
+      "AGE": "Age",
+      "ADDRESS": "Address",
+      "PHONE": "Phone",
+      "EMAIL": "Email",
+      "URL": "URL",
+      "ID_NUMBER": "ID number",
+      "ORGANIZATION": "Organization",
+      "PROFESSION": "Profession",
+      "OTHER_PII": "Other"
+    },
+    "type_description": {
+      "PERSON_NAME": "Names of patients, relatives and clinicians",
+      "DATE_OF_BIRTH": "Dates of birth",
+      "OTHER_DATE": "Admission, discharge and treatment dates",
+      "AGE": "Ages",
+      "ADDRESS": "Streets, postal codes, cities",
+      "PHONE": "Phone and fax numbers",
+      "EMAIL": "Email addresses",
+      "URL": "Web addresses",
+      "ID_NUMBER": "Patient, case and insurance numbers",
+      "ORGANIZATION": "Hospitals, practices, employers",
+      "PROFESSION": "Occupations",
+      "OTHER_PII": "Other identifying details (e.g. gender)"
+    },
+    "status": {
+      "REDACTED": "Removed",
+      "GENERALIZED": "Generalized",
+      "TAGGED": "Tagged",
+      "PRESERVED": "Kept"
+    },
+    "transformation": {
+      "TYPE_MASK": "Type mask",
+      "CONSISTENT_TAG": "Consistent placeholder",
+      "GENERALIZE": "Generalization",
+      "REMOVE": "Removal",
+      "PRESERVE": "Kept"
+    },
+    "source_type": {
+      "paste": "Input",
+      "txt": "Text",
+      "pdf": "PDF",
+      "pdf-ocr": "PDF (OCR)",
+      "docx": "DOCX"
+    }
+  },
+  "validation": {
+    "status": {
+      "PASS": "Passed",
+      "REVIEW_REQUIRED": "Review required",
+      "FAIL": "Failed"
+    },
+    "severity": {
+      "INFO": "Notice",
+      "WARNING": "Warning",
+      "HIGH": "Critical"
+    }
+  },
+  "warnings": {
+    "title": "Notices & warnings",
+    "locate": "Show in text",
+    "risk": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high"
+    },
+    "codes": {
+      "docx_comments": "The document contains comments, which are not extracted.",
+      "docx_tracked_changes": "The document contains tracked changes; inserted text may be incomplete.",
+      "docx_tracked_deletions": "The document contains tracked deletions, which are not extracted.",
+      "docx_text_boxes": "The document contains text boxes, which are not extracted.",
+      "pdf_no_page_mapping": "Page mapping is not available for docling-serve extraction.",
+      "pdf_docling_fallback": "docling-serve failed ({reason}); local extraction was used instead.",
+      "ocr_recognition_errors": "The text was produced by OCR; recognition errors are possible.",
+      "llm_mention_not_located": "The AI reported a span of type {entity_type} that could not be located in the source text. Please review the document manually.",
+      "invalid_span_rejected": "An invalid span from detector “{detector}” was rejected (offset mismatch).",
+      "override_not_matched": "An adjustment matched no detected span and was ignored.",
+      "manual_selection_ignored": "A manual selection no longer matches the source text and was ignored.",
+      "residual_identifier": "Redacted content of type {entity_type} appears to remain in the output.",
+      "revalidation_hit": "A rule still finds a possible span of type {entity_type} in the output.",
+      "labelled_field": "A labelled field appears to be followed by non-redacted content.",
+      "llm_recheck_failed": "The AI re-check could not be performed. Please review the result manually.",
+      "llm_recheck_remaining": "The AI re-check found a possible remaining span of type {entity_type} in the output.",
+      "llm_recheck_unlocated": "The AI re-check reported possible remaining personal data that could not be located.",
+      "llm_recheck_skipped": "The AI re-check was not repeated for this adjusted result.",
+      "recheck_risk": "The AI re-check rates the remaining risk of re-identification as {risk}."
+    }
+  },
+  "errors": {
+    "generic": "Anonymization failed. Please try again.",
+    "expired": "Result expired – recalculating",
+    "too_large": "File too large.",
+    "unsupported_type": "File type not supported.",
+    "ocr_unavailable": "This OCR engine is not available yet",
+    "scanned_no_ocr": "This PDF appears to be scanned. OCR is not enabled.",
+    "llm_unreachable": "The AI detection service is unreachable. The document was NOT anonymized.",
+    "backend_unreachable": "Server unreachable. Please check whether the backend is running.",
+    "pdf_export_failed": "PDF export failed. Please try again.",
+    "pdf_export_detail": "PDF export failed: {detail}"
+  },
+  "toast": {
+    "copy_success": "Anonymized text copied to the clipboard.",
+    "copy_failed": "Copying failed. Please select the text and copy it manually.",
+    "zip_downloaded": "{count} files downloaded as a ZIP archive.",
+    "zip_failed": "The ZIP archive could not be created.",
+    "selection_too_long": "Please make a shorter selection.",
+    "images_already_marked": "All detected images are already redacted.",
+    "images_marked": "1 image marked for redaction. | {count} images marked for redaction."
+  },
+  "placeholders": {
+    "type_mask": {
+      "PERSON_NAME": "[PERSON]",
+      "DATE_OF_BIRTH": "[DATE_OF_BIRTH]",
+      "OTHER_DATE": "[DATE]",
+      "AGE": "[AGE]",
+      "ADDRESS": "[ADDRESS]",
+      "PHONE": "[PHONE]",
+      "EMAIL": "[E-MAIL]",
+      "URL": "[URL]",
+      "ID_NUMBER": "[ID]",
+      "ORGANIZATION": "[ORGANIZATION]",
+      "PROFESSION": "[PROFESSION]",
+      "OTHER_PII": "[PII]"
+    },
+    "redacted": "[REDACTED]",
+    "person_tag": "PERSON"
+  }
+}

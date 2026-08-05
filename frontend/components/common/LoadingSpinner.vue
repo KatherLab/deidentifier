@@ -8,7 +8,7 @@
       :class="['animate-spin rounded-full border-b-2', colorClass, sizeClasses]"
       :aria-hidden="decorative ? 'true' : undefined"
     ></div>
-    <span v-if="!decorative" class="sr-only">{{ label }}</span>
+    <span v-if="!decorative" class="sr-only">{{ accessibleLabel }}</span>
   </div>
   <!--
     Inline: sits next to text or inside a button. When `label` is empty the
@@ -20,22 +20,26 @@
     :class="['inline-block animate-spin rounded-full border-b-2', colorClass, sizeClasses]"
     :role="decorative ? undefined : 'status'"
     :aria-live="decorative ? undefined : 'polite'"
-    :aria-label="decorative ? undefined : label"
+    :aria-label="decorative ? undefined : accessibleLabel"
     :aria-hidden="decorative ? 'true' : undefined"
   ></div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 interface Props {
   size?: 'small' | 'medium' | 'large'
   // 'blue' | 'white' | 'gray' | 'current'
   color?: string
   inline?: boolean
-  // Accessible label announced to screen readers. Pass an empty string ('')
-  // to mark the spinner decorative (aria-hidden) when it sits next to visible
-  // text that already conveys the loading state.
+  // Accessible label announced to screen readers; defaults to the translated
+  // "loading". Pass an empty string ('') to mark the spinner decorative
+  // (aria-hidden) when it sits next to visible text that already conveys the
+  // loading state.
   label?: string
 }
 
@@ -43,10 +47,11 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'medium',
   color: 'blue',
   inline: false,
-  label: 'Lädt',
+  label: undefined,
 })
 
 const decorative = computed(() => props.label === '')
+const accessibleLabel = computed(() => props.label ?? t('common.loading'))
 
 const sizeClasses = computed(() => {
   switch (props.size) {

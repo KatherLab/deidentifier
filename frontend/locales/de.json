@@ -1,0 +1,364 @@
+{
+  "app": {
+    "title": "Medizinischer Dokumenten-Anonymisierer"
+  },
+  "common": {
+    "close": "Schließen",
+    "done": "Fertig",
+    "loading": "Lädt",
+    "reset": "Zurücksetzen",
+    "retry": "Erneut versuchen"
+  },
+  "language": {
+    "select": "Sprache wählen",
+    "de": "Deutsch",
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  },
+  "header": {
+    "hints": {
+      "dialog_label": "Systemhinweise",
+      "external_endpoint": "Dokumentinhalte werden an einen externen Endpunkt gesendet: {name} ({host}).",
+      "detector_not_ready": "Detektor „{name}“ ist aktiviert, aber nicht konfiguriert.",
+      "chip_external": "Externer Endpunkt",
+      "chip_detector": "Detektor nicht bereit",
+      "chip_count": "{count} Hinweise"
+    },
+    "settings": {
+      "label": "Einstellungen",
+      "expert_mode": "Expertenmodus",
+      "expert_mode_hint": "Zeigt technische Details (Detektor, Konfidenz, Laufzeiten) und erlaubt die freie Kombination der Ansichten."
+    },
+    "theme": {
+      "to_light": "Zum hellen Design wechseln",
+      "to_dark": "Zum dunklen Design wechseln"
+    }
+  },
+  "input": {
+    "dropzone_label": "Dateien auswählen oder hierher ziehen",
+    "dropzone_prompt": "Dateien hierher ziehen oder klicken, um auszuwählen",
+    "dropzone_hint": "PDF, DOCX oder TXT – mehrere Dateien werden parallel verarbeitet",
+    "dropzone_add_more": "Weitere Dateien hierher ziehen oder klicken, um sie hinzuzufügen",
+    "remove_file": "{name} entfernen",
+    "clear_files": "Alle entfernen",
+    "size_bytes": "{size} B",
+    "size_kb": "{size} KB",
+    "size_mb": "{size} MB",
+    "divider": "oder Text einfügen",
+    "paste_label": "Text einfügen",
+    "paste_placeholder": "Text hier einfügen …",
+    "files_take_precedence": "Es werden die ausgewählten Dateien verarbeitet. Entfernen Sie die Dateien, um stattdessen eingefügten Text zu anonymisieren.",
+    "advanced": "Erweiterte Einstellungen",
+    "advanced_customized": "angepasst",
+    "submit": "Anonymisieren",
+    "submit_many": "{count} Dokumente anonymisieren",
+    "disclaimer": "Dokumente werden lokal von dieser Installation verarbeitet. Das Ergebnis ist kein Nachweis rechtssicherer Anonymisierung.",
+    "unsupported_file": "Dateityp nicht unterstützt: {name}. Erlaubt sind .txt, .pdf und .docx.",
+    "pasted_text": "Eingefügter Text"
+  },
+  "policy": {
+    "intro": "Hier legen Sie fest, wie erkannte Datenarten ersetzt werden und ergänzen eigene Regeln. Die Standardeinstellung schwärzt alles Erkannte.",
+    "customized_title": "Vom Standard abweichend",
+    "customized_sr": "(vom Standard abweichend)",
+    "applies_next_run": "Änderungen gelten für den nächsten Durchlauf.",
+    "options": {
+      "mask": "Schwärzen",
+      "generalize_year": "Nur Jahr",
+      "preserve": "Beibehalten",
+      "remove": "Entfernen {example}",
+      "consistent_tag": "Konsistente Tags"
+    },
+    "hints": {
+      "TYPE_MASK": "Wird durch einen Platzhalter ersetzt, z. B. {example}",
+      "CONSISTENT_TAG": "Gleiche Person erhält im ganzen Dokument dieselbe Nummer, z. B. {example}",
+      "GENERALIZE": "Nur das Jahr bleibt sichtbar, z. B. 01.02.1980 → 1980",
+      "PRESERVE": "Bleibt unverändert sichtbar (reduziert den Schutz)",
+      "REMOVE": "Wird durch {example} ersetzt"
+    },
+    "custom_rules": {
+      "title": "Eigene Regeln",
+      "redact_label": "Zusätzlich schwärzen",
+      "redact_hint": "Diese Begriffe werden immer und überall geschwärzt – unabhängig von der KI-Erkennung (ganze Wörter, Groß-/Kleinschreibung egal). Beispiel: interne Stationsnamen.",
+      "preserve_label": "Nie schwärzen",
+      "preserve_hint": "Erkannte Stellen mit genau diesem Wortlaut bleiben sichtbar. Vorsicht: reduziert den Schutz.",
+      "chips_placeholder": "Begriff eingeben, mit Enter oder Komma hinzufügen",
+      "instruction_label": "Zusätzliche Anweisung an die KI-Erkennung",
+      "instruction_placeholder": "z. B.: Melde auch Zimmernummern und Studien-IDs (z. B. NCT-Nummern).",
+      "instruction_hint": "Freitext, der der KI-Erkennung mitgegeben wird. Kann die Erkennung nur erweitern oder präzisieren – die Standarderkennung und alle deterministischen Prüfungen bleiben immer aktiv."
+    },
+    "ocr": {
+      "title": "Texterkennung (OCR)",
+      "force_label": "OCR erzwingen",
+      "force_hint": "Liest hochgeladene PDFs immer per Texterkennung neu ein, statt eine vorhandene Textebene zu verwenden. Sinnvoll für Scans mit fehlender oder fehlerhafter Textebene. Betrifft nur PDF-Uploads (nicht Text/DOCX) und macht die Verarbeitung langsamer."
+    },
+    "output_language": {
+      "title": "Sprache des Ergebnisses",
+      "label": "Sprache der Platzhalter",
+      "follow_ui": "Wie die Oberfläche ({language})",
+      "hint": "Bestimmt die Platzhalter im anonymisierten Dokument (z. B. {example}) und die Sprache der Hinweise aus der KI-Nachprüfung. Sie wird beim Start der Anonymisierung festgelegt: ein späterer Sprachwechsel der Oberfläche ändert fertige Dokumente nicht."
+    }
+  },
+  "processing": {
+    "queued": "In der Warteschlange – wird gestartet, sobald ein Verarbeitungsplatz frei ist …",
+    "progress_label": "Fortschritt der Anonymisierung",
+    "stage": {
+      "default": "Dokument wird verarbeitet …",
+      "ocr": "Texterkennung (OCR): Seite {done} von {total}",
+      "detection": "KI-Erkennung läuft: Abschnitt {done} von {total}",
+      "recheck": "Abschließende Prüfung des Ergebnisses …"
+    }
+  },
+  "batch": {
+    "parallel": "{count} Dokumente werden parallel verarbeitet",
+    "overall_label": "Gesamtfortschritt der Anonymisierung",
+    "settled": "{done} von {total} abgeschlossen",
+    "failed": "{count} fehlgeschlagen",
+    "row_progress": "Fortschritt: {name}",
+    "status": {
+      "queued": "Wartet",
+      "done": "Fertig",
+      "error": "Fehler",
+      "ocr": "OCR Seite {done}/{total}",
+      "detection": "KI-Erkennung {done}/{total}",
+      "recheck": "Prüfung …"
+    }
+  },
+  "documents": {
+    "nav_label": "Dokumente des Stapels",
+    "previous": "Vorheriges Dokument",
+    "next": "Nächstes Dokument",
+    "select": "Dokument wählen",
+    "status": {
+      "queued": "In der Warteschlange",
+      "processing": "Wird verarbeitet",
+      "error": "Fehlgeschlagen: {message}",
+      "unknown_error": "Unbekannter Fehler",
+      "done": "Abgeschlossen"
+    }
+  },
+  "result": {
+    "background_progress_label": "Gesamtfortschritt der Verarbeitung im Hintergrund",
+    "background_progress": "Verarbeitung im Hintergrund: {done} von {total} abgeschlossen",
+    "rerunning": "Wird neu berechnet …",
+    "reset_one": "Neues Dokument",
+    "reset_many": "Neue Dokumente",
+    "processed_in": "Verarbeitet in {ms} ms",
+    "batch_summary": "{done} von {total} Dokumenten verarbeitet",
+    "batch_review": "{count} mit Prüfbedarf",
+    "batch_failed": "{count} fehlgeschlagen",
+    "failed": "Anonymisierung fehlgeschlagen.",
+    "status": {
+      "pass": "Geprüft – keine Auffälligkeiten",
+      "review": "Prüfbedarf – 1 Hinweis | Prüfbedarf – {count} Hinweise",
+      "fail": "Prüfung fehlgeschlagen"
+    },
+    "export": {
+      "button": "Exportieren",
+      "copy": "Kopieren",
+      "txt": "Als Textdatei (.txt)",
+      "pdf": "Als PDF",
+      "zip": "Alle Dokumente (.zip)",
+      "keep_filenames": "Dateinamen beibehalten",
+      "keep_filenames_hint": "Vorsicht: Dateinamen können personenbezogene Daten enthalten.",
+      "filename": "anonymisiert",
+      "document_fallback": "dokument"
+    },
+    "panels": {
+      "switcher_label": "Ansichten wählen",
+      "original": "Original",
+      "source": "Quellprüfung",
+      "source_simple": "Prüfung",
+      "pdf": "Geschwärztes PDF",
+      "anonymized": "Anonymisierter Text",
+      "result": "Ergebnis"
+    },
+    "original": {
+      "iframe_title": "Originaldokument",
+      "unavailable": "Die Originaldatei ist nicht mehr verfügbar."
+    },
+    "source": {
+      "hint": "Klicken Sie auf eine markierte Stelle für Details – oder markieren Sie beliebigen Text, um ihn manuell zu schwärzen."
+    },
+    "pdf": {
+      "areas": "Bereiche schwärzen",
+      "reconstructed": "Rekonstruiertes Dokument – Layout angenähert, Originalpixel werden verworfen.",
+      "generating": "PDF wird erzeugt …",
+      "preview_title": "Geschwärztes PDF (Vorschau)",
+      "no_preview": "Keine Vorschau verfügbar."
+    },
+    "entities": {
+      "section_label": "Erkannte Entitäten",
+      "intro": "1 Stelle erkannt: | {count} Stellen erkannt:",
+      "none": "Keine personenbezogenen Stellen erkannt.",
+      "cycle_title": "Nächste Stelle vom Typ {type} anzeigen"
+    }
+  },
+  "highlights": {
+    "legend_label": "Legende",
+    "warning_legend": "Warnung",
+    "warning_title": "Warnung · möglicherweise nicht erkannte personenbezogene Daten",
+    "mark_label": "Entität: {type}, {status}",
+    "mark_label_overridden": "Entität: {type}, {status}, geändert",
+    "redact": "Schwärzen",
+    "redact_label": "Auswahl manuell schwärzen"
+  },
+  "detail": {
+    "panel_label": "Details zur ausgewählten Entität",
+    "changed": "Geändert",
+    "changed_short": "geändert",
+    "replaced_by": "Ersetzt durch {replacement}",
+    "offsets": "Zeichen {start}–{end}",
+    "preserve": "Beibehalten",
+    "redact": "Schwärzen",
+    "change_type": "Entitätstyp ändern",
+    "close": "Details schließen"
+  },
+  "areas": {
+    "hint": "Angezeigt werden die Originalseiten. Ziehen Sie ein Rechteck über einen Bereich (z. B. Unterschrift, Logo oder Stempel), um ihn zusätzlich zu schwärzen – Klick auf einen Bereich entfernt ihn wieder. Jede Änderung wird sofort übernommen.",
+    "mark_all_images": "Alle Bilder schwärzen ({count})",
+    "truncated": "Nur die ersten {count} Seiten werden angezeigt.",
+    "rendering": "Seiten werden gerendert …",
+    "page_alt": "Seite {page}",
+    "remove_label": "Geschwärzten Bereich auf Seite {page} entfernen",
+    "remove_title": "Bereich entfernen"
+  },
+  "chips": {
+    "placeholder": "Begriff eingeben, mit Enter hinzufügen",
+    "remove": "{term} entfernen",
+    "limit": "Maximal {count} Begriffe möglich."
+  },
+  "entity": {
+    "manual_mark": "Manuell geschwärzt",
+    "manual_badge": "Manuelle Schwärzung",
+    "type": {
+      "PERSON_NAME": "Person",
+      "DATE_OF_BIRTH": "Geburtsdatum",
+      "OTHER_DATE": "Datum",
+      "AGE": "Alter",
+      "ADDRESS": "Adresse",
+      "PHONE": "Telefon",
+      "EMAIL": "E-Mail",
+      "URL": "URL",
+      "ID_NUMBER": "ID-Nummer",
+      "ORGANIZATION": "Organisation",
+      "PROFESSION": "Beruf",
+      "OTHER_PII": "Sonstige"
+    },
+    "type_description": {
+      "PERSON_NAME": "Namen von Patient:innen, Angehörigen und Behandelnden",
+      "DATE_OF_BIRTH": "Geburtsdaten",
+      "OTHER_DATE": "Aufnahme-, Entlassungs- und Behandlungsdaten",
+      "AGE": "Altersangaben",
+      "ADDRESS": "Straßen, Postleitzahlen, Orte",
+      "PHONE": "Telefon- und Faxnummern",
+      "EMAIL": "E-Mail-Adressen",
+      "URL": "Internetadressen",
+      "ID_NUMBER": "Patienten-, Fall- und Versichertennummern",
+      "ORGANIZATION": "Kliniken, Praxen, Arbeitgeber",
+      "PROFESSION": "Berufsangaben",
+      "OTHER_PII": "Sonstige identifizierende Angaben (z. B. Geschlecht)"
+    },
+    "status": {
+      "REDACTED": "Entfernt",
+      "GENERALIZED": "Verallgemeinert",
+      "TAGGED": "Getaggt",
+      "PRESERVED": "Beibehalten"
+    },
+    "transformation": {
+      "TYPE_MASK": "Typ-Maske",
+      "CONSISTENT_TAG": "Konsistenter Platzhalter",
+      "GENERALIZE": "Verallgemeinerung",
+      "REMOVE": "Entfernung",
+      "PRESERVE": "Beibehalten"
+    },
+    "source_type": {
+      "paste": "Eingabe",
+      "txt": "Text",
+      "pdf": "PDF",
+      "pdf-ocr": "PDF (OCR)",
+      "docx": "DOCX"
+    }
+  },
+  "validation": {
+    "status": {
+      "PASS": "Bestanden",
+      "REVIEW_REQUIRED": "Prüfung erforderlich",
+      "FAIL": "Fehlgeschlagen"
+    },
+    "severity": {
+      "INFO": "Hinweis",
+      "WARNING": "Warnung",
+      "HIGH": "Kritisch"
+    }
+  },
+  "warnings": {
+    "title": "Hinweise & Warnungen",
+    "locate": "Im Text anzeigen",
+    "risk": {
+      "low": "gering",
+      "medium": "mittel",
+      "high": "hoch"
+    },
+    "codes": {
+      "docx_comments": "Das Dokument enthält Kommentare, die nicht extrahiert werden.",
+      "docx_tracked_changes": "Das Dokument enthält nachverfolgte Änderungen; eingefügter Text kann unvollständig sein.",
+      "docx_tracked_deletions": "Das Dokument enthält nachverfolgte Löschungen, die nicht extrahiert werden.",
+      "docx_text_boxes": "Das Dokument enthält Textfelder, die nicht extrahiert werden.",
+      "pdf_no_page_mapping": "Für die Extraktion über docling-serve steht keine Seitenzuordnung zur Verfügung.",
+      "pdf_docling_fallback": "docling-serve ist fehlgeschlagen ({reason}); es wurde lokal extrahiert.",
+      "ocr_recognition_errors": "Der Text stammt aus einer Texterkennung (OCR); Erkennungsfehler sind möglich.",
+      "llm_mention_not_located": "Die KI hat eine Stelle vom Typ {entity_type} gemeldet, die im Quelltext nicht gefunden wurde. Bitte prüfen Sie das Dokument manuell.",
+      "invalid_span_rejected": "Eine ungültige Fundstelle des Detektors „{detector}“ wurde verworfen (Offset-Konflikt).",
+      "override_not_matched": "Eine Anpassung passte zu keiner erkannten Stelle und wurde ignoriert.",
+      "manual_selection_ignored": "Eine manuelle Auswahl passt nicht mehr zum Quelltext und wurde ignoriert.",
+      "residual_identifier": "Geschwärzter Inhalt vom Typ {entity_type} scheint im Ergebnis noch vorhanden zu sein.",
+      "revalidation_hit": "Eine Regel erkennt im Ergebnis weiterhin eine mögliche Stelle vom Typ {entity_type}.",
+      "labelled_field": "Auf ein beschriftetes Feld folgt offenbar nicht geschwärzter Inhalt.",
+      "llm_recheck_failed": "Die KI-Nachprüfung konnte nicht durchgeführt werden. Bitte prüfen Sie das Ergebnis manuell.",
+      "llm_recheck_remaining": "Die KI-Nachprüfung hat im Ergebnis eine mögliche verbliebene Stelle vom Typ {entity_type} gefunden.",
+      "llm_recheck_unlocated": "Die KI-Nachprüfung meldet möglicherweise verbliebene personenbezogene Daten, die nicht lokalisiert werden konnten.",
+      "llm_recheck_skipped": "Die KI-Nachprüfung wurde für dieses angepasste Ergebnis nicht wiederholt.",
+      "recheck_risk": "Die KI-Nachprüfung stuft das verbleibende Risiko einer Identifizierung als {risk} ein."
+    }
+  },
+  "errors": {
+    "generic": "Anonymisierung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    "expired": "Ergebnis abgelaufen – wird neu berechnet",
+    "too_large": "Datei zu groß.",
+    "unsupported_type": "Dateityp nicht unterstützt.",
+    "ocr_unavailable": "Diese OCR-Engine ist noch nicht verfügbar",
+    "scanned_no_ocr": "Dieses PDF scheint gescannt zu sein. OCR ist nicht aktiviert.",
+    "llm_unreachable": "Der KI-Erkennungsdienst ist nicht erreichbar. Das Dokument wurde NICHT anonymisiert.",
+    "backend_unreachable": "Server nicht erreichbar. Bitte prüfen Sie, ob das Backend läuft.",
+    "pdf_export_failed": "PDF-Export fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    "pdf_export_detail": "PDF-Export fehlgeschlagen: {detail}"
+  },
+  "toast": {
+    "copy_success": "Anonymisierter Text in die Zwischenablage kopiert.",
+    "copy_failed": "Kopieren fehlgeschlagen. Bitte markieren und manuell kopieren.",
+    "zip_downloaded": "{count} Dateien als ZIP heruntergeladen.",
+    "zip_failed": "Das ZIP-Archiv konnte nicht erstellt werden.",
+    "selection_too_long": "Bitte eine kürzere Auswahl treffen.",
+    "images_already_marked": "Alle erkannten Bilder sind bereits geschwärzt.",
+    "images_marked": "1 Bild zum Schwärzen markiert. | {count} Bilder zum Schwärzen markiert."
+  },
+  "placeholders": {
+    "type_mask": {
+      "PERSON_NAME": "[PERSON]",
+      "DATE_OF_BIRTH": "[GEBURTSDATUM]",
+      "OTHER_DATE": "[DATUM]",
+      "AGE": "[ALTER]",
+      "ADDRESS": "[ADRESSE]",
+      "PHONE": "[TELEFON]",
+      "EMAIL": "[E-MAIL]",
+      "URL": "[URL]",
+      "ID_NUMBER": "[ID]",
+      "ORGANIZATION": "[ORGANISATION]",
+      "PROFESSION": "[BERUF]",
+      "OTHER_PII": "[PII]"
+    },
+    "redacted": "[GESCHWÄRZT]",
+    "person_tag": "PERSON"
+  }
+}

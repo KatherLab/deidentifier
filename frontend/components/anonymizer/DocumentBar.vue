@@ -8,7 +8,7 @@
   <nav
     v-if="session.documents.length <= COMPACT_THRESHOLD"
     class="flex flex-wrap gap-1.5 rounded-card border border-default bg-surface-sunken p-1.5"
-    aria-label="Dokumente des Stapels"
+    :aria-label="t('documents.nav_label')"
   >
     <button
       v-for="doc in session.documents"
@@ -56,23 +56,23 @@
         v-if="doc.status === 'processing' && processingPercent(doc) !== null"
         class="shrink-0 text-xs tabular-nums text-content-subtle"
       >
-        {{ processingPercent(doc) }} %
+        {{ formatPercent(doc.progressMaxPercent) }}
       </span>
       <span class="sr-only">{{ statusText(doc) }}</span>
     </button>
   </nav>
 
-  <nav v-else class="flex items-center gap-2" aria-label="Dokumente des Stapels">
+  <nav v-else class="flex items-center gap-2" :aria-label="t('documents.nav_label')">
     <BaseButton
       variant="icon"
       tone="gray"
       :disabled="activeIndex <= 0"
-      aria-label="Vorheriges Dokument"
+      :aria-label="t('documents.previous')"
       @click="step(-1)"
     >
       <ChevronLeft class="h-4 w-4" aria-hidden="true" />
     </BaseButton>
-    <label for="document-select" class="sr-only">Dokument wählen</label>
+    <label for="document-select" class="sr-only">{{ t('documents.select') }}</label>
     <select
       id="document-select"
       :value="session.activeDocumentId"
@@ -87,7 +87,7 @@
       variant="icon"
       tone="gray"
       :disabled="activeIndex >= session.documents.length - 1"
-      aria-label="Nächstes Dokument"
+      :aria-label="t('documents.next')"
       @click="step(1)"
     >
       <ChevronRight class="h-4 w-4" aria-hidden="true" />
@@ -100,16 +100,19 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronLeft, ChevronRight, Clock, X } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { documentProgressPercent, useSessionStore } from '@/stores/session'
 import type { SessionDocument } from '@/stores/session'
 import { validationStatusLabel } from '@/utils/entityLabels'
+import { formatPercent } from '@/utils/format'
 
 /** Above this batch size, chips would wall up — switch to the dropdown. */
 const COMPACT_THRESHOLD = 10
 
+const { t } = useI18n()
 const session = useSessionStore()
 
 const activeIndex = computed(() =>
@@ -150,7 +153,7 @@ function statusGlyph(doc: SessionDocument): string {
       return '·'
     case 'processing': {
       const percent = processingPercent(doc)
-      return percent === null ? '…' : `${percent} %`
+      return percent === null ? '…' : formatPercent(percent)
     }
     case 'error':
       return '✗'
@@ -170,13 +173,17 @@ function statusGlyph(doc: SessionDocument): string {
 function statusText(doc: SessionDocument): string {
   switch (doc.status) {
     case 'queued':
-      return 'In der Warteschlange'
+      return t('documents.status.queued')
     case 'processing':
-      return 'Wird verarbeitet'
+      return t('documents.status.processing')
     case 'error':
-      return `Fehlgeschlagen: ${doc.error ?? 'Unbekannter Fehler'}`
+      return t('documents.status.error', {
+        message: doc.error ?? t('documents.status.unknown_error'),
+      })
     default:
-      return doc.result ? validationStatusLabel(doc.result.validation.status) : 'Abgeschlossen'
+      return doc.result
+        ? validationStatusLabel(doc.result.validation.status)
+        : t('documents.status.done')
   }
 }
 </script>

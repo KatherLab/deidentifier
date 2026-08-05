@@ -5,7 +5,7 @@
     <div
       v-if="legend.length > 0"
       class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-default bg-surface-muted px-4 py-2 text-xs text-content-muted"
-      aria-label="Legende"
+      :aria-label="t('highlights.legend_label')"
     >
       <span v-for="item in legend" :key="item.label" class="inline-flex items-center gap-1.5">
         <span class="h-2 w-2 rounded-full" :class="item.dotClass" aria-hidden="true"></span>
@@ -30,7 +30,7 @@
             segment.entityIndex === selectedIndex ? 'ring-2 ring-ring shadow-sm' : '',
           ]"
           :title="markTitle(segment.entityIndex)"
-          :aria-label="`Entität: ${markTypeLabel(segment.entityIndex)}, ${entityStatusLabel(entityAt(segment.entityIndex).status)}${isOverridden(segment.entityIndex) ? ', geändert' : ''}`"
+          :aria-label="markAriaLabel(segment.entityIndex)"
           :data-entity-index="segment.entityIndex"
           @click="emit('select', segment.entityIndex)"
         >
@@ -63,7 +63,7 @@
           v-else-if="segment.warning"
           class="rounded-md px-1 py-0.5 box-decoration-clone"
           :class="WARNING_HIGHLIGHT_CLASS"
-          title="Warnung · möglicherweise nicht erkannte personenbezogene Daten"
+          :title="t('highlights.warning_title')"
         >
           <span :data-start="segment.start" v-text="segment.text"></span>
         </mark>
@@ -83,12 +83,12 @@
           type="button"
           class="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white shadow-lg transition-colors hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 dark:bg-slate-700 dark:hover:bg-slate-600"
           :disabled="rerunning"
-          aria-label="Auswahl manuell schwärzen"
+          :aria-label="t('highlights.redact_label')"
           @mousedown.prevent
           @click="applyManualRedaction"
         >
           <EyeOff class="h-3.5 w-3.5" aria-hidden="true" />
-          Schwärzen
+          {{ t('highlights.redact') }}
         </button>
       </div>
     </div>
@@ -97,6 +97,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { EyeOff } from '@lucide/vue'
 import { buildHighlightSegments } from '@/utils/textSegments'
 import { getPillClass } from '@/utils/statusStyles'
@@ -104,7 +105,7 @@ import { overrideKey, useSessionStore } from '@/stores/session'
 import { useToast } from '@/composables/useToast'
 import { extractApiErrorMessage } from '@/utils/errors'
 import {
-  ENTITY_STATUS_LABELS,
+  ENTITY_STATUSES,
   ENTITY_DOT_CLASSES,
   WARNING_DOT_CLASS,
   WARNING_HIGHLIGHT_CLASS,
@@ -113,7 +114,7 @@ import {
   entityStatusPillColor,
   entityTypeLabel,
 } from '@/utils/entityLabels'
-import type { AnonymizedEntity, EntityStatus, ValidationWarning } from '@/types/anonymizer'
+import type { AnonymizedEntity, ValidationWarning } from '@/types/anonymizer'
 
 interface Props {
   sourceText: string
@@ -128,6 +129,7 @@ const emit = defineEmits<{
   (e: 'select', index: number): void
 }>()
 
+const { t } = useI18n()
 const session = useSessionStore()
 const toast = useToast()
 
@@ -150,15 +152,28 @@ function isUserManual(index: number): boolean {
 
 /** Type label for the tooltip/aria text; manual spans get a dedicated one. */
 function markTypeLabel(index: number): string {
-  return isUserManual(index) ? 'Manuell geschwärzt' : entityTypeLabel(entityAt(index).entity_type)
+  return isUserManual(index)
+    ? t('entity.manual_mark')
+    : entityTypeLabel(entityAt(index).entity_type)
 }
 
 /** Native tooltip: "Person · [PERSON_1] · geändert". */
 function markTitle(index: number): string {
   const entity = entityAt(index)
   const parts = [markTypeLabel(index), entity.replacement ?? entityStatusLabel(entity.status)]
-  if (isOverridden(index)) parts.push('geändert')
+  if (isOverridden(index)) parts.push(t('detail.changed_short'))
   return parts.join(' · ')
+}
+
+/** Accessible name of a mark — the status is never conveyed by color alone. */
+function markAriaLabel(index: number): string {
+  const params = {
+    type: markTypeLabel(index),
+    status: entityStatusLabel(entityAt(index).status),
+  }
+  return isOverridden(index)
+    ? t('highlights.mark_label_overridden', params)
+    : t('highlights.mark_label', params)
 }
 
 /** Superscript badge on the selected entity: replacement (or type). */
@@ -169,13 +184,13 @@ function badgeText(index: number): string {
 
 const legend = computed(() => {
   const present = new Set(props.entities.map((entity) => entity.status))
-  const items = (Object.keys(ENTITY_STATUS_LABELS) as EntityStatus[])
-    .filter((status) => present.has(status))
-    .map((status) => ({
-      label: ENTITY_STATUS_LABELS[status],
-      dotClass: ENTITY_DOT_CLASSES[status],
-    }))
-  if (props.warnings.length > 0) items.push({ label: 'Warnung', dotClass: WARNING_DOT_CLASS })
+  const items = ENTITY_STATUSES.filter((status) => present.has(status)).map((status) => ({
+    label: entityStatusLabel(status),
+    dotClass: ENTITY_DOT_CLASSES[status],
+  }))
+  if (props.warnings.length > 0) {
+    items.push({ label: t('highlights.warning_legend'), dotClass: WARNING_DOT_CLASS })
+  }
   return items
 })
 
@@ -311,7 +326,7 @@ function handleSelectionMouseUp(event: MouseEvent): void {
     return
   }
   if (end - start > MAX_MANUAL_SELECTION) {
-    toast.info('Bitte eine kürzere Auswahl treffen.')
+    toast.info(t('toast.selection_too_long'))
     hidePopover()
     return
   }

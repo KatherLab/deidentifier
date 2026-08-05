@@ -17,15 +17,13 @@
     <p class="text-sm font-medium text-content break-all">{{ document.name }}</p>
 
     <template v-if="document.status === 'queued'">
-      <p class="text-sm text-content-muted" aria-live="polite">
-        In der Warteschlange – wird gestartet, sobald ein Verarbeitungsplatz frei ist …
-      </p>
+      <p class="text-sm text-content-muted" aria-live="polite">{{ t('processing.queued') }}</p>
     </template>
     <template v-else>
       <div
         class="h-2.5 w-full overflow-hidden rounded-full bg-surface-sunken"
         role="progressbar"
-        aria-label="Fortschritt der Anonymisierung"
+        :aria-label="t('processing.progress_label')"
         :aria-valuemin="0"
         :aria-valuemax="100"
         :aria-valuenow="roundedPercent ?? undefined"
@@ -40,9 +38,9 @@
       </div>
 
       <p class="text-sm text-content-muted" aria-live="polite">
-        <span v-if="roundedPercent !== null" class="font-semibold text-content"
-          >{{ roundedPercent }} %</span
-        >
+        <span v-if="percent !== null" class="font-semibold text-content">{{
+          formatPercent(percent)
+        }}</span>
         {{ stageLabel }}
       </p>
     </template>
@@ -51,8 +49,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Clock, FileText } from '@lucide/vue'
 import { documentProgressPercent } from '@/stores/session'
+import { formatPercent } from '@/utils/format'
 import type { SessionDocument } from '@/stores/session'
 
 interface Props {
@@ -61,23 +61,26 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const { t } = useI18n()
+
 /** Streamed overall percent (null → indeterminate shimmer). */
 const percent = computed(() => documentProgressPercent(props.document))
 const roundedPercent = computed(() => (percent.value === null ? null : Math.round(percent.value)))
 
-/** German label for the current pipeline stage. */
+/** Label for the current pipeline stage. */
 const stageLabel = computed(() => {
   const progress = props.document.progress
-  if (progress === null) return 'Dokument wird verarbeitet …'
+  if (progress === null) return t('processing.stage.default')
+  const counts = { done: progress.done, total: progress.total }
   switch (progress.stage) {
     case 'ocr':
-      return `Texterkennung (OCR): Seite ${progress.done} von ${progress.total}`
+      return t('processing.stage.ocr', counts)
     case 'detection':
-      return `KI-Erkennung läuft: Abschnitt ${progress.done} von ${progress.total}`
+      return t('processing.stage.detection', counts)
     case 'recheck':
-      return 'Abschließende Prüfung des Ergebnisses …'
+      return t('processing.stage.recheck')
     default:
-      return 'Dokument wird verarbeitet …'
+      return t('processing.stage.default')
   }
 })
 </script>

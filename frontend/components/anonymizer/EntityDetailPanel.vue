@@ -2,7 +2,7 @@
   <!-- Compact footer bar inside the Quellprüfung card for the selected entity. -->
   <aside
     class="shrink-0 border-t border-default bg-surface-muted px-4 py-3"
-    aria-label="Details zur ausgewählten Entität"
+    :aria-label="t('detail.panel_label')"
   >
     <div class="flex items-start gap-2">
       <div class="min-w-0 flex-1 space-y-2">
@@ -18,18 +18,23 @@
             :label="entityStatusLabel(entity.status)"
             :color="entityStatusPillColor(entity.status)"
           />
-          <StatusBadge v-if="isOverridden && !isUserManual" label="Geändert" color="purple" />
+          <StatusBadge
+            v-if="isOverridden && !isUserManual"
+            :label="t('detail.changed')"
+            color="purple"
+          />
           <span
             v-if="entity.replacement !== null"
             class="font-mono text-xs text-content-muted"
-            :title="`Ersetzt durch ${entity.replacement}`"
+            :title="t('detail.replaced_by', { replacement: entity.replacement })"
             >→ {{ entity.replacement }}</span
           >
           <!-- Diagnostics (transformation, detector, confidence, offsets):
                expert-only. -->
           <span v-if="settings.expertMode" class="text-xs text-content-subtle">
             {{ transformationLabel(entity.transformation) }} · {{ entity.detector }} ·
-            {{ confidenceLabel }} · Zeichen {{ entity.start }}–{{ entity.end }}
+            {{ confidenceLabel }} ·
+            {{ t('detail.offsets', { start: entity.start, end: entity.end }) }}
           </span>
         </div>
 
@@ -44,7 +49,7 @@
               :disabled="rerunning"
               @click="setTransformation('PRESERVE')"
             >
-              Beibehalten
+              {{ t('detail.preserve') }}
             </BaseButton>
             <BaseButton
               v-else
@@ -53,9 +58,9 @@
               :disabled="rerunning"
               @click="setTransformation('TYPE_MASK')"
             >
-              Schwärzen
+              {{ t('detail.redact') }}
             </BaseButton>
-            <label :for="typeSelectId" class="sr-only">Entitätstyp ändern</label>
+            <label :for="typeSelectId" class="sr-only">{{ t('detail.change_type') }}</label>
             <!-- Changing the type applies immediately (re-run with override). -->
             <select
               :id="typeSelectId"
@@ -64,8 +69,8 @@
               class="rounded-card border border-strong bg-surface px-2 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               @change="applyType"
             >
-              <option v-for="(label, type) in ENTITY_TYPE_LABELS" :key="type" :value="type">
-                {{ label }}
+              <option v-for="type in ENTITY_TYPES" :key="type" :value="type">
+                {{ entityTypeLabel(type) }}
               </option>
             </select>
           </template>
@@ -76,7 +81,7 @@
             :disabled="rerunning"
             @click="resetOverride"
           >
-            Zurücksetzen
+            {{ t('common.reset') }}
           </BaseButton>
           <span
             v-if="rerunning"
@@ -84,11 +89,11 @@
             aria-live="polite"
           >
             <LoadingSpinner size="small" color="gray" inline label="" />
-            Wird neu berechnet …
+            {{ t('result.rerunning') }}
           </span>
         </div>
       </div>
-      <BaseButton variant="icon" tone="gray" aria-label="Details schließen" @click="emit('close')">
+      <BaseButton variant="icon" tone="gray" :aria-label="t('detail.close')" @click="emit('close')">
         <X class="h-4 w-4" aria-hidden="true" />
       </BaseButton>
     </div>
@@ -97,6 +102,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
@@ -106,12 +112,13 @@ import { useSettingsStore } from '@/stores/settings'
 import { useToast } from '@/composables/useToast'
 import { extractApiErrorMessage } from '@/utils/errors'
 import {
-  ENTITY_TYPE_LABELS,
+  ENTITY_TYPES,
   entityStatusLabel,
   entityStatusPillColor,
   entityTypeLabel,
   transformationLabel,
 } from '@/utils/entityLabels'
+import { formatPercent } from '@/utils/format'
 import type { AnonymizedEntity, EntityType, TransformationType } from '@/types/anonymizer'
 
 interface Props {
@@ -124,13 +131,14 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
+const { t } = useI18n()
 const session = useSessionStore()
 const settings = useSettingsStore()
 const toast = useToast()
 
 const typeSelectId = 'entity-type-select'
 
-const confidenceLabel = computed(() => `${Math.round(props.entity.confidence * 100)} %`)
+const confidenceLabel = computed(() => formatPercent(props.entity.confidence * 100))
 const rerunning = computed(() => session.rerunning)
 const hasOverride = computed(() => session.overrideFor(props.entity) !== undefined)
 const isOverridden = computed(() => props.entity.metadata?.overridden === true || hasOverride.value)
@@ -138,7 +146,7 @@ const isOverridden = computed(() => props.entity.metadata?.overridden === true |
 /** Manually redacted selection (backend-created span, detector `user_manual`). */
 const isUserManual = computed(() => props.entity.metadata?.user_manual === true)
 const typeBadgeLabel = computed(() =>
-  isUserManual.value ? 'Manuelle Schwärzung' : entityTypeLabel(props.entity.entity_type),
+  isUserManual.value ? t('entity.manual_badge') : entityTypeLabel(props.entity.entity_type),
 )
 
 // The type dropdown follows the currently selected entity.

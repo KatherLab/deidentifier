@@ -2,7 +2,7 @@
   <div class="min-h-screen">
     <header class="border-b border-default">
       <div class="mx-auto flex items-center gap-3 px-4 py-4" :class="containerClass">
-        <h1 class="text-xl font-semibold text-content">Medizinischer Dokumenten-Anonymisierer</h1>
+        <h1 class="text-xl font-semibold text-content">{{ t('app.title') }}</h1>
 
         <div class="ml-auto flex items-center gap-1.5">
           <!-- System hints (external endpoints / unready detectors): compact
@@ -21,7 +21,7 @@
               v-if="hintsOpen"
               class="absolute right-0 top-full z-20 mt-2 w-80 rounded-card border border-default bg-surface p-3 shadow-lg"
               role="dialog"
-              aria-label="Systemhinweise"
+              :aria-label="t('header.hints.dialog_label')"
             >
               <ul class="space-y-2 text-sm text-content">
                 <li
@@ -44,7 +44,7 @@
             <button
               type="button"
               class="rounded-card p-2 text-content-subtle transition-colors hover:bg-surface-muted hover:text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Einstellungen"
+              :aria-label="t('header.settings.label')"
               :aria-expanded="settingsOpen"
               @click="toggleSettings()"
             >
@@ -54,11 +54,11 @@
               v-if="settingsOpen"
               class="absolute right-0 top-full z-20 mt-2 w-72 rounded-card border border-default bg-surface p-4 shadow-lg"
               role="dialog"
-              aria-label="Einstellungen"
+              :aria-label="t('header.settings.label')"
             >
               <div class="flex items-center justify-between gap-3">
                 <span id="expert-mode-label" class="text-sm font-medium text-content">
-                  Expertenmodus
+                  {{ t('header.settings.expert_mode') }}
                 </span>
                 <button
                   type="button"
@@ -77,17 +77,18 @@
                 </button>
               </div>
               <p class="mt-1.5 text-xs text-content-subtle">
-                Zeigt technische Details (Detektor, Konfidenz, Laufzeiten) und erlaubt die freie
-                Kombination der Ansichten.
+                {{ t('header.settings.expert_mode_hint') }}
               </p>
             </div>
           </div>
+
+          <LanguageSwitcher />
 
           <!-- Dark mode -->
           <button
             type="button"
             class="rounded-card p-2 text-content-subtle transition-colors hover:bg-surface-muted hover:text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            :aria-label="isDark ? 'Zum hellen Design wechseln' : 'Zum dunklen Design wechseln'"
+            :aria-label="isDark ? t('header.theme.to_light') : t('header.theme.to_dark')"
             @click="toggleDarkMode"
           >
             <Sun v-if="isDark" class="h-5 w-5" aria-hidden="true" />
@@ -108,14 +109,17 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { AlertTriangle, Moon, Settings, Sun } from '@lucide/vue'
 import InputPanel from '@/components/anonymizer/InputPanel.vue'
 import ResultView from '@/components/anonymizer/ResultView.vue'
+import LanguageSwitcher from '@/components/common/LanguageSwitcher.vue'
 import ToastContainer from '@/components/common/ToastContainer.vue'
 import { usePopover } from '@/composables/usePopover'
 import { useSessionStore } from '@/stores/session'
 import { useSettingsStore } from '@/stores/settings'
 
+const { t } = useI18n()
 const session = useSessionStore()
 const settings = useSettingsStore()
 
@@ -129,12 +133,10 @@ const { open: settingsOpen, toggle: toggleSettings } = usePopover(settingsContai
 const systemHints = computed<string[]>(() => {
   const hints: string[] = []
   for (const endpoint of session.externalEndpoints) {
-    hints.push(
-      `Dokumentinhalte werden an einen externen Endpunkt gesendet: ${endpoint.name} (${endpoint.host}).`,
-    )
+    hints.push(t('header.hints.external_endpoint', { name: endpoint.name, host: endpoint.host }))
   }
   for (const detector of session.notReadyDetectors) {
-    hints.push(`Detektor '${detector.name}' ist aktiviert, aber nicht konfiguriert.`)
+    hints.push(t('header.hints.detector_not_ready', { name: detector.name }))
   }
   return hints
 })
@@ -142,9 +144,9 @@ const systemHints = computed<string[]>(() => {
 const hintsLabel = computed(() => {
   const external = session.externalEndpoints.length > 0
   const notReady = session.notReadyDetectors.length > 0
-  if (external && !notReady) return 'Externer Endpunkt'
-  if (!external && notReady) return 'Detektor nicht bereit'
-  return `${systemHints.value.length} Hinweise`
+  if (external && !notReady) return t('header.hints.chip_external')
+  if (!external && notReady) return t('header.hints.chip_detector')
+  return t('header.hints.chip_count', { count: systemHints.value.length })
 })
 
 /**

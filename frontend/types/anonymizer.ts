@@ -131,6 +131,15 @@ export interface CustomRules {
 }
 
 /** Fresh run from raw text (optionally with overrides, e.g. after a 410). */
+/**
+ * Language of everything a run WRITES into the document: the replacement
+ * placeholders and the free-text notes of the LLM re-check. Captured at submit
+ * and independent of the interface language — switching the UI while reviewing
+ * must not rewrite the placeholders of a finished document. Same set as the
+ * UI's `SupportedLocale` (asserted in `i18n/index.test.ts`).
+ */
+export type OutputLanguage = 'de' | 'en' | 'fr' | 'es'
+
 export interface AnonymizeTextRequest {
   text: string
   overrides?: Override[]
@@ -138,6 +147,7 @@ export interface AnonymizeTextRequest {
   custom_instruction?: string
   redact_terms?: string[]
   preserve_terms?: string[]
+  output_language?: OutputLanguage
 }
 
 /**
@@ -150,6 +160,7 @@ export interface AnonymizeRerunRequest {
   overrides: Override[]
   policy?: PolicyMap
   preserve_terms?: string[]
+  output_language?: OutputLanguage
 }
 
 export type AnonymizeRequest = AnonymizeTextRequest | AnonymizeRerunRequest
@@ -167,6 +178,20 @@ export interface StreamProgressEvent {
   total: number
 }
 
+/** Placeholder values of a translatable backend message. */
+export type NoticeParams = Record<string, string | number | boolean>
+
+/**
+ * A non-fatal message about the run. `code` identifies the message in the
+ * catalogs (`warnings.codes.*`); `message` is the backend's English rendering
+ * and stays the fallback for codes the frontend does not know.
+ */
+export interface Notice {
+  code: string
+  message: string
+  params: NoticeParams
+}
+
 export interface ValidationWarning {
   category: string
   message: string
@@ -174,6 +199,9 @@ export interface ValidationWarning {
   /** Unicode code point offset into `source_text`, when located. */
   start: number | null
   end: number | null
+  /** Translation contract, as for `Notice`; empty for model-authored text. */
+  code: string
+  params: NoticeParams
 }
 
 export interface ValidationResult {
@@ -192,11 +220,13 @@ export interface TimingMs {
 export interface AnonymizeResponse {
   request_id: string
   source_type: SourceType
+  /** The language its placeholders are written in (fixed at submit). */
+  output_language: OutputLanguage
   source_text: string
   anonymized_text: string
   entities: AnonymizedEntity[]
   validation: ValidationResult
-  warnings: string[]
+  warnings: Notice[]
   timing_ms: TimingMs
 }
 

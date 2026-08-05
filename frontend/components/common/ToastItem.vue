@@ -36,7 +36,7 @@
     <button
       type="button"
       class="shrink-0 p-1.5 rounded-card text-content-subtle hover:text-content hover:bg-surface-muted transition-colors"
-      aria-label="Schließen"
+      :aria-label="t('common.close')"
       @click="emit('dismiss')"
     >
       <X class="h-4 w-4" />
@@ -46,6 +46,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 import { getToastVisual } from '@/utils/toastIcons'
 import type { ToastType } from '@/stores/toast'
@@ -60,6 +61,8 @@ const props = withDefaults(defineProps<Props>(), {
   type: 'info',
   timeout: 4000,
 })
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'dismiss'): void

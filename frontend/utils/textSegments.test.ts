@@ -17,7 +17,15 @@ function entity(start: number, end: number, text: string): AnonymizedEntity {
 }
 
 function warning(start: number | null, end: number | null): ValidationWarning {
-  return { category: 'residual', message: 'Rest', severity: 'HIGH', start, end }
+  return {
+    category: 'residual_identifier',
+    message: 'Rest',
+    severity: 'HIGH',
+    start,
+    end,
+    code: 'residual_identifier',
+    params: { entity_type: 'PERSON_NAME' },
+  }
 }
 
 describe('buildHighlightSegments', () => {

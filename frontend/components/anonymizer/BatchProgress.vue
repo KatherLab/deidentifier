@@ -8,17 +8,19 @@
     class="w-full max-w-xl space-y-4 rounded-modal border border-default bg-surface p-8 shadow-sm"
   >
     <p class="text-center text-sm font-medium text-content">
-      {{ session.documents.length }} Dokumente werden parallel verarbeitet
+      {{ t('batch.parallel', { count: session.documents.length }) }}
     </p>
 
     <ProgressBar
       class="w-full"
       :percent="session.batchOverallPercent"
-      label="Gesamtfortschritt der Anonymisierung"
+      :label="t('batch.overall_label')"
     />
 
     <p class="text-center text-sm text-content-muted" aria-live="polite">
-      <span class="font-semibold text-content">{{ overallRounded }} %</span>
+      <span class="font-semibold text-content">{{
+        formatPercent(session.batchOverallPercent)
+      }}</span>
       · {{ settledSummary }}
     </p>
 
@@ -57,7 +59,7 @@
           thin
           class="w-20 shrink-0"
           :percent="documentBatchPercent(doc)"
-          :label="`Fortschritt: ${doc.name}`"
+          :label="t('batch.row_progress', { name: doc.name })"
         />
 
         <span
@@ -73,20 +75,26 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Check, Clock, X } from '@lucide/vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import ProgressBar from '@/components/common/ProgressBar.vue'
 import { documentBatchPercent, useSessionStore } from '@/stores/session'
+import { formatPercent } from '@/utils/format'
 import type { SessionDocument } from '@/stores/session'
 
+const { t } = useI18n()
 const session = useSessionStore()
-
-const overallRounded = computed(() => Math.round(session.batchOverallPercent))
 
 /** "X von N abgeschlossen" (done + error), plus failures only when any. */
 const settledSummary = computed(() => {
-  let summary = `${session.batchSettledCount} von ${session.documents.length} abgeschlossen`
-  if (session.batchFailedCount > 0) summary += ` · ${session.batchFailedCount} fehlgeschlagen`
+  let summary = t('batch.settled', {
+    done: session.batchSettledCount,
+    total: session.documents.length,
+  })
+  if (session.batchFailedCount > 0) {
+    summary += ` · ${t('batch.failed', { count: session.batchFailedCount })}`
+  }
   return summary
 })
 
@@ -94,21 +102,22 @@ const settledSummary = computed(() => {
 function statusLabel(doc: SessionDocument): string {
   switch (doc.status) {
     case 'queued':
-      return 'Wartet'
+      return t('batch.status.queued')
     case 'done':
-      return 'Fertig'
+      return t('batch.status.done')
     case 'error':
-      return 'Fehler'
+      return t('batch.status.error')
     default: {
       const progress = doc.progress
-      if (progress === null) return `${Math.round(doc.progressMaxPercent)} %`
+      if (progress === null) return formatPercent(doc.progressMaxPercent)
+      const counts = { done: progress.done, total: progress.total }
       switch (progress.stage) {
         case 'ocr':
-          return `OCR Seite ${progress.done}/${progress.total}`
+          return t('batch.status.ocr', counts)
         case 'detection':
-          return `KI-Erkennung ${progress.done}/${progress.total}`
+          return t('batch.status.detection', counts)
         default:
-          return 'Prüfung …'
+          return t('batch.status.recheck')
       }
     }
   }

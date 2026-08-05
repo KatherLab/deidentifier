@@ -1,98 +1,73 @@
 /**
- * German display names + visual treatment for entity types, entity statuses,
+ * Display names + visual treatment for entity types, entity statuses,
  * transformations, validation statuses and warning severities.
+ *
+ * The text lives in the message catalogs (`entity.*`, `validation.*`); the
+ * functions here resolve a backend enum value to its localized label and fall
+ * back to the raw value for anything a catalog does not know (a new backend
+ * enum value must never blank the UI).
  *
  * Accessibility rule: highlight colors are ALWAYS paired with a visible text
  * label (chip) — never color alone.
  */
+import { hasMessage, t } from '@/i18n'
 import type {
   EntityStatus,
   EntityType,
-  SourceType,
-  TransformationType,
   ValidationStatus,
   WarningSeverity,
 } from '@/types/anonymizer'
 
-/** Source type → German display name (badge in the result header). */
-export const SOURCE_TYPE_LABELS: Record<SourceType, string> = {
-  paste: 'Eingabe',
-  txt: 'Text',
-  pdf: 'PDF',
-  'pdf-ocr': 'PDF (OCR)',
-  docx: 'DOCX',
+/** Label for `key`, or the raw value when the catalogs don't know it. */
+function label(key: string, value: string): string {
+  return hasMessage(key) ? t(key) : value
 }
 
 export function sourceTypeLabel(type: string): string {
-  return SOURCE_TYPE_LABELS[type as SourceType] ?? type
+  return label(`entity.source_type.${type}`, type)
 }
 
-/** Entity type → German display name (chips, legend, counts). */
-export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
-  PERSON_NAME: 'Person',
-  DATE_OF_BIRTH: 'Geburtsdatum',
-  OTHER_DATE: 'Datum',
-  AGE: 'Alter',
-  ADDRESS: 'Adresse',
-  PHONE: 'Telefon',
-  EMAIL: 'E-Mail',
-  URL: 'URL',
-  ID_NUMBER: 'ID-Nummer',
-  ORGANIZATION: 'Organisation',
-  PROFESSION: 'Beruf',
-  OTHER_PII: 'Sonstige',
-}
+/**
+ * All entity types in display order (policy editor rows, type dropdown).
+ * Mirrors the backend's EntityType enum.
+ */
+export const ENTITY_TYPES: EntityType[] = [
+  'PERSON_NAME',
+  'DATE_OF_BIRTH',
+  'OTHER_DATE',
+  'AGE',
+  'ADDRESS',
+  'PHONE',
+  'EMAIL',
+  'URL',
+  'ID_NUMBER',
+  'ORGANIZATION',
+  'PROFESSION',
+  'OTHER_PII',
+]
 
 export function entityTypeLabel(type: string): string {
-  return ENTITY_TYPE_LABELS[type as EntityType] ?? type
+  return label(`entity.type.${type}`, type)
 }
 
-/** Entity type → short German description (policy editor rows). */
-export const ENTITY_TYPE_DESCRIPTIONS: Record<EntityType, string> = {
-  PERSON_NAME: 'Namen von Patient:innen, Angehörigen und Behandelnden',
-  DATE_OF_BIRTH: 'Geburtsdaten',
-  OTHER_DATE: 'Aufnahme-, Entlassungs- und Behandlungsdaten',
-  AGE: 'Altersangaben',
-  ADDRESS: 'Straßen, Postleitzahlen, Orte',
-  PHONE: 'Telefon- und Faxnummern',
-  EMAIL: 'E-Mail-Adressen',
-  URL: 'Internetadressen',
-  ID_NUMBER: 'Patienten-, Fall- und Versichertennummern',
-  ORGANIZATION: 'Kliniken, Praxen, Arbeitgeber',
-  PROFESSION: 'Berufsangaben',
-  OTHER_PII: 'Sonstige identifizierende Angaben (z. B. Geschlecht)',
+/** Short description of an entity type (policy editor rows). */
+export function entityTypeDescription(type: EntityType): string {
+  return label(`entity.type_description.${type}`, type)
 }
 
-/** Entity status → German display name. */
-export const ENTITY_STATUS_LABELS: Record<EntityStatus, string> = {
-  REDACTED: 'Entfernt',
-  GENERALIZED: 'Verallgemeinert',
-  TAGGED: 'Getaggt',
-  PRESERVED: 'Beibehalten',
-}
+/** Entity statuses in legend order. */
+export const ENTITY_STATUSES: EntityStatus[] = ['REDACTED', 'GENERALIZED', 'TAGGED', 'PRESERVED']
 
 export function entityStatusLabel(status: string): string {
-  return ENTITY_STATUS_LABELS[status as EntityStatus] ?? status
-}
-
-/** Transformation → German display name (detail panel). */
-export const TRANSFORMATION_LABELS: Record<TransformationType, string> = {
-  TYPE_MASK: 'Typ-Maske',
-  CONSISTENT_TAG: 'Konsistenter Platzhalter',
-  GENERALIZE: 'Verallgemeinerung',
-  REMOVE: 'Entfernung',
-  PRESERVE: 'Beibehalten',
+  return label(`entity.status.${status}`, status)
 }
 
 export function transformationLabel(transformation: string): string {
-  return TRANSFORMATION_LABELS[transformation as TransformationType] ?? transformation
+  return label(`entity.transformation.${transformation}`, transformation)
 }
 
-/** Validation status → German label + StatusBadge pill color. */
-export const VALIDATION_STATUS_LABELS: Record<ValidationStatus, string> = {
-  PASS: 'Bestanden',
-  REVIEW_REQUIRED: 'Prüfung erforderlich',
-  FAIL: 'Fehlgeschlagen',
+export function validationStatusLabel(status: string): string {
+  return label(`validation.status.${status}`, status)
 }
 
 export const VALIDATION_STATUS_COLORS: Record<ValidationStatus, string> = {
@@ -101,29 +76,18 @@ export const VALIDATION_STATUS_COLORS: Record<ValidationStatus, string> = {
   FAIL: 'red',
 }
 
-export function validationStatusLabel(status: string): string {
-  return VALIDATION_STATUS_LABELS[status as ValidationStatus] ?? status
-}
-
 export function validationStatusColor(status: string): string {
   return VALIDATION_STATUS_COLORS[status as ValidationStatus] ?? 'gray'
 }
 
-/** Warning severity → German label + pill color. */
-export const SEVERITY_LABELS: Record<WarningSeverity, string> = {
-  INFO: 'Hinweis',
-  WARNING: 'Warnung',
-  HIGH: 'Kritisch',
+export function severityLabel(severity: string): string {
+  return label(`validation.severity.${severity}`, severity)
 }
 
 export const SEVERITY_COLORS: Record<WarningSeverity, string> = {
   INFO: 'blue',
   WARNING: 'amber',
   HIGH: 'red',
-}
-
-export function severityLabel(severity: string): string {
-  return SEVERITY_LABELS[severity as WarningSeverity] ?? severity
 }
 
 export function severityColor(severity: string): string {

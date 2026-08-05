@@ -5,8 +5,17 @@
  * The session store holds the editable policy (memory only — never persisted).
  * Requests only carry the DEVIATIONS from these defaults as the request-level
  * `policy` field; omitted types keep their backend default.
+ *
+ * Option labels and hints live in the message catalogs (`policy.options.*`,
+ * `policy.hints.*`); only the transformation values belong here.
  */
-import type { EntityType, PolicyMap, TransformationType } from '@/types/anonymizer'
+import { t } from '@/i18n'
+import {
+  consistentTagExample,
+  redactedPlaceholder,
+  typeMaskPlaceholder,
+} from '@/utils/placeholders'
+import type { EntityType, OutputLanguage, PolicyMap, TransformationType } from '@/types/anonymizer'
 
 /** Must mirror backend DEFAULT_POLICY exactly (recall-first defaults). */
 export const DEFAULT_POLICY: Record<EntityType, TransformationType> = {
@@ -24,44 +33,71 @@ export const DEFAULT_POLICY: Record<EntityType, TransformationType> = {
   OTHER_PII: 'TYPE_MASK',
 }
 
-export interface PolicyOption {
-  value: TransformationType
-  label: string
+/** Catalog key of the dropdown label for each transformation. */
+const OPTION_LABEL_KEYS: Record<TransformationType, string> = {
+  TYPE_MASK: 'policy.options.mask',
+  GENERALIZE: 'policy.options.generalize_year',
+  PRESERVE: 'policy.options.preserve',
+  REMOVE: 'policy.options.remove',
+  CONSISTENT_TAG: 'policy.options.consistent_tag',
+}
+
+/**
+ * The placeholder a transformation would write for one entity type, in the
+ * OUTPUT language of the next run — the example shown in the policy editor.
+ * `undefined` for transformations that produce no placeholder.
+ */
+function placeholderExample(
+  transformation: TransformationType,
+  type: EntityType,
+  outputLanguage: OutputLanguage,
+): string | undefined {
+  switch (transformation) {
+    case 'TYPE_MASK':
+      return typeMaskPlaceholder(type, outputLanguage)
+    case 'CONSISTENT_TAG':
+      return consistentTagExample(outputLanguage)
+    case 'REMOVE':
+      return redactedPlaceholder(outputLanguage)
+    default:
+      return undefined
+  }
+}
+
+/** Dropdown label of a transformation ("Schwärzen", "Entfernen [GESCHWÄRZT]", …). */
+export function policyOptionLabel(
+  transformation: TransformationType,
+  outputLanguage: OutputLanguage,
+): string {
+  return t(OPTION_LABEL_KEYS[transformation], {
+    example: redactedPlaceholder(outputLanguage),
+  })
+}
+
+/**
+ * Explanation of a transformation with a concrete example, shown in the policy
+ * editor under the select for the CURRENTLY chosen value. The example is the
+ * placeholder this very row would produce, in the run's output language.
+ */
+export function transformationHint(
+  transformation: TransformationType,
+  type: EntityType,
+  outputLanguage: OutputLanguage,
+): string {
+  return t(`policy.hints.${transformation}`, {
+    example: placeholderExample(transformation, type, outputLanguage) ?? '',
+  })
 }
 
 /** Dates can be generalized to the year instead of fully masked. */
-const DATE_OPTIONS: PolicyOption[] = [
-  { value: 'TYPE_MASK', label: 'Schwärzen' },
-  { value: 'GENERALIZE', label: 'Nur Jahr' },
-  { value: 'PRESERVE', label: 'Beibehalten' },
-]
+const DATE_OPTIONS: TransformationType[] = ['TYPE_MASK', 'GENERALIZE', 'PRESERVE']
 
 /** Generic PII: mask with the type label, remove entirely, or preserve. */
-const GENERIC_OPTIONS: PolicyOption[] = [
-  { value: 'TYPE_MASK', label: 'Schwärzen' },
-  { value: 'REMOVE', label: 'Entfernen [GESCHWÄRZT]' },
-  { value: 'PRESERVE', label: 'Beibehalten' },
-]
-
-/**
- * Explanation of each transformation with a concrete example, shown in the
- * policy editor under the select for the CURRENTLY chosen value.
- */
-export const TRANSFORMATION_HINTS: Record<TransformationType, string> = {
-  TYPE_MASK: 'Wird durch einen Platzhalter ersetzt, z. B. [ADRESSE]',
-  CONSISTENT_TAG: 'Gleiche Person erhält im ganzen Dokument dieselbe Nummer, z. B. [PERSON_1]',
-  GENERALIZE: 'Nur das Jahr bleibt sichtbar, z. B. 01.02.1980 → 1980',
-  PRESERVE: 'Bleibt unverändert sichtbar (reduziert den Schutz)',
-  REMOVE: 'Wird durch [GESCHWÄRZT] ersetzt',
-}
+const GENERIC_OPTIONS: TransformationType[] = ['TYPE_MASK', 'REMOVE', 'PRESERVE']
 
 /** Allowed transformations per entity type (policy editor dropdowns). */
-export const POLICY_OPTIONS: Record<EntityType, PolicyOption[]> = {
-  PERSON_NAME: [
-    { value: 'CONSISTENT_TAG', label: 'Konsistente Tags' },
-    { value: 'TYPE_MASK', label: 'Schwärzen' },
-    { value: 'PRESERVE', label: 'Beibehalten' },
-  ],
+export const POLICY_OPTIONS: Record<EntityType, TransformationType[]> = {
+  PERSON_NAME: ['CONSISTENT_TAG', 'TYPE_MASK', 'PRESERVE'],
   DATE_OF_BIRTH: DATE_OPTIONS,
   OTHER_DATE: DATE_OPTIONS,
   AGE: GENERIC_OPTIONS,

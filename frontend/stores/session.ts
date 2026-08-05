@@ -16,6 +16,8 @@
  */
 import { computed, reactive, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
+import { i18n, t, type SupportedLocale } from '@/i18n'
+import { loadLocaleMessages } from '@/composables/useLocale'
 import { anonymizeApi } from '@/services/anonymizeApi'
 import { anonymizeFileStream, anonymizeTextStream } from '@/services/anonymizeStream'
 import { statusApi } from '@/services/statusApi'
@@ -33,6 +35,7 @@ import type {
   EntityType,
   ExternalEndpoint,
   Override,
+  OutputLanguage,
   PdfPageRender,
   PolicyMap,
   RedactArea,
@@ -104,6 +107,12 @@ export interface SessionDocument {
   rules: CustomRules | null
   /** Force-OCR flag captured at submit — re-sent on export (cache-miss parity). */
   forceOcr: boolean
+  /**
+   * Language of the placeholders written into THIS document, captured at
+   * submit and re-sent with every re-run/export. Switching the interface
+   * language while reviewing never rewrites a finished document.
+   */
+  outputLanguage: OutputLanguage
   /** Aborts the in-flight stream request on reset. */
   abort: AbortController | null
 }
@@ -192,6 +201,27 @@ export const useSessionStore = defineStore('session', () => {
    * cache-miss re-extraction matches.
    */
   const forceOcr = ref(false)
+
+  /**
+   * Language of the placeholders in the anonymized output (advanced settings).
+   * `null` means "follow the interface language", which is what most users
+   * want; picking one explicitly pins it. Memory only — never persisted, like
+   * every other per-run setting.
+   */
+  const outputLanguageOverride = ref<OutputLanguage | null>(null)
+
+  /** The language the NEXT run will write its placeholders in. */
+  const outputLanguage = computed<OutputLanguage>(
+    () => outputLanguageOverride.value ?? (i18n.global.locale.value as SupportedLocale),
+  )
+
+  /** Pin (or release, with `null`) the output language of the next run. */
+  function setOutputLanguage(language: OutputLanguage | null): void {
+    outputLanguageOverride.value = language
+    // The policy editor previews that language's placeholders, so make sure
+    // its catalog is in memory (no-op for an already-loaded locale).
+    if (language) void loadLocaleMessages(language)
+  }
 
   const status = ref<StatusResponse | null>(null)
 
@@ -326,9 +356,18 @@ export const useSessionStore = defineStore('session', () => {
     }
   })
 
-  /** True when policy OR custom rules OR force-OCR deviate from the defaults. */
+  /**
+   * True when policy OR custom rules OR force-OCR OR the output language
+   * deviate from the defaults. An output language that matches the interface
+   * is not a deviation — it is what would have happened anyway.
+   */
   const advancedCustomized = computed(
-    () => policyCustomized.value || customRules.value !== null || forceOcr.value,
+    () =>
+      policyCustomized.value ||
+      customRules.value !== null ||
+      forceOcr.value ||
+      (outputLanguageOverride.value !== null &&
+        outputLanguageOverride.value !== i18n.global.locale.value),
   )
 
   function setPolicyTransformation(type: EntityType, transformation: TransformationType): void {
@@ -342,6 +381,7 @@ export const useSessionStore = defineStore('session', () => {
     redactTerms.value = []
     preserveTerms.value = []
     forceOcr.value = false
+    outputLanguageOverride.value = null
   }
 
   // ---------------------------------------------------------------------
@@ -353,6 +393,7 @@ export const useSessionStore = defineStore('session', () => {
     batchPolicy: PolicyMap | null,
     batchRules: CustomRules | null,
     batchForceOcr: boolean,
+    batchOutputLanguage: OutputLanguage,
   ): SessionDocument {
     const doc: SessionDocument = {
       id: `doc-${++documentIdCounter}`,
@@ -383,6 +424,7 @@ export const useSessionStore = defineStore('session', () => {
       policy: batchPolicy,
       rules: batchRules,
       forceOcr: batchForceOcr,
+      outputLanguage: batchOutputLanguage,
       abort: null,
     }
     // reactive() up front: the queue/stream callbacks hold direct references,
@@ -394,12 +436,14 @@ export const useSessionStore = defineStore('session', () => {
     if (inputs.length === 0) return
     // Defensive: a previous batch (should already be reset) is fully dropped.
     reset()
-    // Policy/custom rules/force-OCR are captured ONCE at submit for the batch.
+    // Policy/custom rules/force-OCR/output language are captured ONCE at
+    // submit for the batch.
     const batchPolicy = policyOverrides.value
     const batchRules = customRules.value
     const batchForceOcr = forceOcr.value
+    const batchOutputLanguage = outputLanguage.value
     documents.value = inputs.map((input) =>
-      createDocument(input, batchPolicy, batchRules, batchForceOcr),
+      createDocument(input, batchPolicy, batchRules, batchForceOcr, batchOutputLanguage),
     )
     activeDocumentId.value = documents.value[0]!.id
     phase.value = 'loading'
@@ -417,7 +461,7 @@ export const useSessionStore = defineStore('session', () => {
 
   /** Anonymize pasted text — always a single-document batch. */
   function submitText(text: string): void {
-    startBatch([{ file: null, text, name: 'Eingefügter Text' }])
+    startBatch([{ file: null, text, name: t('input.pasted_text') }])
   }
 
   /** Start queued documents while free stream slots exist. */
@@ -462,10 +506,18 @@ export const useSessionStore = defineStore('session', () => {
             doc.policy,
             doc.rules,
             doc.forceOcr,
+            doc.outputLanguage,
             onProgress,
             abort.signal,
           )
-        : await anonymizeTextStream(doc.text ?? '', doc.policy, doc.rules, onProgress, abort.signal)
+        : await anonymizeTextStream(
+            doc.text ?? '',
+            doc.policy,
+            doc.rules,
+            doc.outputLanguage,
+            onProgress,
+            abort.signal,
+          )
       if (token !== batchToken) return // batch was reset while streaming
       doc.result = response
       doc.overrides = new Map()
@@ -639,6 +691,7 @@ export const useSessionStore = defineStore('session', () => {
         doc.rules,
         doc.redactAreas,
         doc.forceOcr,
+        doc.outputLanguage,
       )
       if (token !== doc.pdfPreviewToken) return
       if (doc.pdfPreviewUrl !== null) URL.revokeObjectURL(doc.pdfPreviewUrl)
@@ -774,6 +827,7 @@ export const useSessionStore = defineStore('session', () => {
             allOverrides,
             doc.policy,
             doc.rules?.preserveTerms ?? null,
+            doc.outputLanguage,
           )
         ).data
       } catch (err) {
@@ -782,7 +836,13 @@ export const useSessionStore = defineStore('session', () => {
         // overrides (full custom rules apply again); the response carries a
         // fresh request_id.
         response = (
-          await anonymizeApi.anonymizeText(sourceText, allOverrides, doc.policy, doc.rules)
+          await anonymizeApi.anonymizeText(
+            sourceText,
+            allOverrides,
+            doc.policy,
+            doc.rules,
+            doc.outputLanguage,
+          )
         ).data
       }
       doc.result = response
@@ -899,6 +959,9 @@ export const useSessionStore = defineStore('session', () => {
     redactTerms,
     preserveTerms,
     forceOcr,
+    outputLanguage,
+    outputLanguageOverride,
+    setOutputLanguage,
     customRules,
     advancedCustomized,
     setPolicyTransformation,

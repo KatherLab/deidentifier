@@ -10,11 +10,15 @@
           thin
           class="w-full"
           :percent="session.batchOverallPercent"
-          label="Gesamtfortschritt der Verarbeitung im Hintergrund"
+          :label="t('result.background_progress_label')"
         />
         <p class="text-xs text-content-subtle" aria-live="polite">
-          Verarbeitung im Hintergrund: {{ session.batchSettledCount }} von
-          {{ session.documents.length }} abgeschlossen
+          {{
+            t('result.background_progress', {
+              done: session.batchSettledCount,
+              total: session.documents.length,
+            })
+          }}
         </p>
       </div>
     </template>
@@ -36,7 +40,7 @@
           aria-live="polite"
         >
           <LoadingSpinner size="small" color="gray" inline label="" />
-          Wird neu berechnet …
+          {{ t('result.rerunning') }}
         </span>
         <!-- Export always acts on the anonymized result, regardless of the
              visible panels. -->
@@ -48,14 +52,14 @@
               :aria-expanded="exportOpen"
               @click="toggleExport()"
             >
-              Exportieren
+              {{ t('result.export.button') }}
               <ChevronDown class="h-4 w-4" aria-hidden="true" />
             </BaseButton>
             <div
               v-if="exportOpen"
               class="absolute right-0 top-full z-20 mt-1 w-56 rounded-card border border-default bg-surface p-1 shadow-lg"
               role="menu"
-              aria-label="Exportieren"
+              :aria-label="t('result.export.button')"
             >
               <button
                 type="button"
@@ -64,7 +68,7 @@
                 @click="runExport(copyAnonymized)"
               >
                 <Copy class="h-4 w-4 shrink-0 text-content-subtle" aria-hidden="true" />
-                Kopieren
+                {{ t('result.export.copy') }}
               </button>
               <button
                 type="button"
@@ -73,7 +77,7 @@
                 @click="runExport(downloadAnonymized)"
               >
                 <Download class="h-4 w-4 shrink-0 text-content-subtle" aria-hidden="true" />
-                Als Textdatei (.txt)
+                {{ t('result.export.txt') }}
               </button>
               <button
                 v-if="canExportPdf"
@@ -83,7 +87,7 @@
                 @click="runExport(downloadRedactedPdf)"
               >
                 <FileDown class="h-4 w-4 shrink-0 text-content-subtle" aria-hidden="true" />
-                Als PDF
+                {{ t('result.export.pdf') }}
               </button>
               <button
                 v-if="canExportAll"
@@ -93,7 +97,7 @@
                 @click="runExport(downloadAllDocuments)"
               >
                 <Archive class="h-4 w-4 shrink-0 text-content-subtle" aria-hidden="true" />
-                Alle Dokumente (.zip)
+                {{ t('result.export.zip') }}
               </button>
               <!-- Export option (does not close the menu): keep original
                    filenames instead of "anonymisiert.*". -->
@@ -108,9 +112,9 @@
                   @change="settings.setKeepFilenames(($event.target as HTMLInputElement).checked)"
                 />
                 <span class="text-sm text-content">
-                  Dateinamen beibehalten
+                  {{ t('result.export.keep_filenames') }}
                   <span class="block text-xs text-content-subtle">
-                    Vorsicht: Dateinamen können personenbezogene Daten enthalten.
+                    {{ t('result.export.keep_filenames_hint') }}
                   </span>
                 </span>
               </label>
@@ -132,7 +136,7 @@
         <div
           class="inline-flex flex-wrap gap-1 rounded-card bg-surface-muted p-1"
           role="group"
-          aria-label="Ansichten wählen"
+          :aria-label="t('result.panels.switcher_label')"
         >
           <button
             v-for="panel in switcherPanels"
@@ -164,17 +168,17 @@
              sources the extracted source text. -->
         <section v-if="isVisible('original')" :class="panelCardClass">
           <header :class="panelHeaderClass">
-            <h3 class="text-sm font-semibold text-content">Original</h3>
+            <h3 class="text-sm font-semibold text-content">{{ t('result.panels.original') }}</h3>
           </header>
           <template v-if="isPdfSource">
             <iframe
               v-if="session.originalPreviewUrl"
               :src="session.originalPreviewUrl"
-              title="Originaldokument"
+              :title="t('result.original.iframe_title')"
               class="min-h-0 w-full flex-1"
             ></iframe>
             <p v-else class="p-6 text-sm text-content-subtle">
-              Die Originaldatei ist nicht mehr verfügbar.
+              {{ t('result.original.unavailable') }}
             </p>
           </template>
           <!-- v-text: the panel is whitespace-pre-wrap, so template indentation
@@ -189,7 +193,7 @@
         <!-- Quellprüfung: interactive source review (primary view). -->
         <section v-if="isVisible('source')" :class="panelCardClass">
           <header :class="panelHeaderClass">
-            <h3 class="text-sm font-semibold text-content">Quellprüfung</h3>
+            <h3 class="text-sm font-semibold text-content">{{ t('result.panels.source') }}</h3>
           </header>
           <EntityHighlights
             class="min-h-0 flex-1"
@@ -208,8 +212,7 @@
             v-else
             class="shrink-0 border-t border-default px-4 py-2.5 text-xs text-content-subtle"
           >
-            Klicken Sie auf eine markierte Stelle für Details – oder markieren Sie beliebigen Text,
-            um ihn manuell zu schwärzen.
+            {{ t('result.source.hint') }}
           </p>
         </section>
 
@@ -220,7 +223,7 @@
         <section v-if="isVisible('pdf')" :class="panelCardClass">
           <header class="shrink-0 border-b border-default bg-surface-muted px-4 py-2.5">
             <div class="flex items-center justify-between gap-2">
-              <h3 class="text-sm font-semibold text-content">Geschwärztes PDF</h3>
+              <h3 class="text-sm font-semibold text-content">{{ t('result.panels.pdf') }}</h3>
               <button
                 v-if="session.sourceFile !== null"
                 type="button"
@@ -234,14 +237,14 @@
                 @click="areaEditing = !areaEditing"
               >
                 <EyeOff class="h-3.5 w-3.5" aria-hidden="true" />
-                Bereiche schwärzen
+                {{ t('result.pdf.areas') }}
                 <span v-if="session.redactAreas.length > 0">
                   ({{ session.redactAreas.length }})
                 </span>
               </button>
             </div>
             <p v-if="result.source_type === 'pdf-ocr'" class="text-xs text-content-subtle">
-              Rekonstruiertes Dokument – Layout angenähert, Originalpixel werden verworfen.
+              {{ t('result.pdf.reconstructed') }}
             </p>
           </header>
           <PdfAreaEditor v-if="areaEditing" class="min-h-0 flex-1" @done="areaEditing = false" />
@@ -251,29 +254,31 @@
             aria-live="polite"
           >
             <LoadingSpinner size="small" color="gray" inline label="" />
-            PDF wird erzeugt …
+            {{ t('result.pdf.generating') }}
           </div>
           <div v-else-if="session.pdfPreviewError" class="space-y-3 p-4">
             <p class="rounded-card px-3 py-2 text-sm" :class="getBannerClass('red')">
               {{ session.pdfPreviewError }}
             </p>
             <BaseButton size="sm" variant="secondary" @click="session.refreshPdfPreview()">
-              Erneut versuchen
+              {{ t('common.retry') }}
             </BaseButton>
           </div>
           <iframe
             v-else-if="session.pdfPreviewUrl"
             :src="session.pdfPreviewUrl"
-            title="Geschwärztes PDF (Vorschau)"
+            :title="t('result.pdf.preview_title')"
             class="min-h-0 w-full flex-1"
           ></iframe>
-          <p v-else class="p-6 text-sm text-content-subtle">Keine Vorschau verfügbar.</p>
+          <p v-else class="p-6 text-sm text-content-subtle">{{ t('result.pdf.no_preview') }}</p>
         </section>
 
         <!-- Anonymized output as plain selectable text. -->
         <section v-if="isVisible('anonymized')" :class="panelCardClass">
           <header :class="panelHeaderClass">
-            <h3 class="text-sm font-semibold text-content">Anonymisierter Text</h3>
+            <h3 class="text-sm font-semibold text-content">
+              {{ t('result.panels.anonymized') }}
+            </h3>
           </header>
           <div
             class="min-h-0 flex-1 overflow-y-auto p-6 font-sans text-[15px] leading-relaxed whitespace-pre-wrap break-words text-content"
@@ -285,7 +290,7 @@
       <!-- Entity summary: one quiet line; each type steps through its finds. -->
       <section
         class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm"
-        aria-label="Erkannte Entitäten"
+        :aria-label="t('result.entities.section_label')"
       >
         <template v-if="session.entityCounts.length > 0">
           <span class="text-content-muted">{{ entitySummaryIntro }}</span>
@@ -294,14 +299,14 @@
             <button
               type="button"
               class="rounded-sm font-medium text-content transition-colors hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              :title="`Nächste Stelle vom Typ ${entityTypeLabel(item.type)} anzeigen`"
+              :title="t('result.entities.cycle_title', { type: entityTypeLabel(item.type) })"
               @click="cycleEntityType(item.type)"
             >
               {{ entityTypeLabel(item.type) }} {{ item.count }}
             </button>
           </template>
         </template>
-        <span v-else class="text-content-subtle">Keine personenbezogenen Stellen erkannt.</span>
+        <span v-else class="text-content-subtle">{{ t('result.entities.none') }}</span>
       </section>
 
       <!-- Warnings (collapsed when the validation passed). Keyed per document
@@ -332,10 +337,10 @@
           <FileX class="mx-auto h-10 w-10 text-red-600 dark:text-red-400" aria-hidden="true" />
           <p class="text-sm font-medium text-content break-all">{{ doc.name }}</p>
           <p class="rounded-card px-3 py-2 text-sm" :class="getBannerClass('red')" role="alert">
-            {{ doc.error ?? 'Anonymisierung fehlgeschlagen.' }}
+            {{ doc.error ?? t('result.failed') }}
           </p>
           <BaseButton variant="secondary" @click="session.retryDocument(doc.id)">
-            Erneut versuchen
+            {{ t('common.retry') }}
           </BaseButton>
         </div>
       </div>
@@ -361,6 +366,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { strToU8, zipSync } from 'fflate'
 import {
   AlertTriangle,
@@ -394,8 +400,9 @@ import { anonymizeApi } from '@/services/anonymizeApi'
 import { extractPdfExportErrorMessage } from '@/utils/errors'
 import { getBannerClass } from '@/utils/statusStyles'
 import { entityTypeLabel, sourceTypeLabel } from '@/utils/entityLabels'
-import type { EntityType } from '@/types/anonymizer'
+import type { EntityType, OutputLanguage } from '@/types/anonymizer'
 
+const { t } = useI18n()
 const session = useSessionStore()
 const settings = useSettingsStore()
 const toast = useToast()
@@ -435,13 +442,13 @@ const statusHeadline = computed(() => {
   if (!validation) return ''
   switch (validation.status) {
     case 'PASS':
-      return 'Geprüft – keine Auffälligkeiten'
+      return t('result.status.pass')
     case 'REVIEW_REQUIRED': {
       const count = validation.warnings.length
-      return count === 1 ? 'Prüfbedarf – 1 Hinweis' : `Prüfbedarf – ${count} Hinweise`
+      return t('result.status.review', { count }, count)
     }
     default:
-      return 'Prüfung fehlgeschlagen'
+      return t('result.status.fail')
   }
 })
 
@@ -472,7 +479,7 @@ const metaLine = computed<string | null>(() => {
   const parts: string[] = []
   if (settings.expertMode && result.value) {
     parts.push(sourceTypeLabel(result.value.source_type))
-    parts.push(`Verarbeitet in ${Math.round(result.value.timing_ms.total)} ms`)
+    parts.push(t('result.processed_in', { ms: Math.round(result.value.timing_ms.total) }))
   }
   if (batchSummary.value) parts.push(batchSummary.value)
   return parts.length > 0 ? parts.join(' · ') : null
@@ -494,11 +501,11 @@ function runExport(action: () => unknown): void {
 const availablePanels = computed<{ id: ResultPanelId; label: string }[]>(() => {
   // Chip order mirrors the panel reading order: Original → Quellprüfung → Ergebnis.
   const panels: { id: ResultPanelId; label: string }[] = [
-    { id: 'original', label: 'Original' },
-    { id: 'source', label: 'Quellprüfung' },
+    { id: 'original', label: t('result.panels.original') },
+    { id: 'source', label: t('result.panels.source') },
   ]
-  if (isPdfSource.value) panels.push({ id: 'pdf', label: 'Geschwärztes PDF' })
-  panels.push({ id: 'anonymized', label: 'Anonymisierter Text' })
+  if (isPdfSource.value) panels.push({ id: 'pdf', label: t('result.panels.pdf') })
+  panels.push({ id: 'anonymized', label: t('result.panels.anonymized') })
   return panels
 })
 
@@ -507,9 +514,9 @@ const simpleResultPanel = computed<ResultPanelId>(() => (isPdfSource.value ? 'pd
 
 /** Default mode consolidates pdf+anonymized into one "Ergebnis" chip. */
 const simplePanels = computed<{ id: ResultPanelId; label: string }[]>(() => [
-  { id: 'original', label: 'Original' },
-  { id: 'source', label: 'Prüfung' },
-  { id: simpleResultPanel.value, label: 'Ergebnis' },
+  { id: 'original', label: t('result.panels.original') },
+  { id: 'source', label: t('result.panels.source_simple') },
+  { id: simpleResultPanel.value, label: t('result.panels.result') },
 ])
 
 const switcherPanels = computed(() =>
@@ -579,7 +586,7 @@ function showSourcePanel(): void {
 
 const entitySummaryIntro = computed(() => {
   const count = result.value?.entities.length ?? 0
-  return count === 1 ? '1 Stelle erkannt:' : `${count} Stellen erkannt:`
+  return t('result.entities.intro', { count }, count)
 })
 
 function cycleEntityType(type: EntityType): void {
@@ -608,14 +615,14 @@ const batchSummary = computed<string | null>(() => {
   const review = docs.filter(
     (entry) => entry.status === 'done' && entry.result?.validation.status !== 'PASS',
   ).length
-  let summary = `${done} von ${docs.length} Dokumenten verarbeitet`
-  if (review > 0) summary += ` · ${review} mit Prüfbedarf`
-  if (failed > 0) summary += ` · ${failed} fehlgeschlagen`
+  let summary = t('result.batch_summary', { done, total: docs.length })
+  if (review > 0) summary += ` · ${t('result.batch_review', { count: review })}`
+  if (failed > 0) summary += ` · ${t('result.batch_failed', { count: failed })}`
   return summary
 })
 
 const resetLabel = computed(() =>
-  session.documents.length > 1 ? 'Neue Dokumente' : 'Neues Dokument',
+  session.documents.length > 1 ? t('result.reset_many') : t('result.reset_one'),
 )
 
 // ---------------------------------------------------------------------------
@@ -626,11 +633,28 @@ async function copyAnonymized() {
   if (!result.value) return
   try {
     await navigator.clipboard.writeText(result.value.anonymized_text)
-    toast.success('Anonymisierter Text in die Zwischenablage kopiert.')
+    toast.success(t('toast.copy_success'))
   } catch {
-    toast.error('Kopieren fehlgeschlagen. Bitte markieren und manuell kopieren.')
+    toast.error(t('toast.copy_failed'))
   }
 }
+
+/**
+ * A word for a file name, in the language the DOCUMENT was written in — not
+ * the interface language. An exported file belongs to its document: a French
+ * run stays "anonymise.txt" even when the reviewer has switched the UI to
+ * English. The catalog is guaranteed to be loaded, because a language other
+ * than the interface's can only be chosen in the policy editor, which preloads
+ * all of them.
+ */
+function inDocumentLanguage(key: string, language: OutputLanguage): string {
+  return t(key, {}, { locale: language })
+}
+
+/** The language the ACTIVE document was written in. */
+const documentLanguage = computed<OutputLanguage>(
+  () => result.value?.output_language ?? doc.value?.outputLanguage ?? 'de',
+)
 
 /** Base name derived from the ORIGINAL upload (pasted text has none). */
 const exportBase = computed<string | null>(() => {
@@ -644,7 +668,7 @@ const exportBase = computed<string | null>(() => {
 function exportFilename(extension: 'txt' | 'pdf'): string {
   return settings.keepFilenames && exportBase.value !== null
     ? `${exportBase.value}.${extension}`
-    : `anonymisiert.${extension}`
+    : `${inDocumentLanguage('result.export.filename', documentLanguage.value)}.${extension}`
 }
 
 function downloadAnonymized() {
@@ -688,6 +712,11 @@ async function downloadRedactedPdf() {
           entry.policy,
           entry.rules,
           entry.redactAreas,
+          // Both matter only on a backend cache miss, where the document is
+          // re-extracted and re-transformed: without them the fallback would
+          // skip the forced OCR and write German placeholders.
+          entry.forceOcr,
+          entry.outputLanguage,
         ),
       exportFilename('pdf'),
     )
@@ -731,11 +760,17 @@ async function downloadAllDocuments() {
       return candidate
     }
     // ZIP entries always carry the base name (needed to tell 100 files
-    // apart); the opt-in only drops the ".anonymisiert" infix.
-    const infix = settings.keepFilenames ? '' : '.anonymisiert'
+    // apart); the opt-in only drops the ".anonymisiert" infix. The whole batch
+    // shares one output language (captured at submit), so one lookup does.
+    const language = documentLanguage.value
+    const infix = settings.keepFilenames
+      ? ''
+      : `.${inDocumentLanguage('result.export.filename', language)}`
     for (const entry of doneDocuments.value) {
       if (!entry.result) continue
-      const base = entry.name.replace(/\.[^.]+$/, '') || 'dokument'
+      const base =
+        entry.name.replace(/\.[^.]+$/, '') ||
+        inDocumentLanguage('result.export.document_fallback', language)
       files[uniqueName(`${base}${infix}.txt`)] = strToU8(entry.result.anonymized_text)
       if (entry.pdfPreviewBlob !== null && !entry.pdfPreviewLoading) {
         files[uniqueName(`${base}${infix}.pdf`)] = new Uint8Array(
@@ -744,10 +779,14 @@ async function downloadAllDocuments() {
       }
     }
     const zipped = zipSync(files)
-    downloadBlob(new Blob([zipped]), 'anonymisiert.zip', 'application/zip')
-    toast.success(`${Object.keys(files).length} Dateien als ZIP heruntergeladen.`)
+    downloadBlob(
+      new Blob([zipped]),
+      `${inDocumentLanguage('result.export.filename', language)}.zip`,
+      'application/zip',
+    )
+    toast.success(t('toast.zip_downloaded', { count: Object.keys(files).length }))
   } catch {
-    toast.error('Das ZIP-Archiv konnte nicht erstellt werden.')
+    toast.error(t('toast.zip_failed'))
   } finally {
     exportingAll.value = false
   }

@@ -7,14 +7,10 @@
       class="shrink-0 space-y-1.5 border-b border-default bg-surface-muted px-4 py-2 text-xs text-content-muted"
     >
       <div class="flex items-start justify-between gap-3">
-        <p>
-          Angezeigt werden die Originalseiten. Ziehen Sie ein Rechteck über einen Bereich
-          (z.&nbsp;B. Unterschrift, Logo oder Stempel), um ihn zusätzlich zu schwärzen – Klick auf
-          einen Bereich entfernt ihn wieder. Jede Änderung wird sofort übernommen.
-        </p>
+        <p>{{ t('areas.hint') }}</p>
         <BaseButton size="sm" class="shrink-0" @click="emit('done')">
           <Check class="h-3.5 w-3.5" aria-hidden="true" />
-          Fertig
+          {{ t('common.done') }}
         </BaseButton>
       </div>
       <div
@@ -23,10 +19,10 @@
       >
         <BaseButton v-if="imageBoxCount > 0" size="sm" variant="secondary" @click="markAllImages">
           <ImageOff class="h-3.5 w-3.5" aria-hidden="true" />
-          Alle Bilder schwärzen ({{ imageBoxCount }})
+          {{ t('areas.mark_all_images', { count: imageBoxCount }) }}
         </BaseButton>
         <span v-if="session.pdfPagesTruncated" class="text-amber-700 dark:text-amber-300">
-          Nur die ersten {{ session.pdfPages?.length }} Seiten werden angezeigt.
+          {{ t('areas.truncated', { count: session.pdfPages?.length ?? 0 }) }}
         </span>
       </div>
     </div>
@@ -37,14 +33,14 @@
       aria-live="polite"
     >
       <LoadingSpinner size="small" color="gray" inline label="" />
-      Seiten werden gerendert …
+      {{ t('areas.rendering') }}
     </div>
     <div v-else-if="session.pdfPagesError" class="space-y-3 p-4">
       <p class="rounded-card px-3 py-2 text-sm" :class="getBannerClass('red')">
         {{ session.pdfPagesError }}
       </p>
       <BaseButton size="sm" variant="secondary" @click="session.loadPdfPages()">
-        Erneut versuchen
+        {{ t('common.retry') }}
       </BaseButton>
     </div>
 
@@ -60,7 +56,12 @@
         @pointerup="onPointerUp($event, page.page)"
         @pointercancel="drawing = null"
       >
-        <img :src="page.image" :alt="`Seite ${page.page}`" class="block w-full" draggable="false" />
+        <img
+          :src="page.image"
+          :alt="t('areas.page_alt', { page: page.page })"
+          class="block w-full"
+          draggable="false"
+        />
 
         <!-- Existing areas: click to remove. -->
         <button
@@ -69,8 +70,8 @@
           type="button"
           class="group absolute bg-black/85 transition-colors hover:bg-black/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :style="rectStyle(area)"
-          :aria-label="`Geschwärzten Bereich auf Seite ${page.page} entfernen`"
-          title="Bereich entfernen"
+          :aria-label="t('areas.remove_label', { page: page.page })"
+          :title="t('areas.remove_title')"
           @pointerdown.stop
           @click="session.removeRedactArea(area.index)"
         >
@@ -93,6 +94,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Check, ImageOff, X } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
@@ -104,6 +106,7 @@ const emit = defineEmits<{
   (e: 'done'): void
 }>()
 
+const { t } = useI18n()
 const session = useSessionStore()
 const toast = useToast()
 
@@ -204,11 +207,9 @@ function onPointerUp(event: PointerEvent, page: number): void {
 function markAllImages(): void {
   const added = session.addImageAreas()
   if (added === 0) {
-    toast.info('Alle erkannten Bilder sind bereits geschwärzt.')
+    toast.info(t('toast.images_already_marked'))
   } else {
-    toast.success(
-      added === 1 ? '1 Bild zum Schwärzen markiert.' : `${added} Bilder zum Schwärzen markiert.`,
-    )
+    toast.success(t('toast.images_marked', { count: added }, added))
   }
 }
 </script>

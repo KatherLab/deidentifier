@@ -23,6 +23,7 @@ import type {
   AnonymizeResponse,
   AnonymizeTextRequest,
   CustomRules,
+  OutputLanguage,
   PolicyMap,
   StreamProgressEvent,
 } from '@/types/anonymizer'
@@ -157,11 +158,13 @@ export function anonymizeTextStream(
   text: string,
   policy: PolicyMap | null,
   rules: CustomRules | null,
+  outputLanguage: OutputLanguage | null,
   onProgress: OnStreamProgress,
   signal?: AbortSignal,
 ): Promise<AnonymizeResponse> {
   const body: AnonymizeTextRequest = { text }
   if (hasPolicyEntries(policy)) body.policy = policy
+  if (outputLanguage) body.output_language = outputLanguage
   if (rules) {
     if (rules.customInstruction.length > 0) body.custom_instruction = rules.customInstruction
     if (rules.redactTerms.length > 0) body.redact_terms = rules.redactTerms
@@ -181,6 +184,7 @@ export function anonymizeFileStream(
   policy: PolicyMap | null,
   rules: CustomRules | null,
   forceOcr: boolean,
+  outputLanguage: OutputLanguage | null,
   onProgress: OnStreamProgress,
   signal?: AbortSignal,
 ): Promise<AnonymizeResponse> {
@@ -188,6 +192,7 @@ export function anonymizeFileStream(
   formData.append('file', file)
   if (hasPolicyEntries(policy)) formData.append('policy', JSON.stringify(policy))
   appendCustomRules(formData, rules)
+  if (outputLanguage) formData.append('output_language', outputLanguage)
   if (forceOcr) formData.append('force_ocr', 'true')
   // No explicit headers — the browser sets the multipart boundary itself.
   return streamAnonymize(formData, undefined, onProgress, signal)

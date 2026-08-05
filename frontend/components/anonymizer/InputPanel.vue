@@ -24,7 +24,7 @@
       "
       role="button"
       tabindex="0"
-      aria-label="Dateien auswählen oder hierher ziehen"
+      :aria-label="t('input.dropzone_label')"
       @click="openFilePicker"
       @keydown.enter.prevent="openFilePicker"
       @keydown.space.prevent="openFilePicker"
@@ -43,12 +43,8 @@
       <div class="flex flex-col items-center gap-2">
         <UploadCloud class="h-10 w-10 text-content-subtle" aria-hidden="true" />
         <template v-if="selectedFiles.length === 0">
-          <p class="text-sm font-medium text-content">
-            Dateien hierher ziehen oder klicken, um auszuwählen
-          </p>
-          <p class="text-xs text-content-subtle">
-            PDF, DOCX oder TXT – mehrere Dateien werden parallel verarbeitet
-          </p>
+          <p class="text-sm font-medium text-content">{{ t('input.dropzone_prompt') }}</p>
+          <p class="text-xs text-content-subtle">{{ t('input.dropzone_hint') }}</p>
         </template>
         <template v-else>
           <ul class="w-full max-w-md space-y-1 text-left">
@@ -67,18 +63,16 @@
               <button
                 type="button"
                 class="shrink-0 rounded-card p-0.5 text-content-subtle transition-colors hover:text-content"
-                :aria-label="`${file.name} entfernen`"
+                :aria-label="t('input.remove_file', { name: file.name })"
                 @click.stop="removeFile(index)"
               >
                 <X class="h-4 w-4" aria-hidden="true" />
               </button>
             </li>
           </ul>
-          <p class="text-xs text-content-subtle">
-            Weitere Dateien hierher ziehen oder klicken, um sie hinzuzufügen
-          </p>
+          <p class="text-xs text-content-subtle">{{ t('input.dropzone_add_more') }}</p>
           <BaseButton variant="link" tone="gray" @click.stop="clearFiles">
-            Alle entfernen
+            {{ t('input.clear_files') }}
           </BaseButton>
         </template>
       </div>
@@ -87,24 +81,25 @@
     <!-- Divider -->
     <div class="flex items-center gap-3" aria-hidden="true">
       <div class="h-px flex-1 bg-(--color-default-border)"></div>
-      <span class="text-xs uppercase tracking-wide text-content-subtle">oder Text einfügen</span>
+      <span class="text-xs uppercase tracking-wide text-content-subtle">{{
+        t('input.divider')
+      }}</span>
       <div class="h-px flex-1 bg-(--color-default-border)"></div>
     </div>
 
     <!-- Paste textarea -->
     <div>
-      <label for="paste-text" class="sr-only">Text einfügen</label>
+      <label for="paste-text" class="sr-only">{{ t('input.paste_label') }}</label>
       <textarea
         id="paste-text"
         v-model="pastedText"
         rows="10"
         :disabled="selectedFiles.length > 0 || loading"
-        placeholder="Text hier einfügen …"
+        :placeholder="t('input.paste_placeholder')"
         class="w-full rounded-card border border-strong bg-surface p-3 text-sm text-content placeholder:text-content-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
       ></textarea>
       <p v-if="selectedFiles.length > 0" class="mt-1 text-xs text-content-subtle">
-        Es werden die ausgewählten Dateien verarbeitet. Entfernen Sie die Dateien, um stattdessen
-        eingefügten Text zu anonymisieren.
+        {{ t('input.files_take_precedence') }}
       </p>
     </div>
 
@@ -124,8 +119,12 @@
           :class="advancedOpen ? '' : '-rotate-90'"
           aria-hidden="true"
         />
-        Erweiterte Einstellungen
-        <StatusBadge v-if="session.advancedCustomized" label="angepasst" color="purple" />
+        {{ t('input.advanced') }}
+        <StatusBadge
+          v-if="session.advancedCustomized"
+          :label="t('input.advanced_customized')"
+          color="purple"
+        />
       </button>
       <div v-if="advancedOpen" id="advanced-settings" class="border-t border-default px-4 py-4">
         <PolicyEditor />
@@ -135,16 +134,14 @@
     <!-- Submit -->
     <div class="space-y-2">
       <BaseButton size="lg" :disabled="!canSubmit" @click="submit">{{ submitLabel }}</BaseButton>
-      <p class="text-xs text-content-subtle">
-        Dokumente werden lokal von dieser Installation verarbeitet. Das Ergebnis ist kein Nachweis
-        rechtssicherer Anonymisierung.
-      </p>
+      <p class="text-xs text-content-subtle">{{ t('input.disclaimer') }}</p>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown, FileText, UploadCloud, X } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -153,7 +150,9 @@ import PolicyEditor from '@/components/anonymizer/PolicyEditor.vue'
 import ProcessingCard from '@/components/anonymizer/ProcessingCard.vue'
 import { useSessionStore } from '@/stores/session'
 import { useToast } from '@/composables/useToast'
+import { formatDecimal } from '@/utils/format'
 
+const { t } = useI18n()
 const session = useSessionStore()
 const toast = useToast()
 
@@ -170,14 +169,14 @@ const canSubmit = computed(
 
 const submitLabel = computed(() =>
   selectedFiles.value.length > 1
-    ? `${selectedFiles.value.length} Dokumente anonymisieren`
-    : 'Anonymisieren',
+    ? t('input.submit_many', { count: selectedFiles.value.length })
+    : t('input.submit'),
 )
 
 function fileSizeLabel(size: number): string {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  if (size < 1024) return t('input.size_bytes', { size: formatDecimal(size) })
+  if (size < 1024 * 1024) return t('input.size_kb', { size: formatDecimal(size / 1024) })
+  return t('input.size_mb', { size: formatDecimal(size / (1024 * 1024)) })
 }
 
 function openFilePicker() {
@@ -194,7 +193,7 @@ function acceptFiles(files: Iterable<File>) {
       ACCEPTED_EXTENSIONS.some((extension) => name.endsWith(extension)) ||
       file.type === 'text/plain'
     if (!isAccepted) {
-      toast.error(`Dateityp nicht unterstützt: ${file.name}. Erlaubt sind .txt, .pdf und .docx.`)
+      toast.error(t('input.unsupported_file', { name: file.name }))
       continue
     }
     selectedFiles.value.push(file)

@@ -5,6 +5,7 @@ import type {
   AnonymizeResponse,
   AnonymizeTextRequest,
   CustomRules,
+  OutputLanguage,
   Override,
   PdfPagesResponse,
   PolicyMap,
@@ -48,10 +49,12 @@ export const anonymizeApi = {
     overrides?: Override[],
     policy?: PolicyMap | null,
     rules?: CustomRules | null,
+    outputLanguage?: OutputLanguage | null,
   ): Promise<AxiosResponse<AnonymizeResponse>> {
     const body: AnonymizeTextRequest = { text }
     if (overrides && overrides.length > 0) body.overrides = overrides
     if (hasPolicyEntries(policy)) body.policy = policy
+    if (outputLanguage) body.output_language = outputLanguage
     if (rules) {
       if (rules.customInstruction.length > 0) body.custom_instruction = rules.customInstruction
       if (rules.redactTerms.length > 0) body.redact_terms = rules.redactTerms
@@ -71,10 +74,14 @@ export const anonymizeApi = {
     overrides: Override[],
     policy?: PolicyMap | null,
     preserveTerms?: string[] | null,
+    outputLanguage?: OutputLanguage | null,
   ): Promise<AxiosResponse<AnonymizeResponse>> {
     const body: AnonymizeRerunRequest = { request_id: requestId, overrides }
     if (hasPolicyEntries(policy)) body.policy = policy
     if (preserveTerms && preserveTerms.length > 0) body.preserve_terms = preserveTerms
+    // Re-sent so an adjusted document keeps the placeholders it already shows
+    // (the backend also remembers the run's language for cached re-runs).
+    if (outputLanguage) body.output_language = outputLanguage
     return api.post<AnonymizeResponse>('/anonymize', body)
   },
 
@@ -84,11 +91,13 @@ export const anonymizeApi = {
     policy?: PolicyMap | null,
     rules?: CustomRules | null,
     forceOcr?: boolean,
+    outputLanguage?: OutputLanguage | null,
   ): Promise<AxiosResponse<AnonymizeResponse>> {
     const formData = new FormData()
     formData.append('file', file)
     if (hasPolicyEntries(policy)) formData.append('policy', JSON.stringify(policy))
     appendCustomRules(formData, rules)
+    if (outputLanguage) formData.append('output_language', outputLanguage)
     if (forceOcr) formData.append('force_ocr', 'true')
     return api.post<AnonymizeResponse>('/anonymize', formData)
   },
@@ -107,6 +116,7 @@ export const anonymizeApi = {
     rules?: CustomRules | null,
     areas?: RedactArea[] | null,
     forceOcr?: boolean,
+    outputLanguage?: OutputLanguage | null,
   ): Promise<AxiosResponse<Blob>> {
     const formData = new FormData()
     formData.append('file', file)
@@ -115,6 +125,7 @@ export const anonymizeApi = {
     if (hasPolicyEntries(policy)) formData.append('policy', JSON.stringify(policy))
     appendCustomRules(formData, rules)
     if (areas && areas.length > 0) formData.append('redact_areas', JSON.stringify(areas))
+    if (outputLanguage) formData.append('output_language', outputLanguage)
     // Re-sent so a cache-miss re-extraction matches the original forced-OCR run.
     if (forceOcr) formData.append('force_ocr', 'true')
     return api.post<Blob>('/export/pdf', formData, { responseType: 'blob' })
