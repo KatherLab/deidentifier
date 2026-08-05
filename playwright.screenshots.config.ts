@@ -28,6 +28,9 @@ export default defineConfig({
     deviceScaleFactor: 2,
     // Force light mode regardless of OS preference (the docs are light-only).
     colorScheme: 'light',
+    // The documented screens are German; the app otherwise follows the
+    // browser language (see frontend/i18n).
+    locale: 'de-DE',
     screenshot: 'off',
     trace: 'off',
     // Cap every action so one bad selector can't consume the whole budget.

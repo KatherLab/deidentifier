@@ -45,8 +45,12 @@ on top, in both paths.
 
 ## Filenames
 
-By default every export is named `anonymisiert.*`, and the ZIP numbers its
-entries.
+By default every export is named after the document's
+[output language](advanced-settings.md#sprache-des-ergebnisses-output-language)
+— `anonymisiert.*` for a German run, `anonymized.*`, `anonymise.*` or
+`anonimizado.*` for the others — and the ZIP numbers its entries. The file
+belongs to the document, so switching the interface language afterwards does
+not rename it.
 
 **Dateinamen beibehalten** in the export menu keeps the original filenames
 instead. Convenient for a large batch — and a real risk: filenames routinely

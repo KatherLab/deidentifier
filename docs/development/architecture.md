@@ -14,8 +14,8 @@ Browser ── nginx (SPA + /api proxy) ── FastAPI ── LLM / OCR endpoint
 ```
 
 Deliberately absent: database, migrations, task queue, object storage,
-authentication, WebSockets, i18n. The app is a stateless transformer of a
-document into an anonymized document.
+authentication, WebSockets. The app is a stateless transformer of a document
+into an anonymized document.
 
 Conventions come from the sibling project
 [llmaixweb](https://github.com/KatherLab/llmaixweb) — layout, config pattern,

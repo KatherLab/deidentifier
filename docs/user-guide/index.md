@@ -29,5 +29,17 @@ Two habits worth forming:
 
 ## Interface language
 
-The interface is German. This documentation uses the German labels for
-anything you click, so the two stay aligned.
+The interface speaks **German, English, French and Spanish**. It opens in the
+language your browser asks for and falls back to German; the globe button in
+the header switches it at any time, and that choice is remembered in this
+browser (a UI preference — no document content is ever stored).
+
+That covers everything the app *says* — including the notices and warnings the
+backend produces. What a run *writes into the document* is a separate setting:
+the placeholders (`[GEBURTSDATUM]` vs `[DATE_OF_BIRTH]`) follow the **output
+language** of that run, which defaults to the interface language and is fixed
+when you press Anonymisieren. See
+[Advanced settings](advanced-settings.md#sprache-des-ergebnisses-output-language).
+
+This documentation uses the German labels for anything you click, so the docs
+and the default interface stay aligned.

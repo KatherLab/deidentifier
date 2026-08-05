@@ -14,7 +14,7 @@ uv run pytest
 
 # Frontend
 npm run dev
-npm run check        # prettier + eslint + vue-tsc
+npm run check        # prettier + eslint + vue-tsc + i18n catalogs
 npm test             # vitest
 npm run build
 
@@ -41,10 +41,50 @@ uv run --only-group docs mkdocs serve
 5. **Frontend** — mirror the type in `frontend/types/anonymizer.ts`, add the
    call to a `services/*Api.ts` module, put state on the active document in
    `stores/session.ts`, build the UI from `components/common/`.
-6. **Tests** — unit for the logic, integration for the route, Vitest for a new
+6. **Text** — every user-visible string is a message key in
+   `frontend/locales/de.json` (the source catalog) plus the same key in
+   `en/fr/es.json`. See [Translations](#translations).
+7. **Tests** — unit for the logic, integration for the route, Vitest for a new
    frontend helper, e2e if the user-visible workflow changed.
-7. **Docs + changelog** — the affected page, plus `CHANGELOG.md` when it
+8. **Docs + changelog** — the affected page, plus `CHANGELOG.md` when it
    affects users or setup. Re-run `npm run screenshots` for a documented screen.
+
+## Translations
+
+The UI ships in German, English, French and Spanish. `frontend/locales/de.json`
+is the source of truth (the app is authored in German) and the fallback for
+every other locale; the rest are lazy-loaded when the user switches.
+
+```bash
+npm run i18n:check   # catalogs in sync with de.json, placeholders intact, messages compile
+npm run i18n:usage   # every literal $t('key') exists in de.json
+```
+
+Both run inside `npm run check`, so a forgotten translation fails the gate
+rather than rendering a raw key in production.
+
+Rules worth knowing:
+
+- **No literal strings in components.** Use `useI18n()` in a component and the
+  exported `t` from `@/i18n` in stores/utils.
+- **Backend messages are codes, not prose.** Warnings and notices carry a
+  stable `code` plus `params` (`backend/src/utils/notices.py`) which the
+  frontend renders from `warnings.codes.*`; the backend's English `message`
+  stays the fallback for a code the catalogs do not know yet. Adding a backend
+  warning therefore means adding its key to all four catalogs —
+  `backend/tests/unit/test_notices.py` enforces exactly that.
+- **Escape `@` and `|` in messages** (`"a{'@'}b.de"`): vue-i18n reads them as
+  linked-message and plural syntax. `npm run i18n:check` catches it.
+- **Numbers go through `Intl`.** Use `formatPercent`/`formatDecimal` from
+  `@/utils/format` — the separators and the space before `%` differ per
+  language.
+- **Two languages, not one.** The *interface* language is a UI preference; the
+  *output* language decides what a run writes into the document (placeholders
+  plus the AI re-check's notes). It is captured at submit and travels with
+  every request of that run, so a finished document never changes language.
+  Labels live in `PLACEHOLDERS` (`backend/src/utils/policy.py`), mirrored into
+  the catalogs under `placeholders.*` for the policy editor's previews and
+  pinned by `backend/tests/unit/test_placeholders.py`.
 
 ## Adding a detector
 

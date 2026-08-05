@@ -12,6 +12,12 @@ import { defineConfig, devices } from '@playwright/test'
 // to reset between runs.
 const CI = !!process.env.CI
 
+// Vite's port. Overridable because `reuseExistingServer` (below) will happily
+// adopt whatever already listens on 3000 — including an unrelated dev server —
+// and then test the wrong app. Only 3000 and 3100 are CORS-allowed in
+// backend/.env.e2e, so those are the two useful values.
+const PORT = process.env.E2E_PORT ?? '3000'
+
 export default defineConfig({
   testDir: './e2e/tests',
   timeout: 60_000,
@@ -22,7 +28,10 @@ export default defineConfig({
   retries: CI ? 1 : 0,
   reporter: CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: `http://localhost:${PORT}`,
+    // The UI language follows the browser (see frontend/i18n); pin German so
+    // the assertions below stay stable regardless of the runner's locale.
+    locale: 'de-DE',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -44,8 +53,8 @@ export default defineConfig({
       env: { ENV_PATH: 'backend/.env.e2e' },
     },
     {
-      command: 'npm run dev',
-      url: 'http://localhost:3000',
+      command: `npm run dev -- --port ${PORT} --strictPort`,
+      url: `http://localhost:${PORT}`,
       // The dev server is the same app regardless of run; reuse it locally for
       // faster iteration, but always start fresh in CI.
       reuseExistingServer: !CI,

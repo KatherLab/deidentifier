@@ -24,7 +24,19 @@ Both boot:
    `frontend/services/api.ts` talks to `http://localhost:8000` directly in dev
    mode, so both origins are allow-listed in `backend/.env.e2e`.
 
+   Locally the smoke suite *reuses* an existing server on its port
+   (`reuseExistingServer: !CI`), which means an unrelated dev server on 3000
+   gets tested instead — the symptom is every selector timing out at once. Run
+   `E2E_PORT=3100 npm run test:e2e` to take the other port (3000 and 3100 are
+   the CORS-allowed ones).
+
 Nothing is persisted server-side, so there is no state to reset between runs.
+
+Both configs pin the browser locale to `de-DE`. The UI language follows the
+browser (German, English, French, Spanish — see `frontend/i18n`), and every
+selector in these suites is written against the German labels; without the pin
+a runner in an English locale would fail on every one of them. The one
+exception is the language-switch spec, which switches to English on purpose.
 
 ## Adding fixtures
 

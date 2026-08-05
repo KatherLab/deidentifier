@@ -85,8 +85,10 @@ deidentifier/
 │   ├── App.vue, main.ts, index.html, vite.config.ts
 │   ├── components/            # common/ (primitives) + anonymizer/ (the product)
 │   ├── composables/, stores/, services/, types/, utils/
+│   ├── i18n/, locales/        # vue-i18n setup + de/en/fr/es catalogs
 │   └── nginx.conf, docker-entrypoint.d/
 ├── e2e/                       # Playwright: tests/ (smoke) + screenshots/ (docs)
+├── scripts/                   # i18n catalog checks, third-party-notices generator
 ├── docs/                      # MkDocs source (see "Documentation site")
 ├── mkdocs.yml
 ├── .github/workflows/         # CI — currently workflow_dispatch only, see below
@@ -101,7 +103,7 @@ deidentifier/
 
 Deliberately **absent** (and not to be reintroduced without a design change):
 `models/`, `db/`, `alembic/`, `celery/`, dynamic settings, auth/SSO, S3,
-WebSockets, i18n.
+WebSockets.
 
 ---
 
@@ -229,6 +231,10 @@ A separate pass over the *output*:
 `compute_status()`: any HIGH → `FAIL`, any WARNING → `REVIEW_REQUIRED`, INFO
 alone still `PASS`.
 
+Every warning it produces (and every extraction/override notice on
+`AnonymizeResponse.warnings`) carries a stable `code` + `params` so the UI can
+show it in the user's language — see "Internationalization".
+
 ### 7. The request cache (`utils/cache.py`)
 
 `request_cache` is an in-memory, TTL-bounded (15 min, 100 entries) map from
@@ -277,6 +283,8 @@ extensions `.txt/.docx/.pdf`. `Cache-Control: no-store` on content routes
 | `utils/leakage.py` | Output validation + `compute_status`. |
 | `utils/cache.py` | `request_cache` (TTL, bounded, in-memory). |
 | `utils/pdf_export.py` | Native-PDF true redaction, rasterized fallback, scanned-PDF reconstruction, page rendering. **Fails closed**: an export that cannot be verified is refused. |
+| `utils/notices.py` | Stable codes + English text for every non-fatal message (the translation contract). |
+| `utils/policy.py` | Default policy + the replacement placeholders of every output language. |
 | `utils/safe_logging.py` | `get_safe_logger()` — the only logger application code may use. |
 | `utils/concurrency.py` | Process-wide named semaphores (global LLM/OCR request budgets across concurrent documents). |
 | `services/docling_serve_client.py` | docling-serve HTTP client. |
@@ -363,18 +371,105 @@ than reaching for `api` directly.
 
 - **Accessibility: never color alone.** Every highlight, badge, and status
   carries a visible text label or an `aria-label` (see `utils/entityLabels.ts`).
-- **UI language is German.** Backend error `detail` strings are English and are
-  mapped to German in `utils/errors.ts` — add new cases there, not inline in
-  components.
+- **No literal user-visible strings.** Every one is a key in
+  `frontend/locales/de.json` (the source catalog) mirrored in `en/fr/es.json`
+  — see "Internationalization" below. Backend error `detail` strings are
+  English and are mapped to catalog keys in `utils/errors.ts`; add new cases
+  there, not inline in components.
 - `defineProps<Props>()` + `withDefaults(...)`, `defineEmits<{...}>()`,
   `defineModel<T>()`. One `Props` interface per component, importing shared
   types from `@/types`.
 - Dark mode is the Tailwind `class` strategy; `App.vue` owns the toggle and
   writes `localStorage['darkMode']`. Style variants with `dark:` utilities.
 - **Verification gate:** `npm run check` (prettier + eslint + `vue-tsc
-  --noEmit`, zero errors) **and** `npm run build` must pass before committing.
+  --noEmit` + the i18n catalog checks, zero errors) **and** `npm run build`
+  must pass before committing.
 
 ---
+
+## Internationalization
+
+The UI ships in **German, English, French and Spanish** (vue-i18n, llmaixweb's
+setup). One difference from llmaixweb: the **source-of-truth catalog is
+German** — the app is authored in German for German clinical documents — so
+`frontend/locales/de.json` is what every other catalog is checked against and
+the fallback for anything they miss.
+
+| Piece | Where |
+|---|---|
+| i18n instance, `SUPPORTED_LOCALES`, `detectInitialLocale()`, `t`, `hasMessage` | `frontend/i18n/index.ts` |
+| Lazy catalog loading, `applyLocale()`, `useLocale()` | `frontend/composables/useLocale.ts` |
+| Catalogs | `frontend/locales/{de,en,fr,es}.json` |
+| Switcher | `components/common/LanguageSwitcher.vue` (header) |
+| Backend message codes | `backend/src/utils/notices.py` |
+| Code → localized text | `frontend/utils/notices.ts` (`noticeMessage`) |
+| Catalog checks | `scripts/i18n-check.mjs`, `scripts/i18n-usage-check.mjs` |
+
+Locale resolution: an explicitly saved choice (`localStorage['locale']`, the
+only i18n state persisted — a UI preference, never document content) → the
+browser language → German. Only German is bundled eagerly; the rest are
+dynamic imports. `applyLocale()` also sets `<html lang>`.
+
+**Rules:**
+
+- Components use `useI18n()`; stores/utils import `t` from `@/i18n` (still
+  reactive, since it reads the locale ref).
+- `defineProps` defaults cannot call `t` (they are hoisted out of `setup()`) —
+  default to `undefined` and resolve with a computed, as `LoadingSpinner` and
+  `ChipsInput` do.
+- Numbers go through `formatPercent`/`formatDecimal` (`utils/format.ts`), never
+  string concatenation: `"75 %"` vs `"75%"` is a per-language difference.
+- Escape literal `@` and `|` in messages (`"a{'@'}b.de"`) — vue-i18n reads them
+  as linked-message and plural syntax. `i18n:check` catches it, but only after
+  it would have blanked a component subtree at render time.
+- Redaction placeholders are backend *output*, not UI text — they follow the
+  run's **output language**, not the interface language (see below).
+- Playwright pins `locale: 'de-DE'` in both configs, since the specs assert
+  German labels.
+
+### Output language ≠ interface language
+
+Two independent languages:
+
+| | Interface | Output |
+|---|---|---|
+| What | Buttons, labels, warnings — everything the app *says* | Placeholders, the LLM re-check's free-text notes and the export file name — everything that belongs to the *document* |
+| Chosen | Header switcher, any time; persisted | Advanced settings, **captured at submit** per document; memory only |
+| Default | Browser language → German | Follows the interface language until pinned |
+
+`OutputLanguage` (`schemas/entities.py`) travels with every request of a run —
+fresh runs, override re-runs and the PDF export — so an adjusted document keeps
+the placeholders the reviewer is already looking at. `CachedDetection` also
+remembers it, so a re-run that omits the field cannot silently change language.
+Switching the interface while reviewing never rewrites a finished document;
+`AnonymizeResponse.output_language` reports what a document was written in.
+
+Export names follow the same rule: `EXPORT_FILENAMES` (`utils/policy.py`) for
+the `Content-Disposition` the API serves, `result.export.filename` in the
+document's language for the downloads the UI names itself — a French run stays
+`anonymise.txt` even when the reviewer switched the interface to English.
+
+Labels live once per language in `PLACEHOLDERS` (`utils/policy.py`), mirrored
+into the catalogs under `placeholders.*` for the policy editor's previews
+(`utils/placeholders.ts`) and pinned by
+`backend/tests/unit/test_placeholders.py`. Tokens are uppercase,
+bracket-delimited and diacritic-free — "in square brackets" is what the leakage
+validator, the re-check prompt and the PDF export treat as an intentional
+replacement.
+
+### Backend messages are codes
+
+Warnings never travel as prose only. `Notice` and `ValidationWarning`
+(`schemas/entities.py`) carry `code` + `params` alongside the English
+`message`; the codes and their English text live in `utils/notices.py`
+(`notice()`, `validation_warning()`, `warning_from_notice()`). The frontend
+renders `warnings.codes.<code>` and falls back to `message` for a code it does
+not know — so a new backend warning degrades to English prose, never to a raw
+key. `backend/tests/unit/test_notices.py` asserts every code exists in all four
+catalogs, which is what keeps that fallback rare.
+
+Adding a warning: constant + `_MESSAGES` entry in `utils/notices.py`, then the
+same key under `warnings.codes` in all four catalogs.
 
 ## Evaluation harness
 
@@ -571,6 +666,9 @@ npm run test:e2e            # when you touched the API or the UI flow
 - **Policy drift.** `frontend/utils/policy.ts` mirrors backend
   `DEFAULT_POLICY`. Requests carry only deviations, so a drifted mirror sends
   *nothing* and displays a transformation the backend never applied.
+- **Catalog drift.** A key used but not in `de.json` renders as the raw key at
+  runtime — invisible to the type check. `npm run check` runs `i18n:usage` for
+  exactly this; don't skip it because "it's only a label".
 - **Silent degradation.** Never catch a `DetectorError` and continue with
   fewer detectors, and never let a failed export produce an unverified PDF.
   Failing loudly is the feature.
@@ -598,9 +696,12 @@ npm run test:e2e            # when you touched the API or the UI flow
 5. **Frontend** → mirror the type in `frontend/types/anonymizer.ts`, add the
    call to a `services/*Api.ts` module, put state on the active document in
    `stores/session.ts`, build the UI from `components/common/` primitives.
-6. **Tests** → a unit test for the logic, an integration test for the route,
+6. **Text** → message keys in `frontend/locales/de.json` **and** the other
+   three catalogs; a new backend warning also needs a code in
+   `utils/notices.py`.
+7. **Tests** → a unit test for the logic, an integration test for the route,
    a Vitest spec for a new frontend helper, and an e2e assertion if it changes
    the user-visible workflow.
-7. **Docs** → the affected page under `docs/`, plus a `CHANGELOG.md` entry if
+8. **Docs** → the affected page under `docs/`, plus a `CHANGELOG.md` entry if
    it affects users or setup. Re-run `npm run screenshots` if a documented
    screen changed.

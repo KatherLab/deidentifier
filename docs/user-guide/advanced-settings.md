@@ -70,6 +70,25 @@ you write. It cannot switch anything off.
 Because this changes detection, it takes effect on a full run — not on a
 correction in the review view.
 
+## Sprache des Ergebnisses (output language)
+
+The placeholders written into the anonymized document — and the language the AI
+re-check phrases its notes in — follow the language selected here. It defaults
+to *Wie die Oberfläche*, i.e. whatever the interface is set to.
+
+| Output language | Person | Date of birth | Entfernen |
+|---|---|---|---|
+| Deutsch | `[PERSON_1]` | `[GEBURTSDATUM]` | `[GESCHWÄRZT]` |
+| English | `[PERSON_1]` | `[DATE_OF_BIRTH]` | `[REDACTED]` |
+| Français | `[PERSONNE_1]` | `[DATE_DE_NAISSANCE]` | `[CAVIARDE]` |
+| Español | `[PERSONA_1]` | `[FECHA_DE_NACIMIENTO]` | `[OCULTADO]` |
+
+Like every other setting here it is **fixed when you press Anonymisieren**.
+Switching the interface language while reviewing translates the buttons and
+warnings around the document, but never rewrites the document itself:
+corrections, re-runs and the PDF export keep the placeholders you already see.
+To get a document in a different language, start a new run.
+
 ## Texterkennung (OCR)
 
 **OCR erzwingen** appears only when an OCR engine is configured. It skips the

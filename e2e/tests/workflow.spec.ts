@@ -132,6 +132,70 @@ test.describe('anonymization workflow', () => {
     await expect(page.getByText(/Dateityp nicht unterstützt/)).toBeVisible()
   })
 
+  test('switches the UI language and remembers the choice', async ({ page }) => {
+    await page.goto('/')
+
+    // The runner is pinned to de-DE (playwright.config.ts), so the app starts
+    // in German and an explicit switch takes it to English.
+    await expect(page.getByRole('button', { name: 'Anonymisieren' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Sprache wählen' }).click()
+    await page.getByRole('menuitemradio', { name: 'English' }).click()
+
+    await expect(page.getByRole('button', { name: 'Anonymize' })).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en')
+
+    // The choice is persisted (localStorage) and survives a reload.
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'Anonymize' })).toBeVisible()
+
+    // …and a full run stays in the chosen language, warnings included.
+    await page.getByLabel('Paste text').fill(DISCHARGE_LETTER)
+    await page.getByRole('button', { name: 'Anonymize' }).click()
+    await expect(page.getByRole('button', { name: 'Export' })).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByRole('heading', { name: 'Anonymized text' })).toBeVisible()
+  })
+
+  test('writes the placeholders in the chosen output language', async ({ page }) => {
+    await page.goto('/')
+
+    // The output language is an advanced setting, captured at submit.
+    await page.getByRole('button', { name: 'Erweiterte Einstellungen' }).click()
+    await page
+      .getByLabel('Sprache der Platzhalter')
+      .selectOption({ label: 'Français' })
+    await page.getByLabel('Text einfügen').fill(DISCHARGE_LETTER)
+    await page.getByRole('button', { name: 'Anonymisieren' }).click()
+    await waitForResult(page)
+
+    const output = page.getByRole('heading', { name: 'Anonymisierter Text' })
+    const outputPanel = page.locator('section', { has: output }).last()
+    await expect(outputPanel).toContainText('[PERSONNE_1]')
+    await expect(outputPanel).toContainText('[DATE_DE_NAISSANCE]')
+    await expect(outputPanel).not.toContainText('[PERSON_1]')
+
+    // Switching the INTERFACE language afterwards translates the chrome but
+    // must not rewrite the placeholders of the finished document.
+    await page.getByRole('button', { name: 'Sprache wählen' }).click()
+    await page.getByRole('menuitemradio', { name: 'English' }).click()
+    await expect(page.getByRole('button', { name: 'Export' })).toBeVisible()
+    const translatedPanel = page
+      .locator('section', { has: page.getByRole('heading', { name: 'Anonymized text' }) })
+      .last()
+    await expect(translatedPanel).toContainText('[PERSONNE_1]')
+
+    // The exported file belongs to the document, so its name follows the
+    // document's language too — "anonymise.txt", not the interface's
+    // "anonymized.txt".
+    await page.getByRole('button', { name: 'Export' }).click()
+    const download = page.waitForEvent('download')
+    await page
+      .getByRole('menu', { name: 'Export' })
+      .getByRole('menuitem', { name: 'As text file (.txt)' })
+      .click()
+    expect((await download).suggestedFilename()).toBe('anonymise.txt')
+  })
+
   test('reports the configured backends in the status header', async ({ page }) => {
     await page.goto('/')
 

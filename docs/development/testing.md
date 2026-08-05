@@ -9,6 +9,9 @@ Four suites, each answering a different question.
 | Playwright smoke | `npm run test:e2e` | Does the whole product path work? |
 | Screenshots | `npm run screenshots` | Do the documentation images still match the app? |
 
+`npm run check` additionally runs the i18n catalog checks (`i18n:check`,
+`i18n:usage`) — see [Translations](developer-guide.md#translations).
+
 ## Backend (pytest)
 
 ```bash
@@ -58,18 +61,21 @@ Specs sit next to the code they cover as `*.test.ts`, under `frontend/utils/`,
 bundle. Specs import from `vitest` explicitly — there are no ambient globals.
 
 Current coverage is the pure helpers (`textSegments`, `policy`, `errors`,
-`entityLabels`), the composables, the API-payload helpers, and the settings
-store. Component-level coverage is not set up.
+`entityLabels`, `notices`), the composables (including locale switching), the
+API-payload helpers, and the settings store. Component-level coverage is not
+set up.
 
-Two specs are load-bearing rather than routine: `policy.test.ts` pins the
-frontend mirror of the backend default policy, and `textSegments.test.ts`
-pins code-point-correct segmentation.
+Three specs are load-bearing rather than routine: `policy.test.ts` pins the
+frontend mirror of the backend default policy, `textSegments.test.ts` pins
+code-point-correct segmentation, and `notices.test.ts` pins the fallback from a
+backend warning code to the backend's own English text.
 
 ## End to end (Playwright)
 
 ```bash
 npm run test:e2e
-npm run test:e2e:ui     # interactive
+npm run test:e2e:ui           # interactive
+E2E_PORT=3100 npm run test:e2e  # when something else already owns port 3000
 ```
 
 The harness boots a deterministic fake OpenAI-compatible server
@@ -80,7 +86,13 @@ there is no state to reset between runs.
 
 `e2e/tests/workflow.spec.ts` covers: pasted text → detection → override →
 undo; the export menu and a text download; a PDF upload → redacted-PDF preview
-→ PDF export; rejection of an unsupported file; and the status header.
+→ PDF export; rejection of an unsupported file; the language switch (including
+that it survives a reload); the output language of the placeholders (and that
+switching the interface afterwards leaves them alone); and the status header.
+
+Both Playwright configs pin the browser locale to `de-DE`, because the app
+otherwise follows the browser language and the assertions are written against
+the German UI.
 
 Details, including how to teach the fake model about a new fixture, are in
 [`e2e/README.md`](https://github.com/KatherLab/deidentifier/blob/main/e2e/README.md).

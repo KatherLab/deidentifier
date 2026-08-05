@@ -34,7 +34,7 @@ look like one that passed.
 
 Twelve deliberately coarse types. Each has a default transformation:
 
-| Entity type | German label | Default | Result |
+| Entity type | Label (German UI) | Default | Result |
 |---|---|---|---|
 | `PERSON_NAME` | Person | `CONSISTENT_TAG` | `[PERSON_1]`, `[PERSON_2]`, … — the same person keeps the same number |
 | `DATE_OF_BIRTH` | Geburtsdatum | `TYPE_MASK` | `[GEBURTSDATUM]` |
@@ -52,6 +52,11 @@ Twelve deliberately coarse types. Each has a default transformation:
 The five transformations: `TYPE_MASK` (placeholder), `CONSISTENT_TAG`
 (numbered per distinct value), `GENERALIZE` (a date becomes its year),
 `REMOVE` (`[GESCHWÄRZT]`), `PRESERVE` (unchanged).
+
+The placeholders above are the German ones. They follow the run's **output
+language**, chosen in
+[advanced settings](../user-guide/advanced-settings.md#sprache-des-ergebnisses-output-language)
+and fixed at submit — an English run writes `[DATE_OF_BIRTH]` and `[REDACTED]`.
 
 !!! note "Preserved dates are a deliberate trade-off"
 

@@ -57,13 +57,17 @@ report.
 
 ## Common warnings
 
-| Warning | Usual cause | Response |
+Warnings appear in the interface language; the German wording is quoted here,
+with the stable code the backend sends alongside it (useful in a bug report,
+and the same in every language).
+
+| Warning (`code`) | Usual cause | Response |
 |---|---|---|
-| *A labelled field appears to be followed by non-redacted content* | A name the detectors missed, or a field the policy deliberately preserves. | Look at the spot. Redact it manually if it is an identifier. |
-| *A rule detector still finds a possible … in the output* | An identifier in an unusual format, or one you preserved on purpose. | Check whether the preservation was intended. |
-| *Redacted … content appears to remain in the output* | A genuine bug or a pathological overlap. | Do not use the output; report it with the document type (never the document). |
-| *The LLM re-check was not repeated for this adjusted result* | Informational — you corrected an entity after the audit ran. | Re-run from scratch if you want a fresh audit. |
-| *Text was produced by OCR; recognition errors are possible* | Informational, on every scanned document. | Bad OCR hides identifiers from detection. Skim the source panel for garbled passages. |
+| *Auf ein beschriftetes Feld folgt offenbar nicht geschwärzter Inhalt* (`labelled_field`) | A name the detectors missed, or a field the policy deliberately preserves. | Look at the spot. Redact it manually if it is an identifier. |
+| *Eine Regel erkennt im Ergebnis weiterhin eine mögliche Stelle vom Typ …* (`revalidation_hit`) | An identifier in an unusual format, or one you preserved on purpose. | Check whether the preservation was intended. |
+| *Geschwärzter Inhalt vom Typ … scheint im Ergebnis noch vorhanden zu sein* (`residual_identifier`) | A genuine bug or a pathological overlap. | Do not use the output; report it with the document type (never the document). |
+| *Die KI-Nachprüfung wurde für dieses angepasste Ergebnis nicht wiederholt* (`llm_recheck_skipped`) | Informational — you corrected an entity after the audit ran. | Re-run from scratch if you want a fresh audit. |
+| *Der Text stammt aus einer Texterkennung (OCR); Erkennungsfehler sind möglich* (`ocr_recognition_errors`) | Informational, on every scanned document. | Bad OCR hides identifiers from detection. Skim the source panel for garbled passages. |
 
 ## The limits of this check
 
