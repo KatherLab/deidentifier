@@ -33,7 +33,7 @@ Layout:
   `SYNTHETIC TEST DATA – NO REAL PATIENT INFORMATION`.
 
 `conftest.py` sets `ENV_PATH` to a nonexistent file **before importing any
-backend module**, so a developer's `backend/.env` — which may point at real
+backend module**, so a developer's `.env` — which may point at real
 endpoints — can never be picked up by a test run. Preserve that when you add
 fixtures.
 

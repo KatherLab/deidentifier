@@ -1,10 +1,11 @@
 # Base stack: backend + frontend. Usage:
 #   docker compose up -d --build          → http://localhost:8080
 #
-# Configuration comes from backend/.env (optional, see .env.example) plus the
-# environment below. APP_ENV defaults to production: docs are disabled and
-# unsafe configurations (mock detector, insecure content logging, enabled but
-# unconfigured llm detector) refuse to start.
+# Configuration comes from .env in the repo root (optional, see .env.example)
+# plus the environment below; backend/.env is still read as a fallback.
+# APP_ENV defaults to production: docs are disabled and unsafe configurations
+# (mock detector, insecure content logging, enabled but unconfigured llm
+# detector) refuse to start.
 #
 # Layered variants:
 #   compose.dev.yml            → source mount + hot reload
@@ -18,9 +19,11 @@ services:
     image: ghcr.io/katherlab/deidentifier-backend:${DEIDENTIFIER_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
-      - path: .env
-        required: false
+      # Later files win: .env in the repo root is the canonical location,
+      # backend/.env the legacy fallback.
       - path: backend/.env
+        required: false
+      - path: .env
         required: false
     environment:
       - APP_ENV=${APP_ENV:-production}

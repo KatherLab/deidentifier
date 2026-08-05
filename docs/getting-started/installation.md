@@ -1,8 +1,8 @@
 # Installation
 
 Two ways to run the app: **Docker Compose** (what you deploy) and a **local dev
-setup** (what you develop against). Both read configuration from
-`backend/.env`.
+setup** (what you develop against). Both read configuration from `.env` in the
+repo root.
 
 ## Docker Compose
 
@@ -12,7 +12,7 @@ unless you run the OCR sidecar.
 ```bash
 git clone https://github.com/KatherLab/deidentifier.git
 cd deidentifier
-cp .env.example backend/.env    # then edit it — see Configuration
+cp .env.example .env    # then edit it — see Configuration
 docker compose up -d --build
 ```
 
@@ -59,7 +59,7 @@ Prerequisites: Python 3.13+, [uv](https://docs.astral.sh/uv/), Node.js 22+.
 ```bash
 uv sync
 npm install
-cp .env.example backend/.env
+cp .env.example .env
 ```
 
 Two terminals:
@@ -89,7 +89,7 @@ docker compose up -d --build
 
 There is no database and no migrations, so an upgrade is a rebuild. Check
 [`CHANGELOG.md`](https://github.com/KatherLab/deidentifier/blob/main/CHANGELOG.md)
-for configuration changes and compare your `backend/.env` against the current
+for configuration changes and compare your `.env` against the current
 `.env.example` — new variables always have safe defaults, but defaults change.
 
 In-flight results live in memory only: restarting the backend drops any cached

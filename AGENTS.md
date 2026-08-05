@@ -503,7 +503,7 @@ uv run pytest --cov=backend/src --cov-report=term-missing # with coverage
 ```
 
 `backend/tests/conftest.py` sets `ENV_PATH` to a nonexistent file **before any
-backend import**, so a developer's `backend/.env` (which may hold real
+backend import**, so a developer's `.env` (which may hold real
 endpoints) can never leak into a test run. Keep that invariant.
 
 - `tests/unit/` — recognizers, grounding (multiple occurrences, not-found,
@@ -629,9 +629,9 @@ docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d  # + GPU OCR si
 `APP_ENV` defaults to **production** in `compose.yml`: docs disabled, unsafe
 configurations refuse to start. The backend publishes **no port** (the
 frontend's nginx proxies `/api/` internally), runs **read-only with no
-volumes**, and both containers are non-root. Configuration is read from
-`backend/.env` at runtime and never baked into an image. Works with Docker or
-Podman.
+volumes**, and both containers are non-root. Configuration is read from `.env`
+in the repo root (`backend/.env` remains a fallback) at runtime and never baked
+into an image. Works with Docker or Podman.
 
 ---
 

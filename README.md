@@ -65,7 +65,7 @@ by step in the
 ## Quick start
 
 ```bash
-cp .env.example backend/.env     # then edit — every variable is documented there
+cp .env.example .env             # then edit — every variable is documented there
 docker compose up -d --build     # → http://localhost:8080
 ```
 

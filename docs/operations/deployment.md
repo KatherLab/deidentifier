@@ -41,17 +41,16 @@ enumerate. That is only true as long as the proxy is actually in front of it.
 
 ## Configuration
 
-Read from `backend/.env` at runtime, never baked into an image:
+Read from `.env` in the repo root at runtime, never baked into an image:
 
 ```bash
-cp .env.example backend/.env
-$EDITOR backend/.env
+cp .env.example .env
+$EDITOR .env
 docker compose up -d
 ```
 
-Both `.env` (repo root) and `backend/.env` are loaded if present, with the
-container environment taking precedence. See
-[Configuration](configuration.md).
+`backend/.env` is still read as a fallback, with `.env` and the container
+environment taking precedence. See [Configuration](configuration.md).
 
 ## Layered compose files
 
@@ -88,11 +87,11 @@ docker compose up -d --build
 ```
 
 No database, no migrations. Check `CHANGELOG.md` for configuration changes and
-diff your `backend/.env` against `.env.example`. Restarting drops in-flight
+diff your `.env` against `.env.example`. Restarting drops in-flight
 results: users with an open result see a "please re-run" message.
 
 ## Backup
 
 There is nothing to back up except your configuration — that is the design.
-Keep `backend/.env` in your usual secret store; everything else is in the
+Keep your `.env` in your usual secret store; everything else is in the
 repository.

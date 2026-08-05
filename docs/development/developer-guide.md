@@ -141,7 +141,7 @@ in test output, and — via the screenshot harness — in the public docs site.
 ## Configuration in tests
 
 `backend/tests/conftest.py` sets `ENV_PATH` to a nonexistent file **before any
-backend import**, so a developer's `backend/.env` can never leak into a test
+backend import**, so a developer's `.env` can never leak into a test
 run. Keep that invariant when you add fixtures. The Playwright harness does the
 same with an explicit `ENV_PATH=backend/.env.e2e`.
 

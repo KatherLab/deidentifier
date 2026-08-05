@@ -6,8 +6,8 @@ which documents every variable the application reads; this page groups them and
 explains the consequences.
 
 **Where they are read from**, in order: the `ENV_PATH` file if that variable is
-set, otherwise `.env` in the repo root, otherwise `backend/.env`. Actual
-environment variables always win.
+set, otherwise `.env` in the repo root (the recommended location), otherwise
+`backend/.env`. Actual environment variables always win.
 
 ## Application
 
@@ -84,7 +84,7 @@ planned additional detector. Leave them off.
 ## Changing configuration
 
 ```bash
-$EDITOR backend/.env
+$EDITOR .env
 docker compose up -d          # recreates the backend with the new settings
 ```
 

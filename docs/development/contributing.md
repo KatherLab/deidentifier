@@ -7,7 +7,7 @@ git clone https://github.com/KatherLab/deidentifier.git
 cd deidentifier
 uv sync
 npm install
-cp .env.example backend/.env
+cp .env.example .env
 ```
 
 Run it:

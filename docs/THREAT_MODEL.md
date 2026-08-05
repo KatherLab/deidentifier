@@ -12,7 +12,7 @@ from.
 | Document content in flight | The whole point: unanonymized clinical text. |
 | The anonymized output | Trusted downstream *because* the tool produced it. A false "clean" is worse than a visible failure. |
 | Detection cache (memory) | The only place text lives between requests. |
-| Configuration (`backend/.env`) | Names the endpoints document content flows to. |
+| Configuration (`.env`) | Names the endpoints document content flows to. |
 
 ## Actors
 
