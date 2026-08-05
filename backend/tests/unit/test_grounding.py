@@ -37,8 +37,9 @@ def test_unlocatable_mention_becomes_warning_without_content():
     )
     assert spans == []
     assert len(warnings) == 1
-    assert "Erika" not in warnings[0]
-    assert "PERSON_NAME" in warnings[0]
+    assert "Erika" not in warnings[0].message
+    assert warnings[0].code == "llm_mention_not_located"
+    assert warnings[0].params == {"entity_type": "PERSON_NAME"}
 
 
 def test_trivially_short_mentions_are_skipped():

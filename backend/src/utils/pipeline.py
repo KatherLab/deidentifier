@@ -14,6 +14,8 @@ from ..schemas.anonymize import AnonymizeResponse, EntityOverride, TimingMs
 from ..schemas.entities import (
     EntitySpan,
     EntityType,
+    Notice,
+    OutputLanguage,
     ValidationResult,
     ValidationSeverity,
     ValidationWarning,
@@ -21,7 +23,8 @@ from ..schemas.entities import (
 from .cache import CachedDetection, request_cache
 from .detection import build_detectors, validate_spans
 from .leakage import compute_status, validate_output
-from .policy import merge_policy
+from .notices import LLM_RECHECK_SKIPPED, MANUAL_SELECTION_IGNORED, notice, validation_warning
+from .policy import merge_policy, resolve_output_language
 from .resolver import resolve_spans
 from .transformation import apply_policy
 
@@ -31,18 +34,20 @@ async def run_anonymization(
     settings: Settings,
     source_type: str,
     extraction_ms: float = 0.0,
-    extraction_warnings: list[str] | None = None,
+    extraction_warnings: list[Notice] | None = None,
     overrides: list[EntityOverride] | None = None,
     policy=None,
     custom_instruction: str | None = None,
     redact_terms: list[str] | None = None,
     preserve_terms: list[str] | None = None,
+    output_language: OutputLanguage | str | None = None,
     file_sha256: str | None = None,
     layout: list | None = None,
     page_count: int = 0,
     progress=None,
 ) -> AnonymizeResponse:
     """Full run: detection, resolution, transformation, validation."""
+    language = resolve_output_language(output_language)
     t0 = time.perf_counter()
     detectors = build_detectors(
         settings,
@@ -51,7 +56,7 @@ async def run_anonymization(
         progress=progress,
     )
     all_spans: list[EntitySpan] = []
-    detection_warnings: list[str] = []
+    detection_warnings: list[Notice] = []
     for detector in detectors:
         outcome = await detector.detect(text)
         valid, span_warnings = validate_spans(text, outcome.spans)
@@ -72,6 +77,7 @@ async def run_anonymization(
             extraction_warnings=list(extraction_warnings or []),
             detection_warnings=detection_warnings,
             llm_recheck_performed=recheck_enabled,
+            output_language=language,
             file_sha256=file_sha256,
             layout=list(layout or []),
             page_count=page_count,
@@ -87,6 +93,7 @@ async def run_anonymization(
         overrides=overrides,
         policy=policy,
         preserve_terms=preserve_terms,
+        output_language=language,
         extraction_ms=extraction_ms,
         detection_ms=detection_ms,
         recheck_settings=settings if recheck_enabled else None,
@@ -100,6 +107,7 @@ async def rerun_with_overrides(
     overrides: list[EntityOverride],
     policy=None,
     preserve_terms: list[str] | None = None,
+    output_language: OutputLanguage | str | None = None,
 ) -> AnonymizeResponse | None:
     """Re-run transformation + validation from cached detection results.
 
@@ -119,6 +127,9 @@ async def rerun_with_overrides(
         overrides=overrides,
         policy=policy,
         preserve_terms=preserve_terms,
+        # A re-run that does not state a language keeps the one the cached
+        # document was written in.
+        output_language=output_language or entry.output_language,
         extraction_ms=0.0,
         detection_ms=0.0,
         recheck_settings=None,
@@ -133,11 +144,12 @@ async def _finalize(
     text: str,
     source_type: str,
     resolved: list[EntitySpan],
-    warnings: list[str],
-    detector_warnings: list[str],
+    warnings: list[Notice],
+    detector_warnings: list[Notice],
     overrides: list[EntityOverride] | None,
     policy,
     preserve_terms: list[str] | None,
+    output_language: OutputLanguage | str | None,
     extraction_ms: float,
     detection_ms: float,
     recheck_settings: Settings | None,
@@ -145,12 +157,18 @@ async def _finalize(
     progress=None,
 ) -> AnonymizeResponse:
     active_policy = merge_policy(policy)
+    language = resolve_output_language(output_language)
     t1 = time.perf_counter()
     manual_spans, manual_warnings = _manual_spans(text, resolved, overrides)
     if manual_spans:
         resolved, _ = resolve_spans(resolved + manual_spans)
     anonymized, applied, override_warnings = apply_policy(
-        text, resolved, policy=active_policy, overrides=overrides, preserve_terms=preserve_terms
+        text,
+        resolved,
+        policy=active_policy,
+        overrides=overrides,
+        preserve_terms=preserve_terms,
+        output_language=language,
     )
     override_warnings = manual_warnings + override_warnings
     t2 = time.perf_counter()
@@ -163,14 +181,18 @@ async def _finalize(
         from .llm_detection import recheck_output
 
         extra_warnings = await recheck_output(
-            anonymized, recheck_settings, policy=active_policy, progress=progress
+            anonymized,
+            recheck_settings,
+            policy=active_policy,
+            output_language=language,
+            progress=progress,
         )
     elif recheck_skipped_note:
         extra_warnings = [
-            ValidationWarning(
+            validation_warning(
+                LLM_RECHECK_SKIPPED,
                 category="llm_recheck",
                 severity=ValidationSeverity.INFO,
-                message="The LLM re-check was not repeated for this adjusted result.",
             )
         ]
     if extra_warnings:
@@ -181,6 +203,7 @@ async def _finalize(
     return AnonymizeResponse(
         request_id=request_id,
         source_type=source_type,
+        output_language=language,
         source_text=text,
         anonymized_text=anonymized,
         entities=applied,
@@ -200,7 +223,7 @@ def _manual_spans(
     text: str,
     resolved: list[EntitySpan],
     overrides: list[EntityOverride] | None,
-) -> tuple[list[EntitySpan], list[str]]:
+) -> tuple[list[EntitySpan], list[Notice]]:
     """Overrides that match no detected span are user-defined manual
     selections from the review UI: they become first-class spans (validated
     against the source, then merged through the regular overlap resolution).
@@ -208,7 +231,7 @@ def _manual_spans(
     transformation."""
     existing = {(span.start, span.end) for span in resolved}
     spans: list[EntitySpan] = []
-    warnings: list[str] = []
+    warnings: list[Notice] = []
     for override in overrides or []:
         if (override.start, override.end) in existing:
             continue
@@ -225,5 +248,5 @@ def _manual_spans(
                 )
             )
         else:
-            warnings.append("A manual selection no longer matches the source text and was ignored.")
+            warnings.append(notice(MANUAL_SELECTION_IGNORED))
     return spans, warnings

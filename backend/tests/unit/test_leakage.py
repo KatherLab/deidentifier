@@ -6,6 +6,7 @@ from backend.src.schemas.entities import (
     ValidationStatus,
 )
 from backend.src.utils.leakage import validate_output
+from backend.src.utils.notices import LLM_MENTION_NOT_LOCATED, notice
 
 
 def applied(
@@ -77,7 +78,11 @@ async def test_detector_warnings_prevent_pass():
     result = await validate_output(
         "Unauffälliger Text.",
         [],
-        detector_warnings=["The LLM reported a PERSON_NAME mention that could not be located."],
+        detector_warnings=[notice(LLM_MENTION_NOT_LOCATED, entity_type="PERSON_NAME")],
     )
     assert result.status == ValidationStatus.REVIEW_REQUIRED
-    assert any(w.category == "detector" for w in result.warnings)
+    detector_warnings = [w for w in result.warnings if w.category == "detector"]
+    assert len(detector_warnings) == 1
+    # The code + params survive so the UI can render the warning in any language.
+    assert detector_warnings[0].code == "llm_mention_not_located"
+    assert detector_warnings[0].params == {"entity_type": "PERSON_NAME"}

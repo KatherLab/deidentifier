@@ -9,12 +9,20 @@ import re
 from ..schemas.entities import (
     AppliedEntity,
     EntityType,
+    Notice,
     SpanStatus,
     TransformationType,
     ValidationResult,
     ValidationSeverity,
     ValidationStatus,
     ValidationWarning,
+)
+from .notices import (
+    LABELLED_FIELD,
+    RESIDUAL_IDENTIFIER,
+    REVALIDATION_HIT,
+    validation_warning,
+    warning_from_notice,
 )
 from .policy import DEFAULT_POLICY
 from .rules import RuleBasedDetector
@@ -24,7 +32,7 @@ from .rules import RuleBasedDetector
 _MIN_RESIDUAL_LENGTH = 4
 
 # "Patient: Something" where Something is not a replacement tag.
-_LABELLED_FIELD = re.compile(
+_LABELLED_FIELD_RE = re.compile(
     r"(?:Patient(?:in)?|Name|Anschrift|Adresse|Wohnhaft)\s*:\s*(?!\[)([A-ZÄÖÜ][^\n]{2,40})"
 )
 
@@ -33,7 +41,7 @@ async def validate_output(
     anonymized: str,
     applied: list[AppliedEntity],
     policy: dict[EntityType, TransformationType] | None = None,
-    detector_warnings: list[str] | None = None,
+    detector_warnings: list[Notice] | None = None,
 ) -> ValidationResult:
     active_policy = policy if policy is not None else DEFAULT_POLICY
     warnings: list[ValidationWarning] = []
@@ -41,11 +49,11 @@ async def validate_output(
     # 0. Detector problems (e.g. an LLM mention that could not be grounded)
     # mean the document may contain unredacted PII — the result must never
     # claim PASS in that case.
-    for message in detector_warnings or []:
+    for detector_notice in detector_warnings or []:
         warnings.append(
-            ValidationWarning(
+            warning_from_notice(
+                detector_notice,
                 category="detector",
-                message=message,
                 severity=ValidationSeverity.WARNING,
             )
         )
@@ -60,12 +68,13 @@ async def validate_output(
         index = anonymized.find(needle)
         if index != -1:
             warnings.append(
-                ValidationWarning(
+                validation_warning(
+                    RESIDUAL_IDENTIFIER,
                     category="residual_identifier",
-                    message=f"Redacted {entity.entity_type} content appears to remain in the output.",
                     severity=ValidationSeverity.HIGH,
                     start=index,
                     end=index + len(needle),
+                    entity_type=str(entity.entity_type),
                 )
             )
 
@@ -77,22 +86,23 @@ async def validate_output(
         if span.text in preserved_texts:
             continue
         warnings.append(
-            ValidationWarning(
+            validation_warning(
+                REVALIDATION_HIT,
                 category="revalidation_hit",
-                message=f"A rule detector still finds a possible {span.entity_type} in the output.",
                 severity=ValidationSeverity.WARNING,
                 start=span.start,
                 end=span.end,
+                entity_type=str(span.entity_type),
             )
         )
 
     # 3. Suspicious labelled fields followed by non-redacted content.
-    for match in _LABELLED_FIELD.finditer(anonymized):
+    for match in _LABELLED_FIELD_RE.finditer(anonymized):
         start, end = match.span(1)
         warnings.append(
-            ValidationWarning(
+            validation_warning(
+                LABELLED_FIELD,
                 category="labelled_field",
-                message="A labelled field appears to be followed by non-redacted content.",
                 severity=ValidationSeverity.WARNING,
                 start=start,
                 end=end,

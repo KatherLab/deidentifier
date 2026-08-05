@@ -186,7 +186,7 @@ async def test_scanned_pdf_ocr_to_anonymized_text():
     assert "[PERSON_1]" in response.anonymized_text
     assert "[ID]" in response.anonymized_text  # Fallnummer via rules
     assert "geb. [GEBURTSDATUM]" in response.anonymized_text
-    assert any("OCR" in w for w in response.warnings)
+    assert any(w.code == "ocr_recognition_errors" for w in response.warnings)
 
 
 async def test_stream_endpoint_emits_progress_then_result():
@@ -312,7 +312,8 @@ async def test_recheck_risk_assessment_forces_review():
     assert "recheck_risk" in categories
     assert "recheck_indirect_identification" in categories
     risk_warning = next(w for w in response.validation.warnings if w.category == "recheck_risk")
-    assert "hoch" in risk_warning.message
+    assert risk_warning.code == "recheck_risk"
+    assert risk_warning.params == {"risk": "high"}
 
 
 async def test_recheck_low_risk_stays_pass():

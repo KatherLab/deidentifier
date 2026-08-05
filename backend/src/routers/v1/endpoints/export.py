@@ -34,6 +34,7 @@ from ....utils.pdf_export import (
     render_pdf_pages,
 )
 from ....utils.pipeline import rerun_with_overrides, run_anonymization
+from ....utils.policy import EXPORT_FILENAMES
 from ....utils.safe_logging import get_safe_logger
 
 router = APIRouter()
@@ -123,6 +124,8 @@ async def export_pdf(
     redact_terms = _parse_terms(form.get("redact_terms"))
     preserve_terms = _parse_terms(form.get("preserve_terms"))
     redact_areas = _parse_areas(form.get("redact_areas"))
+    raw_language = form.get("output_language")
+    output_language = raw_language.strip() if isinstance(raw_language, str) else None
     force_ocr = _parse_bool(form.get("force_ocr"))
 
     file_hash = hashlib.sha256(data).hexdigest()
@@ -136,6 +139,7 @@ async def export_pdf(
         custom_instruction,
         redact_terms,
         preserve_terms,
+        output_language,
         settings,
         force_ocr,
     )
@@ -165,7 +169,11 @@ async def export_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": 'attachment; filename="anonymisiert.pdf"'},
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{EXPORT_FILENAMES[result.output_language]}.pdf"'
+            )
+        },
     )
 
 
@@ -196,6 +204,7 @@ async def _detect(
     custom_instruction: str | None,
     redact_terms: list[str] | None,
     preserve_terms: list[str] | None,
+    output_language: str | None,
     settings: Settings,
     force_ocr: bool = False,
 ) -> tuple[AnonymizeResponse, list[LayoutLine], int, str]:
@@ -205,7 +214,11 @@ async def _detect(
         entry = request_cache.get(request_id)
         if entry is not None and entry.file_sha256 == file_hash:
             result = await rerun_with_overrides(
-                request_id, overrides, policy=policy, preserve_terms=preserve_terms
+                request_id,
+                overrides,
+                policy=policy,
+                preserve_terms=preserve_terms,
+                output_language=output_language,
             )
             if result is not None:
                 return result, entry.layout, entry.page_count, entry.source_type
@@ -225,6 +238,7 @@ async def _detect(
             custom_instruction=custom_instruction,
             redact_terms=redact_terms,
             preserve_terms=preserve_terms,
+            output_language=output_language,
             file_sha256=file_hash,
             layout=extracted.layout,
             page_count=len(extracted.pages),

@@ -28,6 +28,21 @@ class TransformationType(StrEnum):
     PRESERVE = "PRESERVE"
 
 
+class OutputLanguage(StrEnum):
+    """Language of everything a run WRITES into the document: the replacement
+    placeholders and the free-text notes of the LLM re-check.
+
+    Chosen per request (the UI captures it at submit) and independent of the
+    language the interface happens to be showing — the placeholders of a
+    finished document must not change when the reviewer switches language.
+    """
+
+    DE = "de"
+    EN = "en"
+    FR = "fr"
+    ES = "es"
+
+
 class SpanStatus(StrEnum):
     REDACTED = "REDACTED"
     GENERALIZED = "GENERALIZED"
@@ -76,6 +91,21 @@ class ValidationStatus(StrEnum):
     FAIL = "FAIL"
 
 
+class Notice(BaseModel):
+    """A translatable, non-fatal message about a run (extraction hints, ignored
+    overrides, …).
+
+    `code` is a stable identifier the frontend maps to a localized string;
+    `params` carries its placeholders. `message` is the English rendering and
+    stays the fallback for any code a catalog does not know — a notice is never
+    only a code, so an API consumer always has readable text.
+    """
+
+    code: str
+    message: str
+    params: dict[str, str | int | float | bool] = Field(default_factory=dict)
+
+
 class ValidationWarning(BaseModel):
     category: str
     message: str
@@ -83,6 +113,10 @@ class ValidationWarning(BaseModel):
     # Offsets refer to the anonymized output, not the source.
     start: int | None = None
     end: int | None = None
+    # Translation contract, as for Notice. Empty for warnings whose text comes
+    # from the model itself (LLM re-check concerns) — those stay as `message`.
+    code: str = ""
+    params: dict[str, str | int | float | bool] = Field(default_factory=dict)
 
 
 class ValidationResult(BaseModel):

@@ -178,8 +178,49 @@ def test_manual_selection_with_stale_text_is_ignored_with_warning(client):
     )
     assert second.status_code == 200
     body = second.json()
-    assert any("manual selection" in w for w in body["warnings"])
+    assert any(w["code"] == "manual_selection_ignored" for w in body["warnings"])
     assert body["anonymized_text"].startswith("Patient")  # nothing mangled
+
+
+def test_output_language_selects_the_placeholders(client):
+    response = client.post("/api/v1/anonymize", json={"text": SAMPLE_TEXT, "output_language": "fr"})
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["output_language"] == "fr"
+    anonymized = body["anonymized_text"]
+    assert "[PERSONNE_1]" in anonymized
+    assert "[DATE_DE_NAISSANCE]" in anonymized
+    assert "[TELEPHONE]" in anonymized
+    # The German tokens must not leak into a French run.
+    assert "[PERSON_1]" not in anonymized
+    assert "[GEBURTSDATUM]" not in anonymized
+
+
+def test_cached_rerun_keeps_the_output_language_of_the_run(client):
+    """A review-UI adjustment must not rewrite the placeholders of the
+    document the user is looking at, even if the request omits the field."""
+    first = client.post(
+        "/api/v1/anonymize", json={"text": SAMPLE_TEXT, "output_language": "es"}
+    ).json()
+
+    second = client.post(
+        "/api/v1/anonymize",
+        json={"request_id": first["request_id"], "overrides": []},
+    )
+    assert second.status_code == 200
+    body = second.json()
+    assert body["output_language"] == "es"
+    assert "[PERSONA_1]" in body["anonymized_text"]
+
+
+def test_unknown_output_language_falls_back_instead_of_failing(client):
+    response = client.post(
+        "/api/v1/anonymize", json={"text": SAMPLE_TEXT, "output_language": "klingon"}
+    )
+    # An unsupported value is rejected by the schema — it can only come from a
+    # hand-written request, and the UI offers a fixed list.
+    assert response.status_code == 422
 
 
 def test_manual_selection_overlapping_detected_entity(client):

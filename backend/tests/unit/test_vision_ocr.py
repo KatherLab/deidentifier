@@ -44,7 +44,7 @@ async def test_scanned_pdf_transcribed_per_page():
     # Page offsets map back into the text.
     first = document.pages[0]
     assert "Karla Wagenbrecht" in document.text[first.start : first.end]
-    assert any("OCR" in warning for warning in document.warnings)
+    assert any(warning.code == "ocr_recognition_errors" for warning in document.warnings)
 
 
 async def test_vision_request_carries_unlimited_ocr_recipe():

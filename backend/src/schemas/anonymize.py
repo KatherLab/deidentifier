@@ -2,7 +2,14 @@
 
 from pydantic import BaseModel, Field, model_validator
 
-from .entities import AppliedEntity, EntityType, TransformationType, ValidationResult
+from .entities import (
+    AppliedEntity,
+    EntityType,
+    Notice,
+    OutputLanguage,
+    TransformationType,
+    ValidationResult,
+)
 
 
 class EntityOverride(BaseModel):
@@ -79,6 +86,11 @@ class AnonymizeTextRequest(BaseModel):
     custom_instruction: str | None = Field(default=None, max_length=2000)
     redact_terms: list[str] = Field(default_factory=list, max_length=100)
     preserve_terms: list[str] = Field(default_factory=list, max_length=100)
+    # Language of the replacement placeholders (and of the re-check's notes).
+    # Sent with every request of a run, including override re-runs, so an
+    # adjusted document keeps the placeholders it already shows. Omitted =
+    # German; a cached re-run keeps the original run's language.
+    output_language: OutputLanguage | None = None
 
     @model_validator(mode="after")
     def _text_or_request_id(self) -> "AnonymizeTextRequest":
@@ -98,11 +110,15 @@ class TimingMs(BaseModel):
 class AnonymizeResponse(BaseModel):
     request_id: str
     source_type: str
+    # The language its placeholders are written in (fixed at submit).
+    output_language: OutputLanguage
     source_text: str
     anonymized_text: str
     entities: list[AppliedEntity]
     validation: ValidationResult
-    warnings: list[str] = Field(default_factory=list)
+    # Non-fatal notices about the run (extraction hints, ignored overrides).
+    # Each carries a stable `code` the UI translates, plus English `message`.
+    warnings: list[Notice] = Field(default_factory=list)
     timing_ms: TimingMs
 
 

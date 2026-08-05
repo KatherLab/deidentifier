@@ -10,7 +10,7 @@ and it exists only in process memory.
 import time
 from dataclasses import dataclass, field
 
-from ..schemas.entities import EntitySpan
+from ..schemas.entities import EntitySpan, Notice, OutputLanguage
 from .extraction import LayoutLine
 
 
@@ -19,9 +19,12 @@ class CachedDetection:
     text: str
     source_type: str
     spans: list[EntitySpan]
-    extraction_warnings: list[str]
-    detection_warnings: list[str] = field(default_factory=list)
+    extraction_warnings: list[Notice]
+    detection_warnings: list[Notice] = field(default_factory=list)
     llm_recheck_performed: bool = False
+    # Output language of the original run: an override re-run that omits it
+    # keeps the placeholders of the document the user is already reviewing.
+    output_language: OutputLanguage | None = None
     # For redacted-PDF export: identity of the uploaded file plus (for scans)
     # the OCR layout, so an export never repeats OCR/LLM detection.
     file_sha256: str | None = None

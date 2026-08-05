@@ -123,7 +123,7 @@ async def test_detector_grounds_llm_output(monkeypatch):
     assert len(outcome.spans) == 2  # both occurrences grounded
     assert all(text[s.start : s.end] == "Max Mustermann" for s in outcome.spans)
     assert len(outcome.warnings) == 1  # the unlocatable ORGANIZATION mention
-    assert "ORGANIZATION" in outcome.warnings[0]
+    assert outcome.warnings[0].params == {"entity_type": "ORGANIZATION"}
 
 
 async def test_truncated_output_bisects_chunk(monkeypatch):

@@ -11,10 +11,13 @@ from ..schemas.entities import (
     AppliedEntity,
     EntitySpan,
     EntityType,
+    Notice,
+    OutputLanguage,
     SpanStatus,
     TransformationType,
 )
-from .policy import DEFAULT_POLICY, REDACTED_LABEL, TYPE_MASK_LABELS
+from .notices import OVERRIDE_NOT_MATCHED, notice
+from .policy import DEFAULT_POLICY, placeholders_for
 
 _WHITESPACE = re.compile(r"\s+")
 _YEAR = re.compile(r"(?:19|20)\d{2}")
@@ -30,13 +33,16 @@ def apply_policy(
     policy: dict[EntityType, TransformationType] | None = None,
     overrides: list[EntityOverride] | None = None,
     preserve_terms: list[str] | None = None,
-) -> tuple[str, list[AppliedEntity], list[str]]:
+    output_language: OutputLanguage | str | None = None,
+) -> tuple[str, list[AppliedEntity], list[Notice]]:
     """Return (anonymized text, applied entities with source offsets, warnings).
 
     Overrides are matched by (start, end, text) and beat the policy; unmatched
     overrides produce warnings instead of being silently dropped.
+    `output_language` selects the language of the replacement labels.
     """
     active_policy = policy if policy is not None else DEFAULT_POLICY
+    labels = placeholders_for(output_language)
     preserve_set = {_normalize(term) for term in (preserve_terms or []) if term.strip()}
     override_map: dict[tuple[int, int], EntityOverride] = {
         (o.start, o.end): o for o in (overrides or [])
@@ -72,20 +78,20 @@ def apply_policy(
             key = str(span.metadata.get("tag_group") or _normalize(span.text))
             if key not in tag_numbers:
                 tag_numbers[key] = len(tag_numbers) + 1
-            replacement = f"[PERSON_{tag_numbers[key]}]"
+            replacement = labels.consistent_tag(tag_numbers[key])
             status = SpanStatus.TAGGED
         elif transformation == TransformationType.GENERALIZE:
             match = _YEAR.search(span.text)
-            replacement = match.group(0) if match else TYPE_MASK_LABELS[span.entity_type]
+            replacement = match.group(0) if match else labels.type_mask[span.entity_type]
             status = SpanStatus.GENERALIZED
         elif transformation == TransformationType.REMOVE:
-            replacement = REDACTED_LABEL
+            replacement = labels.redacted
             status = SpanStatus.REDACTED
         elif transformation == TransformationType.PRESERVE:
             replacement = None
             status = SpanStatus.PRESERVED
         else:
-            replacement = TYPE_MASK_LABELS[span.entity_type]
+            replacement = labels.type_mask[span.entity_type]
             status = SpanStatus.REDACTED
         applied.append(
             AppliedEntity(
@@ -97,9 +103,7 @@ def apply_policy(
         )
 
     warnings = [
-        "An override did not match any detected span and was ignored."
-        for key in override_map
-        if key not in matched_overrides
+        notice(OVERRIDE_NOT_MATCHED) for key in override_map if key not in matched_overrides
     ]
 
     result = text

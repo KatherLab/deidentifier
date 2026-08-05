@@ -84,6 +84,7 @@ async def _process_json(
             payload.overrides,
             policy=payload.policy,
             preserve_terms=payload.preserve_terms,
+            output_language=payload.output_language,
         )
         if response is None:
             raise HTTPException(
@@ -102,6 +103,7 @@ async def _process_json(
         custom_instruction=payload.custom_instruction,
         redact_terms=payload.redact_terms,
         preserve_terms=payload.preserve_terms,
+        output_language=payload.output_language,
         progress=progress,
     )
 
@@ -114,6 +116,7 @@ class _UploadInput:
     custom_instruction: str | None = None
     redact_terms: list[str] | None = None
     preserve_terms: list[str] | None = field(default=None)
+    output_language: str | None = None
     force_ocr: bool = False
 
 
@@ -130,6 +133,7 @@ async def _parse_upload(request: Request, settings: Settings) -> _UploadInput:
         custom_instruction = None
     redact_terms = _parse_terms_form(form.get("redact_terms"))
     preserve_terms = _parse_terms_form(form.get("preserve_terms"))
+    output_language = _parse_language_form(form.get("output_language"))
     force_ocr = _parse_bool_form(form.get("force_ocr"))
     upload = form.get("file")
     if not isinstance(upload, UploadFile):
@@ -152,6 +156,7 @@ async def _parse_upload(request: Request, settings: Settings) -> _UploadInput:
         custom_instruction=custom_instruction,
         redact_terms=redact_terms,
         preserve_terms=preserve_terms,
+        output_language=output_language,
         force_ocr=force_ocr,
     )
 
@@ -183,6 +188,7 @@ async def _process_upload(
         custom_instruction=upload_input.custom_instruction,
         redact_terms=upload_input.redact_terms,
         preserve_terms=upload_input.preserve_terms,
+        output_language=upload_input.output_language,
         file_sha256=hashlib.sha256(upload_input.data).hexdigest(),
         layout=extracted.layout,
         page_count=len(extracted.pages),
@@ -201,6 +207,7 @@ async def _run(
     custom_instruction: str | None = None,
     redact_terms: list[str] | None = None,
     preserve_terms: list[str] | None = None,
+    output_language: str | None = None,
     file_sha256: str | None = None,
     layout=None,
     page_count: int = 0,
@@ -218,6 +225,7 @@ async def _run(
             custom_instruction=custom_instruction,
             redact_terms=redact_terms,
             preserve_terms=preserve_terms,
+            output_language=output_language,
             file_sha256=file_sha256,
             layout=layout,
             page_count=page_count,
@@ -323,6 +331,13 @@ def _parse_terms_form(raw) -> list[str] | None:
         return terms or None
     except (json.JSONDecodeError, ValueError):
         raise HTTPException(status_code=422, detail="Invalid terms payload.") from None
+
+
+def _parse_language_form(raw) -> str | None:
+    """Parse the multipart 'output_language' field. An unknown value is a
+    cosmetic problem, not a reason to reject a document: the pipeline falls
+    back to the default language (see policy.resolve_output_language)."""
+    return raw.strip() if isinstance(raw, str) and raw.strip() else None
 
 
 def _parse_bool_form(raw) -> bool:

@@ -11,7 +11,8 @@ unexpected places; the type name is enough for the user to review).
 import re
 from dataclasses import dataclass
 
-from ..schemas.entities import EntitySpan, EntityType
+from ..schemas.entities import EntitySpan, EntityType, Notice
+from .notices import LLM_MENTION_NOT_LOCATED, notice
 
 _LLM_CONFIDENCE = 0.9
 _MIN_MENTION_LENGTH = 2
@@ -51,9 +52,9 @@ class Mention:
     role: str = ""
 
 
-def ground_mentions(text: str, mentions: list[Mention]) -> tuple[list[EntitySpan], list[str]]:
+def ground_mentions(text: str, mentions: list[Mention]) -> tuple[list[EntitySpan], list[Notice]]:
     spans: list[EntitySpan] = []
-    warnings: list[str] = []
+    warnings: list[Notice] = []
     seen: set[tuple[int, int, EntityType]] = set()
 
     for mention in mentions:
@@ -84,10 +85,7 @@ def ground_mentions(text: str, mentions: list[Mention]) -> tuple[list[EntitySpan
                 ]
             partial = bool(occurrences)
         if not occurrences:
-            warnings.append(
-                f"The LLM reported a {mention.entity_type} mention that could not be "
-                "located in the source text; please review the document manually."
-            )
+            warnings.append(notice(LLM_MENTION_NOT_LOCATED, entity_type=str(mention.entity_type)))
             continue
         if mention.entity_type != EntityType.PERSON_NAME:
             # Also cover case-variant occurrences ("Gender: Female" reported,

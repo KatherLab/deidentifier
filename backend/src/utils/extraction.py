@@ -15,8 +15,19 @@ import zipfile
 from pydantic import BaseModel, Field
 
 from ..core.config import Settings
+from ..schemas.entities import Notice
 from ..services.docling_serve_client import DoclingServeClient, DoclingServeError
 from ..services.pdf_text_probe import has_embedded_text
+from .notices import (
+    DOCX_COMMENTS,
+    DOCX_TEXT_BOXES,
+    DOCX_TRACKED_CHANGES,
+    DOCX_TRACKED_DELETIONS,
+    OCR_RECOGNITION_ERRORS,
+    PDF_DOCLING_FALLBACK,
+    PDF_NO_PAGE_MAPPING,
+    notice,
+)
 
 
 class ExtractionError(Exception):
@@ -50,7 +61,7 @@ class ExtractedDocument(BaseModel):
     source_type: str  # "txt" | "docx" | "pdf" | "pdf-ocr" | "paste"
     pages: list[PageRange] = Field(default_factory=list)
     layout: list[LayoutLine] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
+    warnings: list[Notice] = Field(default_factory=list)
 
 
 async def extract_document(
@@ -81,9 +92,9 @@ def extract_txt(data: bytes) -> ExtractedDocument:
 # --- DOCX --------------------------------------------------------------------
 
 _DOCX_WARNING_MARKERS = [
-    (b"<w:ins ", "The document contains tracked changes; inserted text may be incomplete."),
-    (b"<w:del ", "The document contains tracked deletions, which are not extracted."),
-    (b"txbxContent", "The document contains text boxes, which are not extracted."),
+    (b"<w:ins ", DOCX_TRACKED_CHANGES),
+    (b"<w:del ", DOCX_TRACKED_DELETIONS),
+    (b"txbxContent", DOCX_TEXT_BOXES),
 ]
 
 
@@ -133,17 +144,17 @@ def extract_docx(data: bytes) -> ExtractedDocument:
     return ExtractedDocument(text=text, source_type="docx", warnings=warnings)
 
 
-def _docx_warnings(data: bytes) -> list[str]:
-    warnings: list[str] = []
+def _docx_warnings(data: bytes) -> list[Notice]:
+    warnings: list[Notice] = []
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             names = set(archive.namelist())
             if "word/comments.xml" in names:
-                warnings.append("The document contains comments, which are not extracted.")
+                warnings.append(notice(DOCX_COMMENTS))
             document_xml = archive.read("word/document.xml")
-            for marker, message in _DOCX_WARNING_MARKERS:
+            for marker, code in _DOCX_WARNING_MARKERS:
                 if marker in document_xml:
-                    warnings.append(message)
+                    warnings.append(notice(code))
     except Exception:
         pass
     return warnings
@@ -170,12 +181,12 @@ async def extract_pdf(
                 return ExtractedDocument(
                     text=text,
                     source_type="pdf",
-                    warnings=["Page mapping is not available for docling-serve extraction."],
+                    warnings=[notice(PDF_NO_PAGE_MAPPING)],
                 )
             except DoclingServeError as exc:
                 # Fall back to local extraction rather than failing the request.
                 fallback = _extract_pdf_local(data)
-                fallback.warnings.insert(0, f"docling-serve failed ({exc}); used local extraction.")
+                fallback.warnings.insert(0, notice(PDF_DOCLING_FALLBACK, reason=str(exc)))
                 return fallback
         return _extract_pdf_local(data)
 
@@ -206,7 +217,7 @@ async def extract_pdf(
         return ExtractedDocument(
             text=text,
             source_type="pdf-ocr",
-            warnings=["Text was produced by OCR; recognition errors are possible."],
+            warnings=[notice(OCR_RECOGNITION_ERRORS)],
         )
     if engine == "llm_vision":
         from ..services.vision_llm_ocr import VisionOCRError, VisionOCRService
@@ -250,7 +261,7 @@ async def extract_pdf(
             source_type="pdf-ocr",
             pages=pages,
             layout=layout,
-            warnings=["Text was produced by OCR; recognition errors are possible."],
+            warnings=[notice(OCR_RECOGNITION_ERRORS)],
         )
     if engine == "mistral_ocr":
         raise ExtractionError(

@@ -4,13 +4,14 @@ import re
 from typing import Protocol
 
 from ..core.config import Settings
-from ..schemas.entities import EntitySpan, EntityType
+from ..schemas.entities import EntitySpan, EntityType, Notice
+from .notices import INVALID_SPAN_REJECTED, notice
 
 
 class DetectionOutcome:
     """Spans plus non-fatal warnings from one detector run."""
 
-    def __init__(self, spans: list[EntitySpan], warnings: list[str] | None = None):
+    def __init__(self, spans: list[EntitySpan], warnings: list[Notice] | None = None):
         self.spans = spans
         self.warnings = warnings or []
 
@@ -156,15 +157,13 @@ def build_detectors(
     return detectors
 
 
-def validate_spans(text: str, spans: list[EntitySpan]) -> tuple[list[EntitySpan], list[str]]:
+def validate_spans(text: str, spans: list[EntitySpan]) -> tuple[list[EntitySpan], list[Notice]]:
     """Reject any span whose text does not match its offsets in the source."""
     valid: list[EntitySpan] = []
-    warnings: list[str] = []
+    warnings: list[Notice] = []
     for span in spans:
         if span.end <= len(text) and text[span.start : span.end] == span.text:
             valid.append(span)
         else:
-            warnings.append(
-                f"Rejected invalid span from detector '{span.detector}' (offset mismatch)."
-            )
+            warnings.append(notice(INVALID_SPAN_REJECTED, detector=span.detector))
     return valid, warnings
