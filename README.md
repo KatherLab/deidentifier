@@ -91,7 +91,6 @@ See [Evaluation](https://katherlab.github.io/deidentifier/evaluation/).
 | File | Purpose |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | The canonical codebase guide (architecture, conventions, pitfalls) |
-| [`DESIGN_DOCUMENT.md`](DESIGN_DOCUMENT.md) | The v1 design and milestones |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release notes |
 | [`.github/SECURITY.md`](.github/SECURITY.md) | Vulnerability disclosure policy |
 | [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | Bundled OSS components and licenses |

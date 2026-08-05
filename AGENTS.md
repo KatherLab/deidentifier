@@ -64,7 +64,6 @@ deidentifier/
 ├── AGENTS.md                  # this file — the canonical dev/agent guide
 ├── CLAUDE.md                  # stub that @-includes AGENTS.md
 ├── README.md                  # short landing page → links into docs/
-├── DESIGN_DOCUMENT.md         # the v1 design + milestones (why, not how)
 ├── CHANGELOG.md               # Keep a Changelog format
 ├── CITATION.cff               # academic citation metadata
 ├── THIRD_PARTY_NOTICES.md     # bundled OSS components + licenses
@@ -568,8 +567,16 @@ drift when the images regenerate.
 
 Governance files: `LICENSE` (AGPL-3.0-or-later — note `pymupdf` is AGPL and
 blocks any future MIT relicense), `THIRD_PARTY_NOTICES.md`, `CITATION.cff`,
-`CHANGELOG.md` (Keep a Changelog; user/setup-facing entries only — skip
-internal refactors, tests, CI), `.github/SECURITY.md`.
+`CHANGELOG.md`, `.github/SECURITY.md`.
+
+**Keep `CHANGELOG.md` short.** It is read by users and by the admin setting the
+app up, so an entry earns its place only if it changes what they see or do: a
+new feature, a changed or removed configuration variable, an API or breaking
+change, a notable fix. One or two sentences each, no sub-bullets, no rationale
+— the details belong on the relevant `docs/` page, which the entry can link to.
+Internal refactors, tests, CI, documentation work, and dependency bumps are
+*not* changelog entries. When in doubt, leave it out; a release section that
+grew past roughly a screenful should be condensed rather than appended to.
 
 ---
 
