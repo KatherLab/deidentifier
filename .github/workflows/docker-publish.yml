@@ -2,25 +2,9 @@ name: docker-publish
 
 # Builds the backend and frontend images. Pushes to GHCR only for a published
 # release; every other run is a build-only smoke test.
-#
-# Automatic triggers are disabled while the repository is private (Actions
-# minutes would be billed). Run manually via the Actions tab; restore the
-# triggers below when the repo goes public.
-#
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-#     branches: [main]
-#   release:
-#     types: [published]
 on:
-  workflow_dispatch:
-    inputs:
-      push:
-        description: "Push the images to ghcr.io (otherwise build only)"
-        type: boolean
-        default: false
+  release:
+    types: [published]
 
 env:
   REGISTRY: ghcr.io

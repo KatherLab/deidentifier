@@ -7,15 +7,13 @@ name: security
 # Security). Run manually via the Actions tab; restore the triggers below when
 # the repo goes public.
 #
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-#     branches: [main]
-#   schedule:
-#     - cron: "17 4 * * 1"   # Mondays, 04:17 UTC
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1"   # Mondays, 04:17 UTC
 
 permissions:
   contents: read

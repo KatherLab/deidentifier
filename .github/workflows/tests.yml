@@ -4,13 +4,11 @@ name: tests
 # minutes would be billed). Run manually via the Actions tab when needed;
 # restore the push/pull_request triggers below when the repo goes public.
 #
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-#     branches: [main]
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
