@@ -4,7 +4,7 @@ A locally deployable web app that anonymizes German clinical documents: drop a
 document (or paste text), click one button, get anonymized text out — with a
 review view showing exactly what was redacted and why.
 
-![The result view: source review on the left, anonymized text on the right](docs/assets/screenshots/result-overview.png)
+![The redacted-PDF preview: the uploaded document with true blackout redaction](docs/assets/screenshots/result-pdf.png)
 
 > **This is an internal evaluation tool.** Its output does **not** establish
 > legal anonymization. Results must be reviewed by a human, and anonymization
@@ -55,8 +55,8 @@ by step in the
       <p><b>3. Act on the validation</b><br>An independent leakage pass re-scans the output and flags anything left to check.</p>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/assets/screenshots/result-pdf-area-editor.png" alt="The PDF area redaction editor with page previews">
-      <p><b>4. Export a redacted PDF</b><br>Blackout areas can be drawn on the original pages — logos, stamps, signatures.</p>
+      <img src="docs/assets/screenshots/result-pdf-area-editor.png" alt="The PDF area redaction editor with two blackout areas drawn on the original page">
+      <p><b>4. Black out what is not text</b><br>Logos, stamps and signatures are drawn over on the original pages and burned into the exported PDF, on top of the text redaction.</p>
     </td>
   </tr>
 </table>

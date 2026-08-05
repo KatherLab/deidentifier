@@ -143,19 +143,61 @@ test('captures the documentation screenshots', async ({ page }) => {
   await page.getByRole('button', { name: 'Anonymisieren' }).click()
   await expect(page.getByRole('button', { name: 'Exportieren' })).toBeVisible({ timeout: 60_000 })
 
+  // Source review and redacted PDF side by side, with the PDF viewer's
+  // thumbnail sidebar collapsed — it eats half the narrow panel and repeats
+  // what the page itself already shows. Chromium ignores `#toolbar=0`, so the
+  // sidebar can only be toggled by clicking the plugin's own hamburger.
   await capture('result-pdf', async () => {
-    await expect(page.locator('iframe[title="Geschwärztes PDF (Vorschau)"]')).toBeVisible({
-      timeout: 60_000,
-    })
+    const frame = page.locator('iframe[title="Geschwärztes PDF (Vorschau)"]')
+    await expect(frame).toBeVisible({ timeout: 60_000 })
     // Chromium's embedded PDF viewer paints late inside an iframe; without a
     // generous wait the panel screenshots blank.
     await page.waitForTimeout(6000)
+    const box = await frame.boundingBox()
+    if (box) {
+      // Hamburger, top-left of the viewer toolbar — plugin UI, so no locator.
+      await page.mouse.click(box.x + 32, box.y + 26)
+      await page.waitForTimeout(1500)
+      // Fit-to-page leaves the redactions unreadably small in a half-width
+      // panel. Ctrl+wheel is the only zoom the plugin exposes to us (the
+      // toolbar buttons have no accessible name); three steps ≈ page width.
+      await page.mouse.move(box.x + box.width / 2, box.y + 70)
+      await page.keyboard.down('Control')
+      for (let step = 0; step < 3; step++) {
+        await page.mouse.wheel(0, -120)
+        await page.waitForTimeout(500)
+      }
+      await page.keyboard.up('Control')
+      // Zooming anchors on the pointer; jump back to the top of page 1.
+      await page.mouse.click(box.x + box.width / 2, box.y + 200)
+      await page.keyboard.press('Home')
+      await page.waitForTimeout(2500)
+    }
     await shoot(page, 'result-pdf')
   })
 
+  // The editor draws on the *original* pages, so an empty one looks like an
+  // un-anonymized document. Capture it doing its job instead: the one-click
+  // image suggestion applied, plus one hand-drawn area over the letterhead.
   await capture('result-pdf-area-editor', async () => {
     await page.getByRole('button', { name: /Bereiche schwärzen/ }).click()
-    await page.waitForTimeout(1500)
+    const firstPage = page.getByRole('img', { name: 'Seite 1' })
+    await expect(firstPage).toBeVisible({ timeout: 60_000 })
+
+    await page.getByRole('button', { name: /Alle Bilder schwärzen/ }).click()
+
+    // Fractions of the page box: the hospital name / department / physician
+    // block in the top-left corner, next to the crest the images pass covers.
+    const box = await firstPage.boundingBox()
+    if (box) {
+      await page.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.03)
+      await page.mouse.down()
+      await page.mouse.move(box.x + box.width * 0.56, box.y + box.height * 0.145, { steps: 12 })
+      await page.mouse.up()
+    }
+
+    // Long enough for the "images blacked out" toast to auto-dismiss.
+    await page.waitForTimeout(4500)
     await shoot(page, 'result-pdf-area-editor')
     await page.getByRole('button', { name: /Bereiche schwärzen/ }).click()
   })

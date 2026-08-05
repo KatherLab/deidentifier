@@ -101,6 +101,9 @@ schwärzen** and drag a rectangle over anything that should be covered:
   ![The area redaction editor](../assets/screenshots/result-pdf-area-editor.png)
 </figure>
 
+The editor shows the **original** pages, not the redacted preview — the text
+redaction is applied to the export on top of the areas you draw here.
+
 - Click an existing rectangle to remove it.
 - **Alle Bilder schwärzen** covers every embedded image the backend found, in
   one click.
