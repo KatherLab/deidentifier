@@ -103,6 +103,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: npm
+
+      # license-checker reads the installed tree, so the frontend section is
+      # empty without node_modules — which reads as "no dependencies" rather
+      # than as a failure.
+      - name: Install frontend dependencies
+        run: npm ci
 
       - name: Regenerate third-party notices
         run: ./scripts/generate-third-party-notices.sh

@@ -35,6 +35,14 @@ echo "Collecting frontend licenses…"
 FRONTEND_LIST="$(npx --yes license-checker-rseidelsohn \
   --production --start . --markdown --excludePrivatePackages)"
 
+# license-checker walks the installed tree: without node_modules it reports an
+# empty list instead of failing, which would silently drop the whole frontend
+# section from the notices.
+if [ -z "$FRONTEND_LIST" ]; then
+  echo "No frontend licenses found — run 'npm ci' first." >&2
+  exit 1
+fi
+
 {
   echo "# Third-Party Notices"
   echo
