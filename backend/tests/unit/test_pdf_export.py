@@ -547,3 +547,67 @@ def test_rebuild_verification_tolerates_embedded_short_needles():
     # "2028" remains in the rebuilt text; word-bounded verification must pass.
     output = rebuild_scanned_pdf(source, layout, entities, page_count=1)
     assert output.startswith(b"%PDF")
+
+
+# --- whitespace divergence between extractor and export search ----------------
+#
+# The detector reads the PDF via docling-serve or pypdf; the export searches it
+# via pymupdf / pdfium. Those extractors inject or drop spaces around kerned
+# glyphs differently, so an entity string detected as "ABC123XYZ789" can appear
+# as "ABC123 XYZ789" in the export's text layer. Locating and verification must
+# survive that divergence instead of failing the whole export closed.
+
+
+def _space_split_pdf() -> tuple[bytes, str]:
+    """A PDF whose text layer splits one visual token with an injected space
+    (two adjacent text runs with a horizontal gap). Returns (pdf, needle) where
+    the needle has NO space but the text layer does."""
+    import pymupdf
+
+    document = pymupdf.open()
+    page = document.new_page(width=300, height=120)
+    page.insert_text((50, 60), "ABC123")
+    page.insert_text((110, 60), "XYZ789")
+    data = document.tobytes()
+    document.close()
+    return data, "ABC123XYZ789"
+
+
+def test_native_true_locates_needle_split_by_injected_whitespace():
+    import pymupdf
+
+    pdf, needle = _space_split_pdf()
+    # search_for cannot find it (the text layer has a space the needle lacks).
+    assert pymupdf.open(stream=pdf, filetype="pdf")[0].search_for(needle) == []
+
+    output = redact_native_pdf(pdf, [applied(needle, 0)], native_settings())
+    document = pymupdf.open(stream=output, filetype="pdf")
+    text = "\n".join(page.get_text() for page in document)
+    document.close()
+    # Redacted in both the literal and whitespace-stripped forms.
+    assert "ABC123" not in text and "XYZ789" not in text
+
+
+def test_native_raster_locates_needle_split_by_injected_whitespace():
+    import pypdfium2 as pdfium
+
+    from backend.src.utils.pdf_export import _redact_native_raster
+
+    pdf, needle = _space_split_pdf()
+    output = _redact_native_raster(pdf, [applied(needle, 0)], native_settings())
+
+    document = pdfium.PdfDocument(output)
+    image = document[0].render(scale=2.0).to_pil().convert("L")
+    document.close()
+    dark = sum(1 for value in image.getdata() if value < 60)
+    assert dark > 300, "expected a visible black redaction bar over the split token"
+
+
+def test_verify_native_catches_needle_surviving_with_injected_whitespace():
+    from backend.src.utils.pdf_export import _verify_native
+
+    pdf, needle = _space_split_pdf()
+    # The needle survives in the (unredacted) text layer as "ABC123 XYZ789";
+    # verification must catch it despite the injected space (fail-closed).
+    with pytest.raises(ExportError):
+        _verify_native(pdf, [needle])

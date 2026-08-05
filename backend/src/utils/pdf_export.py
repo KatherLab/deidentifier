@@ -65,6 +65,16 @@ def redacted_texts(entities: list[AppliedEntity]) -> list[str]:
     return sorted((t for t in unique if len(t) >= _MIN_SEARCH_LENGTH), key=len, reverse=True)
 
 
+def _compact(text: str) -> str:
+    """Strip ALL whitespace. The detector reads the PDF via one extractor
+    (docling-serve or pypdf) while the export searches it via another (pymupdf /
+    pdfium); those extractors inject or drop spaces around kerned glyphs
+    differently, so an entity string detected as `A-BB2F-C` can appear as
+    `A- BB2F -C` in the export's text layer. Comparing whitespace-stripped forms
+    makes locating and verification robust to that divergence."""
+    return re.sub(r"\s+", "", text)
+
+
 # --- Native PDFs -------------------------------------------------------------
 #
 # Primary path: TRUE redaction with PyMuPDF — the redacted text is removed
@@ -118,6 +128,10 @@ def _redact_native_true(
                         rects = page.search_for(variant)
                         if rects:
                             break
+                    if not rects:
+                        # search_for can't bridge whitespace the text layer
+                        # injected around kerned glyphs; retry ignoring spaces.
+                        rects = _ws_insensitive_word_rects(page, needle)
                 if not rects:
                     continue
                 found.add(needle)
@@ -183,13 +197,43 @@ def _short_word_rects(page, needle: str) -> list:
     return rects
 
 
-def _needle_survives(needle: str, text: str, collapsed: str) -> bool:
+def _ws_insensitive_word_rects(page, needle: str) -> list:
+    """Locate a needle whose whitespace differs from the PDF's text layer, by
+    matching against the page's words concatenated WITHOUT separators. Returns
+    the boxes of every word that overlaps a match. A word only partially covered
+    by the needle is redacted whole — over-redaction, never a leak."""
+    import pymupdf
+
+    target = _compact(needle)
+    if len(target) < _MIN_SEARCH_LENGTH:
+        return []
+    spans: list[tuple[int, int, object]] = []
+    haystack = ""
+    for x0, y0, x1, y1, word, *_ in page.get_text("words"):
+        spans.append((len(haystack), len(haystack) + len(word), pymupdf.Rect(x0, y0, x1, y1)))
+        haystack += word
+    rects: list = []
+    pos = haystack.find(target)
+    while pos >= 0:
+        end = pos + len(target)
+        rects.extend(rect for start, stop, rect in spans if start < end and stop > pos)
+        pos = haystack.find(target, end)
+    return rects
+
+
+def _needle_survives(needle: str, text: str, collapsed: str, compact: str | None = None) -> bool:
     """Word-bounded check for short needles (so '2028' never counts as a
-    surviving '28'), substring check otherwise."""
+    surviving '28'), substring check otherwise. Long needles also match against
+    the whitespace-stripped text, so an occurrence the text layer split with
+    injected spaces still counts as surviving (fail-closed, never a silent
+    leak)."""
     if len(needle) <= _SHORT_NEEDLE_MAX:
         pattern = rf"(?<!\w){re.escape(needle)}(?!\w)"
         return bool(re.search(pattern, text) or re.search(pattern, collapsed))
-    return needle in text or re.sub(r"\s+", " ", needle) in collapsed
+    if needle in text or re.sub(r"\s+", " ", needle) in collapsed:
+        return True
+    compact = _compact(text) if compact is None else compact
+    return _compact(needle) in compact
 
 
 def _verify_native(output: bytes, needles: list[str]) -> None:
@@ -203,8 +247,9 @@ def _verify_native(output: bytes, needles: list[str]) -> None:
     finally:
         document.close()
     collapsed = re.sub(r"\s+", " ", text)
+    compact = _compact(text)
     for needle in needles:
-        if _needle_survives(needle, text, collapsed):
+        if _needle_survives(needle, text, collapsed, compact):
             raise ExportError(
                 "Verification failed: a redacted string is still present in the "
                 "redacted PDF's text layer."
@@ -247,6 +292,10 @@ def _redact_native_raster(
                 matches = _search_all(textpage, needle)
                 if len(needle) <= _SHORT_NEEDLE_MAX:
                     matches = [m for m in matches if _pdfium_word_bounded(textpage, m)]
+                elif not matches:
+                    # search can't bridge whitespace the text layer injected
+                    # around kerned glyphs; retry ignoring spaces.
+                    matches = _ws_insensitive_char_matches(textpage, needle)
                 for start, count in matches:
                     found.add(needle)
                     for rect in _char_rects(textpage, start, count):
@@ -321,6 +370,33 @@ def _pdfium_word_bounded(textpage, match: tuple[int, int]) -> bool:
     before = textpage.get_text_range(start - 1, 1) if start > 0 else ""
     after = textpage.get_text_range(start + count, 1) or ""
     return not (before[-1:].isalnum() or after[:1].isalnum())
+
+
+def _ws_insensitive_char_matches(textpage, needle: str) -> list[tuple[int, int]]:
+    """Locate a needle whose whitespace differs from pdfium's text layer, by
+    matching against the page's characters with whitespace removed. Returns
+    (start, count) char-index spans covering the exact visible glyphs of each
+    occurrence (interior whitespace chars are included in the span; their empty
+    boxes are simply skipped when the rects are built)."""
+    target = _compact(needle)
+    if len(target) < _MIN_SEARCH_LENGTH:
+        return []
+    orig_index: list[int] = []
+    compact_chars: list[str] = []
+    for index in range(textpage.count_chars()):
+        char = textpage.get_text_range(index, 1)
+        if char and not char.isspace():
+            compact_chars.append(char)
+            orig_index.append(index)
+    haystack = "".join(compact_chars)
+    matches: list[tuple[int, int]] = []
+    pos = haystack.find(target)
+    while pos >= 0:
+        start = orig_index[pos]
+        end = orig_index[pos + len(target) - 1]
+        matches.append((start, end - start + 1))
+        pos = haystack.find(target, pos + len(target))
+    return matches
 
 
 def _search_all(textpage, needle: str) -> list[tuple[int, int]]:
@@ -586,8 +662,9 @@ def _verify_rebuilt(output: bytes, entities: list[AppliedEntity]) -> None:
     reader = PdfReader(io.BytesIO(output))
     extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
     collapsed = re.sub(r"\s+", " ", extracted)
+    compact = _compact(extracted)
     for needle in redacted_texts(entities):
-        if _needle_survives(needle, extracted, collapsed):
+        if _needle_survives(needle, extracted, collapsed, compact):
             raise ExportError(
                 "Verification failed: a redacted string is still present in the "
                 "rebuilt PDF; the export was aborted."
