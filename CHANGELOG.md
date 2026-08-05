@@ -11,31 +11,6 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
-### Added
-
-- Interface languages: German, English, French and Spanish. The app opens in
-  the browser's language, falls back to German, and the header's globe button
-  switches it. Backend warnings and notices are translated too.
-- Output language of the anonymized document (advanced settings): placeholders,
-  the AI re-check's notes, and the export file name follow the language chosen
-  for the run. It is fixed when anonymization starts, so switching the
-  interface language while reviewing never rewrites a finished document.
-- Deployment banner above the header (e.g. "Research Use Only!"), configured
-  with `BANNER_ENABLED`, `BANNER_TEXT` and `BANNER_COLOR`.
-- Documentation site (MkDocs Material) under `docs/`:
-  `uv run --only-group docs mkdocs serve`.
-
-### Changed
-
-- **API:** requests accept an optional `output_language` (`de`/`en`/`fr`/`es`,
-  default `de`) on `/anonymize`, `/anonymize/stream` and `/export/pdf`, and
-  `AnonymizeResponse` reports the language a document was written in. A cached
-  re-run that omits the field keeps the original run's language.
-- **API:** `AnonymizeResponse.warnings` is now a list of objects
-  (`{code, message, params}`) instead of plain strings, and every
-  `validation.warnings` entry gained `code` and `params`. `message` still
-  carries the English text.
-
 ## [0.1.0] — 2026-08-05
 
 First tagged version.
@@ -80,6 +55,14 @@ First tagged version.
 - Expert mode for diagnostics (detector, confidence, offsets, timings).
 - Exports: clipboard, `.txt`, redacted `.pdf`, and `.zip` for a batch, with an
   opt-in to keep original filenames.
+- Interface languages: German, English, French and Spanish. The app opens in
+  the browser's language, falls back to German, and the header's globe button
+  switches it. Backend warnings and notices are translated too.
+- Output language of the anonymized document (advanced settings, or
+  `output_language` on the API): placeholders, the AI re-check's notes, and the
+  export file name follow the language chosen for the run. It is fixed when
+  anonymization starts, so switching the interface language while reviewing
+  never rewrites a finished document.
 
 **Redacted-PDF export**
 
@@ -104,6 +87,10 @@ First tagged version.
   logging enabled.
 - A structured logger that drops document-content fields, `Cache-Control:
   no-store` on content responses, and no analytics, telemetry, or CDN.
+- Deployment banner above the header (e.g. "Research Use Only!"), configured
+  with `BANNER_ENABLED`, `BANNER_TEXT` and `BANNER_COLOR`.
+- Documentation site (MkDocs Material) under `docs/`:
+  `uv run --only-group docs mkdocs serve`.
 
 [Unreleased]: https://github.com/KatherLab/deidentifier/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/KatherLab/deidentifier/releases/tag/v0.1.0
