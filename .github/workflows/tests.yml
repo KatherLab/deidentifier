@@ -20,7 +20,7 @@ jobs:
     name: Backend lint, format & tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: astral-sh/setup-uv@v5
         with:
@@ -47,7 +47,7 @@ jobs:
     name: Frontend check, unit tests & build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -76,7 +76,7 @@ jobs:
     # ENV_PATH=backend/.env.e2e, and the Vite dev server — no external
     # services, no GPU, nothing to reset (the app persists nothing).
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
