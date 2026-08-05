@@ -76,6 +76,12 @@ class Settings(BaseSettings):
     # Prompt sent with each page image; "<image>document parsing." is the
     # Unlimited-OCR recipe and works for most vision OCR models.
     VISION_OCR_PROMPT: str = "<image>document parsing."
+    # Retry prompt for a page that the primary prompt transcribes to (near-)
+    # empty text while the rendered page clearly has ink. Unlimited-OCR's
+    # layout parser occasionally classifies a whole page as a single image
+    # (dense barcodes, handwriting, redaction bars) and emits no text; the flat
+    # "Free OCR." mode transcribes it. Empty disables the fallback.
+    VISION_OCR_FALLBACK_PROMPT: str = "<image>Free OCR."
     VISION_OCR_MAX_TOKENS: int = Field(default=8192, ge=256)
     # Raw JSON merged into the request body (e.g. Unlimited-OCR's
     # skip_special_tokens / vllm_xargs); empty = none.

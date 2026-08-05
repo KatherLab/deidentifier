@@ -6,7 +6,11 @@ PNG with pypdfium2, sent per page (concurrently, order preserved) as data
 URLs, and the transcriptions are joined.
 
 Fail-closed: if any single page fails, the whole document fails — a document
-missing a page must never be reported as anonymized.
+missing a page must never be reported as anonymized. A page that the primary
+prompt transcribes to no text while it clearly has ink is retried once with the
+fallback prompt (the layout parser sometimes classifies a whole page as one
+image and emits nothing); if it is still empty, the document fails rather than
+silently dropping the page.
 """
 
 import asyncio
@@ -40,12 +44,33 @@ _LAYOUT_LINE = re.compile(
 )
 
 
+# A rendered page whose dark-pixel fraction is below this is treated as blank:
+# an empty transcription is then expected, not a dropped page.
+_MIN_INK_FRACTION = 0.002
+
+
 class TranscribedLine:
     """One output line: text plus optional normalized bounding box."""
 
     def __init__(self, text: str, box: tuple[int, int, int, int] | None = None):
         self.text = text
         self.box = box
+
+
+def _has_text(lines: list["TranscribedLine"]) -> bool:
+    """True if any parsed line carries actual text (an image-only page parses
+    to a single boxed line with empty text — that counts as no text)."""
+    return any(line.text.strip() for line in lines)
+
+
+def _page_has_ink(image) -> bool:
+    """True if the rendered page has more than a trivial fraction of dark
+    pixels — i.e. it is not a blank/near-blank page. Used to decide whether an
+    empty transcription is suspicious (dropped page) or expected (blank page)."""
+    histogram = image.convert("L").histogram()
+    total = sum(histogram) or 1
+    dark = sum(histogram[:128])
+    return dark / total > _MIN_INK_FRACTION
 
 
 def parse_transcription(raw: str) -> list[TranscribedLine]:
@@ -82,31 +107,63 @@ class VisionOCRService:
 
     async def process_pdf(self, data: bytes, progress=None) -> list[list[TranscribedLine]]:
         """Return the parsed transcription (lines with boxes) per page, in order."""
-        images = self._render_pages(data)
-        if not images:
+        pages = self._render_pages(data)
+        if not pages:
             raise VisionOCRError("The PDF contains no pages.", status_code=422)
         # Global slots: the page limit is a TOTAL across all documents in flight.
         semaphore = global_semaphore("vision_ocr", self._settings.VISION_OCR_MAX_CONCURRENT_PAGES)
         completed = 0
         if progress:
-            progress("ocr", 0, len(images))
+            progress("ocr", 0, len(pages))
 
-        async def limited(page_number: int, png: bytes) -> list[TranscribedLine]:
+        async def limited(page_number: int, png: bytes, has_ink: bool) -> list[TranscribedLine]:
             nonlocal completed
             async with semaphore:
-                lines = parse_transcription(await self._transcribe_page(page_number, png))
+                lines = await self._transcribe_with_fallback(page_number, png, has_ink)
             completed += 1
             if progress:
-                progress("ocr", completed, len(images))
+                progress("ocr", completed, len(pages))
             return lines
 
         return list(
             await asyncio.gather(
-                *(limited(number, png) for number, png in enumerate(images, start=1))
+                *(
+                    limited(number, png, has_ink)
+                    for number, (png, has_ink) in enumerate(pages, start=1)
+                )
             )
         )
 
-    def _render_pages(self, data: bytes) -> list[bytes]:
+    async def _transcribe_with_fallback(
+        self, page_number: int, png: bytes, has_ink: bool
+    ) -> list[TranscribedLine]:
+        """Transcribe one page. If the primary prompt yields no text while the
+        page clearly has ink, retry once with the fallback prompt; if it is
+        still empty, fail closed rather than silently drop the page."""
+        lines = parse_transcription(await self._transcribe_page(page_number, png))
+        if _has_text(lines) or not has_ink:
+            return lines
+
+        fallback_prompt = self._settings.VISION_OCR_FALLBACK_PROMPT.strip()
+        if fallback_prompt:
+            lines = parse_transcription(
+                await self._transcribe_page(page_number, png, prompt=fallback_prompt)
+            )
+            if _has_text(lines):
+                return lines
+
+        # An inked page that produced no text under any prompt must never be
+        # passed off as an empty page — that would silently drop its content
+        # (and any PII on it) from the "anonymized" result.
+        raise VisionOCRError(
+            f"OCR produced no text for page {page_number}, which is not blank. "
+            "The document was not processed to avoid silently dropping a page.",
+            status_code=422,
+        )
+
+    def _render_pages(self, data: bytes) -> list[tuple[bytes, bool]]:
+        """Render each page to PNG, paired with whether it carries meaningful
+        ink (used to tell a genuinely blank page from one OCR dropped)."""
         import pypdfium2 as pdfium
 
         try:
@@ -116,19 +173,21 @@ class VisionOCRService:
                 "The PDF could not be rendered for OCR (malformed?).", status_code=415
             ) from exc
         try:
-            images: list[bytes] = []
+            pages: list[tuple[bytes, bool]] = []
             for page in document:
                 bitmap = page.render(scale=self._settings.VISION_OCR_RENDER_SCALE)
                 pil_image = bitmap.to_pil()
                 buffer = io.BytesIO()
                 pil_image.save(buffer, format="PNG")
-                images.append(buffer.getvalue())
+                pages.append((buffer.getvalue(), _page_has_ink(pil_image)))
                 page.close()
-            return images
+            return pages
         finally:
             document.close()
 
-    async def _transcribe_page(self, page_number: int, png: bytes) -> str:
+    async def _transcribe_page(
+        self, page_number: int, png: bytes, prompt: str | None = None
+    ) -> str:
         settings = self._settings
         timeout = settings.VISION_OCR_TIMEOUT_SECONDS
         data_url = "data:image/png;base64," + base64.b64encode(png).decode()
@@ -138,7 +197,7 @@ class VisionOCRService:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": settings.VISION_OCR_PROMPT},
+                        {"type": "text", "text": prompt or settings.VISION_OCR_PROMPT},
                         {"type": "image_url", "image_url": {"url": data_url}},
                     ],
                 }
