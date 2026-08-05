@@ -25,7 +25,7 @@ dev = [
     "pytest-asyncio>=0.25",
     "pytest-cov>=6.0",
     "httpx>=0.28",
-    "ruff>=0.9",
+    "ruff>=0.16.1",
 ]
 # Documentation site (MkDocs Material). Installed on its own so neither the
 # runtime image nor the test environment pulls it in:
