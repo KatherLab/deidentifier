@@ -5,7 +5,7 @@ description = "Locally deployable anonymizer for German clinical documents"
 requires-python = ">=3.13,<3.15"
 dependencies = [
     "fastapi>=0.115",
-    "uvicorn[standard]>=0.34",
+    "uvicorn[standard]>=0.52.1",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
     "python-multipart>=0.0.20",
