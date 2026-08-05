@@ -72,10 +72,8 @@ is excluded because it is not distributed.
 - [@jridgewell/trace-mapping@0.3.31](https://github.com/jridgewell/sourcemaps) - MIT
 - [@lucide/vue@1.28.0](https://github.com/lucide-icons/lucide) - ISC
 - [@oxc-project/types@0.143.0](https://github.com/oxc-project/oxc) - MIT
-- [@rolldown/binding-darwin-arm64@1.2.3](https://github.com/rolldown/rolldown) - MIT
 - [@rolldown/pluginutils@1.0.1](https://github.com/rolldown/plugins) - MIT
 - [@tailwindcss/node@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
-- [@tailwindcss/oxide-darwin-arm64@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [@tailwindcss/oxide@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [@tailwindcss/vite@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [@types/node@26.1.2](https://github.com/DefinitelyTyped/DefinitelyTyped) - MIT
@@ -114,7 +112,6 @@ is excluded because it is not distributed.
 - [fflate@0.8.3](https://github.com/101arrowz/fflate) - MIT
 - [follow-redirects@1.16.0](https://github.com/follow-redirects/follow-redirects) - MIT
 - [form-data@4.0.6](https://github.com/form-data/form-data) - MIT
-- [fsevents@2.3.3](https://github.com/fsevents/fsevents) - MIT
 - [function-bind@1.1.2](https://github.com/Raynos/function-bind) - MIT
 - [get-intrinsic@1.3.0](https://github.com/ljharb/get-intrinsic) - MIT
 - [get-proto@1.0.1](https://github.com/ljharb/get-proto) - MIT
@@ -126,8 +123,6 @@ is excluded because it is not distributed.
 - [hookable@5.5.3](https://github.com/unjs/hookable) - MIT
 - [https-proxy-agent@5.0.1](https://github.com/TooTallNate/node-https-proxy-agent) - MIT
 - [jiti@2.7.0](https://github.com/unjs/jiti) - MIT
-- [lightningcss-darwin-arm64@1.32.0](https://github.com/parcel-bundler/lightningcss) - MPL-2.0
-- [lightningcss-darwin-arm64@1.33.0](https://github.com/parcel-bundler/lightningcss) - MPL-2.0
 - [lightningcss@1.32.0](https://github.com/parcel-bundler/lightningcss) - MPL-2.0
 - [lightningcss@1.33.0](https://github.com/parcel-bundler/lightningcss) - MPL-2.0
 - [magic-string@0.30.21](https://github.com/Rich-Harris/magic-string) - MIT

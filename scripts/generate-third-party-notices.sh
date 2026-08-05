@@ -43,6 +43,14 @@ if [ -z "$FRONTEND_LIST" ]; then
   exit 1
 fi
 
+# Per-platform native binary variants (…-darwin-arm64, …-linux-x64-gnu,
+# fsevents) depend on the machine the script runs on, so keeping them would
+# make the output differ between a developer laptop and CI. Their parent
+# packages (lightningcss, @tailwindcss/oxide, rolldown, …) stay listed and
+# carry the same license.
+FRONTEND_LIST="$(printf '%s\n' "$FRONTEND_LIST" | grep -Ev -- \
+  '-(darwin|linux|win32|freebsd|openbsd|netbsd|android|sunos|aix)-(arm64|arm|x64|ia32|ppc64|riscv64|s390x|loong64|mips64el|wasm32)|\[fsevents@')"
+
 {
   echo "# Third-Party Notices"
   echo
