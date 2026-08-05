@@ -4,6 +4,8 @@ A locally deployable web app that anonymizes German clinical documents: drop a
 document (or paste text), click one button, get anonymized text out — with a
 review view showing exactly what was redacted and why.
 
+![The result view: source review on the left, anonymized text on the right](docs/assets/screenshots/result-overview.png)
+
 > **This is an internal evaluation tool.** Its output does **not** establish
 > legal anonymization. Results must be reviewed by a human, and anonymization
 > quality must be validated locally before any downstream use.
@@ -28,6 +30,36 @@ Pasted text plus `.txt`, `.docx` and `.pdf` uploads; scanned PDFs are detected
 and routed to a configured OCR engine. Individual entities can be preserved,
 redacted, or retyped in the review UI, and PDFs can be exported with true
 blackout redaction. All processing is in memory — nothing is persisted.
+
+## Screenshots
+
+The workflow from a dropped document to a reviewed result, shown with the
+synthetic example documents that ship with the repository. Walk through it step
+by step in the
+**[quickstart](https://katherlab.github.io/deidentifier/getting-started/quickstart/)**.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/assets/screenshots/input-empty.png" alt="The input screen with dropzone, paste area and one button">
+      <p><b>1. Drop or paste</b><br>PDF, DOCX or TXT — several files at once — or paste text straight into the box.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/assets/screenshots/result-entity-selected.png" alt="The result view with an entity selected and its detail bar open">
+      <p><b>2. Review every redaction</b><br>Each detected entity is highlighted in the source; click one to see its type and replacement.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/assets/screenshots/result-review-required.png" alt="A result flagged for review with a warning highlight">
+      <p><b>3. Act on the validation</b><br>An independent leakage pass re-scans the output and flags anything left to check.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/assets/screenshots/result-pdf-area-editor.png" alt="The PDF area redaction editor with page previews">
+      <p><b>4. Export a redacted PDF</b><br>Blackout areas can be drawn on the original pages — logos, stamps, signatures.</p>
+    </td>
+  </tr>
+</table>
 
 ## Quick start
 
