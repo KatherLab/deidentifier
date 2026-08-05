@@ -16,11 +16,20 @@ htmlcov/
 node_modules/
 frontend/dist/
 
+# Test / docs tooling output
+coverage/
+site/
+test-results/
+playwright-report/
+.playwright/
+
 # Environment / secrets — never commit real configuration
 .env
 backend/.env
 backend/.env.*
 !backend/.env.example
+# Fixture-only config for the Playwright harnesses (no secrets, see the file).
+!backend/.env.e2e
 
 # IDE / OS
 .idea/

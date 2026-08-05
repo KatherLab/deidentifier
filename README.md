@@ -1,121 +1,102 @@
 # Medical Document Anonymizer
 
-A locally deployable web app that anonymizes German clinical documents:
-drop a document (or paste text), click one button, get anonymized text out —
-with a review view showing exactly what was redacted and why.
+A locally deployable web app that anonymizes German clinical documents: drop a
+document (or paste text), click one button, get anonymized text out — with a
+review view showing exactly what was redacted and why.
 
 > **This is an internal evaluation tool.** Its output does **not** establish
 > legal anonymization. Results must be reviewed by a human, and anonymization
 > quality must be validated locally before any downstream use.
 
-See `DESIGN_DOCUMENT.md` for the architecture and roadmap.
+📖 **[Full documentation](https://katherlab.github.io/deidentifier/)** —
+getting started, user guide, operations, evaluation, security, development.
 
 ## How it works
 
-No generative model ever rewrites the document. Detectors (rules, and in
-Milestone 2 a prompted LLM) only *propose* character spans; deterministic code
-applies the replacements on the immutable source text, and an independent
-leakage-validation pass re-scans the output and reports a
-`PASS / REVIEW_REQUIRED / FAIL` status.
+No generative model ever rewrites the document. Detectors — rule-based German
+recognizers and a prompted LLM behind any OpenAI-compatible endpoint — only
+*propose* character spans; deterministic code applies the replacements on the
+immutable source text, and an independent leakage-validation pass re-scans the
+output and reports `PASS` / `REVIEW_REQUIRED` / `FAIL`.
 
 ```text
 Document → extraction → rule + LLM detection → span merging
         → deterministic transformation → leakage validation → review UI
 ```
 
-Current milestone (2): pasted text plus `.txt`, `.docx` and `.pdf` uploads
-(scanned PDFs are detected and routed to docling-serve/Tesseract OCR when
-configured), rule-based German recognizers, and the **LLM detector** — a
-prompted model behind any OpenAI-compatible endpoint that returns entity
-strings as JSON, deterministically grounded to character offsets. Individual
-entities can be preserved/redacted/retyped in the review UI; re-runs reuse
-cached detection results. Remaining for Milestone 3: mistral_ocr and
-llm_vision OCR engines, the privacy-filter second net, the evaluation
-harness, and Docker packaging.
+Pasted text plus `.txt`, `.docx` and `.pdf` uploads; scanned PDFs are detected
+and routed to a configured OCR engine. Individual entities can be preserved,
+redacted, or retyped in the review UI, and PDFs can be exported with true
+blackout redaction. All processing is in memory — nothing is persisted.
 
-## Development setup
-
-Backend (Python 3.13+, [uv](https://docs.astral.sh/uv/)):
+## Quick start
 
 ```bash
-uv sync
-uv run uvicorn backend.src.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Frontend (Vue 3 + Vite):
-
-```bash
-npm install
-npm run dev        # http://localhost:5173
-```
-
-Tests and checks:
-
-```bash
-uv run pytest
-uv run ruff check backend/ && uv run ruff format --check backend/
-npm run check && npm run build
-```
-
-## Docker deployment
-
-```bash
-docker compose up -d --build                                  # → http://localhost:8080
-docker compose -f compose.yml -f compose.dev.yml up --build   # dev: hot reload + :8000
-docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d   # + GPU OCR sidecar
+cp .env.example backend/.env     # then edit — every variable is documented there
+docker compose up -d --build     # → http://localhost:8080
 ```
 
 The stack runs in production mode by default (docs disabled, unsafe
-configurations refuse to start). The backend has no published port, a
-read-only filesystem and no volumes — nothing is persisted. Configuration is
-read from `backend/.env` (never copied into images). The `unlimited-ocr`
-overlay serves `baidu/Unlimited-OCR` via vLLM on an NVIDIA GPU and wires it
-as the scanned-PDF OCR engine. Works with Docker or Podman.
+configurations refuse to start). The backend has no published port, a read-only
+filesystem, and no volumes.
 
-## Configuration
+Local development:
 
-Copy `.env.example` to `backend/.env` and adjust. Every variable is documented
-there. Key points:
+```bash
+uv sync && npm install
+uv run uvicorn backend.src.main:app --reload --host 0.0.0.0 --port 8000
+npm run dev                      # → http://localhost:5173
+```
 
-- `DETECTORS` — comma-separated detector list (`rules`, `llm`, `mock`, …).
-  The `mock` detector is for tests only; production mode refuses to start
-  with it enabled.
-- All model/OCR backends are configurable base URLs (OpenAI-compatible LLM,
-  docling-serve, Mistral-OCR-compatible API, vision LLM). Local by default;
-  the UI shows a banner when a configured endpoint is not local.
+See [Installation](https://katherlab.github.io/deidentifier/getting-started/installation/)
+and [Configuration](https://katherlab.github.io/deidentifier/operations/configuration/).
+
+## Tests and checks
+
+```bash
+uv run ruff check backend/ && uv run ruff format --check backend/
+uv run pytest
+npm run check && npm test && npm run build
+npm run test:e2e                 # Playwright smoke against a fake LLM
+```
+
+CI workflows exist but are `workflow_dispatch`-only while the repository is
+private — run the commands above locally. See
+[Contributing](https://katherlab.github.io/deidentifier/development/contributing/).
 
 ## Evaluation
 
-A standalone harness (not part of the web UI) scores the pipeline against
-annotated ground truth:
+A standalone harness scores the pipeline against annotated ground truth,
+reporting document-level leakage alongside character- and span-level metrics:
 
 ```bash
 uv run python -m backend.src.evaluation.run \
-    --input annotations.jsonl \
-    --output evaluation-results.json \
-    --detectors rules,llm
+    --input annotations.jsonl --output evaluation-results.json --detectors rules,llm
 ```
 
-- **Inputs:** our JSONL format (`{"document_id", "text", "entities": [{"start",
-  "end", "entity_type"}]}`) or INCEpTION UIMA-CAS JSON exports (the LLMAIx
-  annotation format) — single files, directories, or `.zip` archives. Custom
-  annotation labels map via `--label-map map.json`.
-- **Metrics:** character-level precision/recall/F1 with LLMAIx-compatible
-  semantics (positive class = redacted, whitespace/punctuation excluded),
-  span-level exact & overlap metrics, a per-entity-type breakdown, and —
-  most prominently — **document-level leakage** (% of documents with at
-  least one leaked character).
-- **Modes:** `--mode detection` (default; scores everything the detectors
-  find) or `--mode redaction` (scores what the default policy actually
-  masks — preserved clinical dates count as leaks if annotated).
-- `--restrict-to-gt-types` gives fair precision when the ground truth only
-  annotates a subset of PII types. By default the report contains **no
-  literal entity text**; `--include-sensitive-text` opts into a debugging
-  report that does.
+See [Evaluation](https://katherlab.github.io/deidentifier/evaluation/).
 
 ## Privacy defaults
 
 - All processing is in memory; nothing is persisted server-side.
 - Logs never contain document content (enforced by a safe logger).
 - API responses are sent with `Cache-Control: no-store`.
+- No analytics, telemetry, CDN, or third-party fonts and scripts.
+- All model and OCR backends are configurable base URLs, local by default; the
+  UI shows a banner when a configured endpoint is not local.
 - The repository contains only clearly marked synthetic example documents.
+
+## Project documents
+
+| File | Purpose |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | The canonical codebase guide (architecture, conventions, pitfalls) |
+| [`DESIGN_DOCUMENT.md`](DESIGN_DOCUMENT.md) | The v1 design and milestones |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release notes |
+| [`.github/SECURITY.md`](.github/SECURITY.md) | Vulnerability disclosure policy |
+| [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | Bundled OSS components and licenses |
+| [`CITATION.cff`](CITATION.cff) | Citation metadata |
+
+## License
+
+AGPL-3.0-or-later. See [`LICENSE`](LICENSE).

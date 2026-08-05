@@ -1,0 +1,119 @@
+name: security
+
+# Static analysis, dependency auditing, and license compliance.
+#
+# Automatic triggers are disabled while the repository is private (Actions
+# minutes would be billed, and CodeQL for private repos needs GitHub Advanced
+# Security). Run manually via the Actions tab; restore the triggers below when
+# the repo goes public.
+#
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
+#     branches: [main]
+#   schedule:
+#     - cron: "17 4 * * 1"   # Mondays, 04:17 UTC
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Audit Python dependencies (production only)
+        # Informational: an unfixed advisory in a transitive dependency should
+        # not block a commit, but it should be visible in the run log.
+        continue-on-error: true
+        run: |
+          uv export --no-dev --no-emit-project --format requirements-txt > requirements.txt
+          uvx pip-audit --requirement requirements.txt --strict
+
+      - name: Audit npm dependencies (production only)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
+  trivy:
+    name: Trivy filesystem scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan repository
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+
+  licenses:
+    name: License compliance
+    runs-on: ubuntu-latest
+
+    # The project is AGPL-3.0-or-later, so copyleft dependencies are not a
+    # problem in themselves — but a new one changes the distribution terms and
+    # should be a conscious decision. This job re-generates the notices and
+    # fails if they are out of date.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Regenerate third-party notices
+        run: ./scripts/generate-third-party-notices.sh
+
+      - name: Fail if THIRD_PARTY_NOTICES.md is stale
+        run: |
+          if ! git diff --quiet THIRD_PARTY_NOTICES.md; then
+            echo "THIRD_PARTY_NOTICES.md is out of date."
+            echo "Run ./scripts/generate-third-party-notices.sh and commit the result."
+            git diff --stat THIRD_PARTY_NOTICES.md
+            exit 1
+          fi

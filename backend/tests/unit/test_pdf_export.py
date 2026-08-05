@@ -333,7 +333,9 @@ def test_raster_fallback_applies_area(monkeypatch):
     pdf = make_pdf(["Signature Dr. Demo"])
     area = area_over_first_line()
     output = redact_native_pdf(pdf, [], native_settings(), areas=[area])
-    assert _dark_fraction_in_area(output, area, scale=native_settings().VISION_OCR_RENDER_SCALE) > 0.8
+    assert (
+        _dark_fraction_in_area(output, area, scale=native_settings().VISION_OCR_RENDER_SCALE) > 0.8
+    )
 
 
 def test_area_on_other_page_leaves_page_untouched():

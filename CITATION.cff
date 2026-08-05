@@ -1,0 +1,46 @@
+cff-version: 1.2.0
+title: "Medical Document Anonymizer (deidentifier)"
+message: >-
+  If you use this software in your research, please cite it using the metadata
+  from this file.
+type: software
+
+authors:
+  - family-names: "Wolf"
+    given-names: "Fabian"
+    affiliation: >-
+      Else Kroener Fresenius Center for Digital Health, Faculty of Medicine
+      and University Hospital Carl Gustav Carus, TUD Dresden University of
+      Technology, Dresden, Germany
+    email: "fabian.wolf2@tu-dresden.de"
+
+  - name: "KatherLab"
+    website: "https://github.com/KatherLab"
+
+repository-code: "https://github.com/KatherLab/deidentifier"
+url: "https://github.com/KatherLab/deidentifier"
+
+abstract: >-
+  A locally deployable web application that anonymizes German clinical
+  documents. Rule-based recognizers and a prompted large language model behind
+  any OpenAI-compatible endpoint propose character spans; deterministic code
+  applies every replacement on the immutable source text, and an independent
+  leakage-validation pass re-scans the output. Documents are processed in
+  memory only and nothing is persisted. The repository also contains a
+  standalone evaluation harness that scores the pipeline against annotated
+  ground truth, reporting document-level leakage alongside character- and
+  span-level metrics.
+
+keywords:
+  - "de-identification"
+  - "anonymization"
+  - "large language models"
+  - "named entity recognition"
+  - "clinical text"
+  - "German clinical documents"
+  - "medical natural language processing"
+  - "privacy-preserving artificial intelligence"
+
+license: "AGPL-3.0-or-later"
+version: "0.1.0"
+date-released: "2026-08-05"

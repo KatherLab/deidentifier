@@ -1,0 +1,68 @@
+name: docs
+
+# Builds the MkDocs site (catching broken links and missing nav pages via
+# --strict) and deploys it to GitHub Pages.
+#
+# Automatic triggers are disabled while the repository is private (Actions
+# minutes would be billed). Run manually via the Actions tab when needed;
+# restore the push/pull_request triggers below when the repo goes public —
+# and enable Pages once under Settings → Pages → Source: GitHub Actions.
+#
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+#       - "docs/**"
+#       - "mkdocs.yml"
+#       - "README.md"
+#       - ".github/workflows/docs.yml"
+#   pull_request:
+#     branches: [main]
+#     paths:
+#       - "docs/**"
+#       - "mkdocs.yml"
+#       - ".github/workflows/docs.yml"
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build site (strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Build site
+        # --strict turns broken internal links and missing nav pages into
+        # errors. Every page in docs/ is self-contained, so it can stay on.
+        run: uv run --only-group docs mkdocs build --strict --site-dir site
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

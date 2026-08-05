@@ -23,8 +23,16 @@ dependencies = [
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
     "httpx>=0.28",
     "ruff>=0.9",
+]
+# Documentation site (MkDocs Material). Installed on its own so neither the
+# runtime image nor the test environment pulls it in:
+#   uv run --only-group docs mkdocs serve
+docs = [
+    "mkdocs-material>=9.6",
+    "mkdocs-include-markdown-plugin>=7.1",
 ]
 
 [tool.ruff]

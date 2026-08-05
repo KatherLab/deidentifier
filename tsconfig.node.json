@@ -13,5 +13,11 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["frontend/vite.config.ts"]
+  "include": [
+    "frontend/vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "playwright.screenshots.config.ts",
+    "e2e/**/*.ts"
+  ]
 }

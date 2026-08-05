@@ -104,9 +104,7 @@ async def test_force_ocr_bypasses_text_probe():
     # proving the embedded text was deliberately ignored.
     pdf = make_pdf(["Patient: Max Mustermann, geb. 01.02.1980"])
     with pytest.raises(ExtractionError) as excinfo:
-        await extract_document(
-            pdf, "brief.pdf", settings_with(OCR_ENGINE="none"), force_ocr=True
-        )
+        await extract_document(pdf, "brief.pdf", settings_with(OCR_ENGINE="none"), force_ocr=True)
     assert excinfo.value.status_code == 503
     assert "OCR was requested" in str(excinfo.value)
 
