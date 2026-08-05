@@ -1,5 +1,7 @@
 """Request/response schemas for the anonymization and status endpoints."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, model_validator
 
 from .entities import (
@@ -139,6 +141,14 @@ class Limits(BaseModel):
     max_text_chars: int
 
 
+class Banner(BaseModel):
+    """Operator-configured deployment banner (BANNER_* in .env). The text is
+    shown verbatim in every interface language."""
+
+    text: str
+    color: Literal["amber", "red", "blue", "green", "gray"]
+
+
 class StatusResponse(BaseModel):
     app_env: str
     version: str
@@ -146,3 +156,4 @@ class StatusResponse(BaseModel):
     ocr_engine: str
     external_endpoints: list[ExternalEndpoint]
     limits: Limits
+    banner: Banner | None = None

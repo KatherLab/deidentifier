@@ -30,6 +30,7 @@ import { DEFAULT_POLICY, policyDeviations } from '@/utils/policy'
 import type {
   AnonymizeResponse,
   AnonymizedEntity,
+  Banner,
   CustomRules,
   DetectorStatus,
   EntityType,
@@ -314,6 +315,9 @@ export const useSessionStore = defineStore('session', () => {
   const externalEndpoints = computed<ExternalEndpoint[]>(
     () => status.value?.external_endpoints.filter((endpoint) => !endpoint.local) ?? [],
   )
+
+  /** Deployment-wide banner configured by the operator (null when disabled). */
+  const banner = computed<Banner | null>(() => status.value?.banner ?? null)
 
   /** Detectors that are enabled but not ready (e.g. LLM not configured). */
   const notReadyDetectors = computed<DetectorStatus[]>(
@@ -986,6 +990,7 @@ export const useSessionStore = defineStore('session', () => {
     removeRedactArea,
     addImageAreas,
     status,
+    banner,
     externalEndpoints,
     notReadyDetectors,
     fetchStatus,

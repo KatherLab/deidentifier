@@ -12,6 +12,9 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+#: Colour schemes the frontend banner knows how to render.
+BANNER_COLORS = ("amber", "red", "blue", "green", "gray")
+
 
 def _default_env_file() -> str | None:
     """ENV_PATH wins; otherwise the repo-top .env, then backend/.env."""
@@ -43,6 +46,13 @@ class Settings(BaseSettings):
     APP_MAX_TEXT_CHARS: int = Field(default=500_000, ge=1)
     APP_ALLOW_INSECURE_CONTENT_LOGGING: bool = False
     APP_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+
+    # Deployment banner shown above the header (e.g. "Research Use Only!").
+    # The text is operator-authored and displayed verbatim in every interface
+    # language — it is a deployment statement, not UI text.
+    BANNER_ENABLED: bool = False
+    BANNER_TEXT: str = ""
+    BANNER_COLOR: str = "amber"  # amber | red | blue | green | gray
 
     # Detectors: comma-separated (mock | rules | llm | privacy_filter)
     DETECTORS: str = "rules"
@@ -106,6 +116,22 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.APP_MAX_UPLOAD_MB * 1024 * 1024
+
+    @property
+    def banner_text(self) -> str:
+        return self.BANNER_TEXT.strip()
+
+    @property
+    def banner_color(self) -> str:
+        """An unrecognized colour name falls back to amber — a typo here must
+        not keep the deployment from starting."""
+        color = self.BANNER_COLOR.strip().lower()
+        return color if color in BANNER_COLORS else "amber"
+
+    @property
+    def banner_active(self) -> bool:
+        """Enabled *and* non-empty — an empty banner would be a blank bar."""
+        return self.BANNER_ENABLED and bool(self.banner_text)
 
 
 def validate_production_settings(settings: Settings) -> None:

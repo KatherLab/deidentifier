@@ -19,6 +19,25 @@ environment variables always win.
 | `APP_ALLOW_INSECURE_CONTENT_LOGGING` | `false` | **Dev only.** Allows document content in logs, prints a loud startup warning, and is refused in production. |
 | `APP_CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Only relevant for local development; in Docker the frontend proxies same-origin. |
 
+## Deployment banner
+
+A bar above the header for a deployment-wide notice — "Research Use Only!",
+"Test system — do not use with patient data". The text is yours and is shown
+verbatim in every interface language, so write it in the language your users
+read (or keep it short and unambiguous).
+
+| Variable | Default | Notes |
+|---|---|---|
+| `BANNER_ENABLED` | `false` | Turns the banner on. Enabled with an empty `BANNER_TEXT` shows nothing. |
+| `BANNER_TEXT` | *(empty)* | The line to display, shown as written. |
+| `BANNER_COLOR` | `amber` | `amber`, `red`, `blue`, `green` or `gray`. An unrecognized value falls back to `amber` rather than failing startup. |
+
+```bash
+BANNER_ENABLED=true
+BANNER_TEXT='Research Use Only!'
+BANNER_COLOR=amber
+```
+
 ## Detectors
 
 | Variable | Default | Notes |

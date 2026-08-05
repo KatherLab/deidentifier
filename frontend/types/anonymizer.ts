@@ -247,6 +247,14 @@ export interface StatusLimits {
   max_text_chars: number
 }
 
+export type BannerColor = 'amber' | 'red' | 'blue' | 'green' | 'gray'
+
+/** Operator-configured deployment banner (BANNER_* in .env); null when off. */
+export interface Banner {
+  text: string
+  color: BannerColor
+}
+
 export interface StatusResponse {
   app_env: string
   version: string
@@ -254,4 +262,5 @@ export interface StatusResponse {
   ocr_engine: string
   external_endpoints: ExternalEndpoint[]
   limits: StatusLimits
+  banner: Banner | null
 }

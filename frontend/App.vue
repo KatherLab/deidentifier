@@ -1,5 +1,12 @@
 <template>
   <div class="min-h-screen">
+    <!-- Deployment banner (BANNER_* in the backend .env), above everything. -->
+    <DeploymentBanner
+      v-if="session.banner"
+      :text="session.banner.text"
+      :color="session.banner.color"
+    />
+
     <header class="border-b border-default">
       <div class="mx-auto flex items-center gap-3 px-4 py-4" :class="containerClass">
         <h1 class="text-xl font-semibold text-content">{{ t('app.title') }}</h1>
@@ -113,6 +120,7 @@ import { useI18n } from 'vue-i18n'
 import { AlertTriangle, Moon, Settings, Sun } from '@lucide/vue'
 import InputPanel from '@/components/anonymizer/InputPanel.vue'
 import ResultView from '@/components/anonymizer/ResultView.vue'
+import DeploymentBanner from '@/components/common/DeploymentBanner.vue'
 import LanguageSwitcher from '@/components/common/LanguageSwitcher.vue'
 import ToastContainer from '@/components/common/ToastContainer.vue'
 import { usePopover } from '@/composables/usePopover'

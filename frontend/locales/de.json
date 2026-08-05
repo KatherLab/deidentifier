@@ -16,6 +16,9 @@
     "fr": "Français",
     "es": "Español"
   },
+  "banner": {
+    "label": "Systemweiter Hinweis"
+  },
   "header": {
     "hints": {
       "dialog_label": "Systemhinweise",

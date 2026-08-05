@@ -423,6 +423,37 @@ def test_status_endpoint(client):
     assert {"mock", "rules"} <= names
     assert all(d["ready"] for d in body["detectors"])
     assert body["limits"]["max_upload_mb"] > 0
+    assert body["banner"] is None
+
+
+def test_status_reports_configured_banner(client, monkeypatch):
+    from backend.src.core.config import get_settings
+
+    monkeypatch.setenv("BANNER_ENABLED", "true")
+    monkeypatch.setenv("BANNER_TEXT", "Research Use Only!")
+    monkeypatch.setenv("BANNER_COLOR", "red")
+    get_settings.cache_clear()
+    body = client.get("/api/v1/status").json()
+    assert body["banner"] == {"text": "Research Use Only!", "color": "red"}
+
+
+def test_status_omits_enabled_banner_without_text(client, monkeypatch):
+    from backend.src.core.config import get_settings
+
+    monkeypatch.setenv("BANNER_ENABLED", "true")
+    monkeypatch.setenv("BANNER_TEXT", "   ")
+    get_settings.cache_clear()
+    assert client.get("/api/v1/status").json()["banner"] is None
+
+
+def test_status_falls_back_to_amber_for_unknown_banner_color(client, monkeypatch):
+    from backend.src.core.config import get_settings
+
+    monkeypatch.setenv("BANNER_ENABLED", "true")
+    monkeypatch.setenv("BANNER_TEXT", "Testsystem")
+    monkeypatch.setenv("BANNER_COLOR", "chartreuse")
+    get_settings.cache_clear()
+    assert client.get("/api/v1/status").json()["banner"]["color"] == "amber"
 
 
 def test_health_endpoints(client):

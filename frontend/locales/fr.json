@@ -16,6 +16,9 @@
     "fr": "Français",
     "es": "Español"
   },
+  "banner": {
+    "label": "Avis à l’échelle du système"
+  },
   "header": {
     "hints": {
       "dialog_label": "Informations système",

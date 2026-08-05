@@ -20,6 +20,8 @@ documentation, and CI work are left out.
   the AI re-check's notes, and the export file name follow the language chosen
   for the run. It is fixed when anonymization starts, so switching the
   interface language while reviewing never rewrites a finished document.
+- Deployment banner above the header (e.g. "Research Use Only!"), configured
+  with `BANNER_ENABLED`, `BANNER_TEXT` and `BANNER_COLOR`.
 - Documentation site (MkDocs Material) under `docs/`:
   `uv run --only-group docs mkdocs serve`.
 

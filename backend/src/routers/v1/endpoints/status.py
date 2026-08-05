@@ -7,7 +7,13 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends
 
 from ....core.config import Settings, get_settings
-from ....schemas.anonymize import DetectorStatus, ExternalEndpoint, Limits, StatusResponse
+from ....schemas.anonymize import (
+    Banner,
+    DetectorStatus,
+    ExternalEndpoint,
+    Limits,
+    StatusResponse,
+)
 from ....utils.detection import detector_ready
 
 router = APIRouter()
@@ -55,5 +61,10 @@ async def status(settings: Settings = Depends(get_settings)) -> StatusResponse:
         limits=Limits(
             max_upload_mb=settings.APP_MAX_UPLOAD_MB,
             max_text_chars=settings.APP_MAX_TEXT_CHARS,
+        ),
+        banner=(
+            Banner.model_validate({"text": settings.banner_text, "color": settings.banner_color})
+            if settings.banner_active
+            else None
         ),
     )
