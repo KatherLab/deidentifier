@@ -1,3 +1,8 @@
+> [!CAUTION]
+> **This is an internal evaluation tool.** Its output does **not** establish
+> legal anonymization. Results must be reviewed by a human, and anonymization
+> quality must be validated locally before any downstream use.
+
 # Medical Document Anonymizer
 
 A locally deployable web app that anonymizes German clinical documents: drop a
@@ -5,10 +10,6 @@ document (or paste text), click one button, get anonymized text out — with a
 review view showing exactly what was redacted and why.
 
 ![The redacted-PDF preview: the uploaded document with true blackout redaction](docs/assets/screenshots/result-pdf.png)
-
-> **This is an internal evaluation tool.** Its output does **not** establish
-> legal anonymization. Results must be reviewed by a human, and anonymization
-> quality must be validated locally before any downstream use.
 
 📖 **[Full documentation](https://katherlab.github.io/deidentifier/)** —
 getting started, user guide, operations, evaluation, security, development.

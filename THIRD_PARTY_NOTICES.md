@@ -18,7 +18,7 @@ is excluded because it is not distributed.
 | Name               | Version   | License                                                          | URL                                                                  |
 |--------------------|-----------|------------------------------------------------------------------|----------------------------------------------------------------------|
 | distro             | 1.9.0     | Apache Software License                                          | https://github.com/python-distro/distro                              |
-| openai             | 2.46.0    | Apache Software License                                          | https://github.com/openai/openai-python                              |
+| openai             | 2.53.0    | Apache Software License                                          | https://github.com/openai/openai-python                              |
 | sniffio            | 1.3.1     | Apache Software License; MIT License                             | https://github.com/python-trio/sniffio                               |
 | uvloop             | 0.22.1    | Apache Software License; MIT License                             | UNKNOWN                                                              |
 | python-multipart   | 0.0.32    | Apache-2.0                                                       | https://github.com/Kludex/python-multipart                           |
@@ -30,15 +30,16 @@ is excluded because it is not distributed.
 | lxml               | 6.1.1     | BSD-3-Clause                                                     | https://lxml.de/                                                     |
 | pypdf              | 6.14.2    | BSD-3-Clause                                                     | https://github.com/py-pdf/pypdf                                      |
 | python-dotenv      | 1.2.2     | BSD-3-Clause                                                     | https://github.com/theskumar/python-dotenv                           |
-| starlette          | 1.3.1     | BSD-3-Clause                                                     | https://github.com/Kludex/starlette                                  |
-| uvicorn            | 0.51.0    | BSD-3-Clause                                                     | https://uvicorn.dev/                                                 |
-| websockets         | 16.1.1    | BSD-3-Clause                                                     | https://github.com/python-websockets/websockets                      |
+| starlette          | 1.4.0     | BSD-3-Clause                                                     | https://github.com/Kludex/starlette                                  |
+| uvicorn            | 0.52.1    | BSD-3-Clause                                                     | https://uvicorn.dev/                                                 |
+| websockets         | 17.0.1    | BSD-3-Clause                                                     | https://github.com/python-websockets/websockets                      |
 | pypdfium2          | 5.12.1    | BSD-3-Clause, Apache-2.0, dependency licenses                    | https://github.com/pypdfium2-team/pypdfium2                          |
 | pymupdf            | 1.28.0    | Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License | https://github.com/pymupdf/pymupdf                                   |
-| annotated-doc      | 0.0.4     | MIT                                                              | https://github.com/fastapi/annotated-doc                             |
+| annotated-doc      | 0.0.5     | MIT                                                              | https://github.com/fastapi/annotated-doc                             |
+| annotated-types    | 0.8.0     | MIT                                                              | https://github.com/annotated-types/annotated-types                   |
 | anyio              | 4.14.2    | MIT                                                              | https://anyio.readthedocs.io/en/stable/versionhistory.html           |
 | charset-normalizer | 3.4.9     | MIT                                                              | https://github.com/jawah/charset_normalizer/blob/master/CHANGELOG.md |
-| fastapi            | 0.139.2   | MIT                                                              | https://github.com/fastapi/fastapi                                   |
+| fastapi            | 0.141.1   | MIT                                                              | https://github.com/fastapi/fastapi                                   |
 | httptools          | 0.8.0     | MIT                                                              | https://github.com/MagicStack/httptools                              |
 | jiter              | 0.16.0    | MIT                                                              | https://github.com/pydantic/jiter/                                   |
 | pydantic           | 2.13.4    | MIT                                                              | https://github.com/pydantic/pydantic                                 |
@@ -46,12 +47,11 @@ is excluded because it is not distributed.
 | pydantic_core      | 2.46.4    | MIT                                                              | https://github.com/pydantic                                          |
 | typing-inspection  | 0.4.2     | MIT                                                              | https://github.com/pydantic/typing-inspection                        |
 | PyYAML             | 6.0.3     | MIT License                                                      | https://pyyaml.org/                                                  |
-| annotated-types    | 0.7.0     | MIT License                                                      | https://github.com/annotated-types/annotated-types                   |
 | h11                | 0.16.0    | MIT License                                                      | https://github.com/python-hyper/h11                                  |
 | python-docx        | 1.2.0     | MIT License                                                      | https://github.com/python-openxml/python-docx                        |
 | watchfiles         | 1.2.0     | MIT License                                                      | https://github.com/samuelcolvin/watchfiles                           |
 | pillow             | 12.3.0    | MIT-CMU                                                          | https://python-pillow.github.io                                      |
-| tqdm               | 4.69.0    | MPL-2.0 AND MIT                                                  | https://tqdm.github.io                                               |
+| tqdm               | 4.70.0    | MPL-2.0 AND MIT                                                  | https://tqdm.github.io                                               |
 | certifi            | 2026.7.22 | Mozilla Public License 2.0 (MPL 2.0)                             | https://github.com/certifi/python-certifi                            |
 | typing_extensions  | 4.16.0    | PSF-2.0                                                          | https://github.com/python/typing_extensions                          |
 
@@ -59,37 +59,42 @@ is excluded because it is not distributed.
 
 - [@babel/helper-string-parser@7.29.7](https://github.com/babel/babel) - MIT
 - [@babel/helper-validator-identifier@7.29.7](https://github.com/babel/babel) - MIT
-- [@babel/parser@7.29.7](https://github.com/babel/babel) - MIT
-- [@babel/types@7.29.7](https://github.com/babel/babel) - MIT
+- [@babel/parser@7.29.8](https://github.com/babel/babel) - MIT
+- [@babel/types@7.29.8](https://github.com/babel/babel) - MIT
+- [@intlify/core-base@11.4.8](https://github.com/intlify/vue-i18n) - MIT
+- [@intlify/devtools-types@11.4.8](https://github.com/intlify/vue-i18n) - MIT
+- [@intlify/message-compiler@11.4.8](https://github.com/intlify/vue-i18n) - MIT
+- [@intlify/shared@11.4.8](https://github.com/intlify/vue-i18n) - MIT
 - [@jridgewell/gen-mapping@0.3.13](https://github.com/jridgewell/sourcemaps) - MIT
 - [@jridgewell/remapping@2.3.5](https://github.com/jridgewell/sourcemaps) - MIT
 - [@jridgewell/resolve-uri@3.1.2](https://github.com/jridgewell/resolve-uri) - MIT
 - [@jridgewell/sourcemap-codec@1.5.5](https://github.com/jridgewell/sourcemaps) - MIT
 - [@jridgewell/trace-mapping@0.3.31](https://github.com/jridgewell/sourcemaps) - MIT
-- [@lucide/vue@1.25.0](https://github.com/lucide-icons/lucide) - ISC
-- [@oxc-project/types@0.139.0](https://github.com/oxc-project/oxc) - MIT
-- [@rolldown/binding-darwin-arm64@1.1.5](https://github.com/rolldown/rolldown) - MIT
+- [@lucide/vue@1.28.0](https://github.com/lucide-icons/lucide) - ISC
+- [@oxc-project/types@0.143.0](https://github.com/oxc-project/oxc) - MIT
+- [@rolldown/binding-darwin-arm64@1.2.3](https://github.com/rolldown/rolldown) - MIT
 - [@rolldown/pluginutils@1.0.1](https://github.com/rolldown/plugins) - MIT
 - [@tailwindcss/node@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [@tailwindcss/oxide-darwin-arm64@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [@tailwindcss/oxide@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [@tailwindcss/vite@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
-- [@types/node@26.1.1](https://github.com/DefinitelyTyped/DefinitelyTyped) - MIT
-- [@vue/compiler-core@3.5.40](https://github.com/vuejs/core) - MIT
-- [@vue/compiler-dom@3.5.40](https://github.com/vuejs/core) - MIT
-- [@vue/compiler-sfc@3.5.40](https://github.com/vuejs/core) - MIT
-- [@vue/compiler-ssr@3.5.40](https://github.com/vuejs/core) - MIT
+- [@types/node@26.1.2](https://github.com/DefinitelyTyped/DefinitelyTyped) - MIT
+- [@vue/compiler-core@3.5.41](https://github.com/vuejs/core) - MIT
+- [@vue/compiler-dom@3.5.41](https://github.com/vuejs/core) - MIT
+- [@vue/compiler-sfc@3.5.41](https://github.com/vuejs/core) - MIT
+- [@vue/compiler-ssr@3.5.41](https://github.com/vuejs/core) - MIT
+- [@vue/devtools-api@6.6.4](https://github.com/vuejs/vue-devtools) - MIT
 - [@vue/devtools-api@8.1.5](https://github.com/vuejs/devtools) - MIT
 - [@vue/devtools-kit@8.1.5](https://github.com/vuejs/devtools) - MIT
 - [@vue/devtools-shared@8.1.5](https://github.com/vuejs/devtools) - MIT
-- [@vue/reactivity@3.5.40](https://github.com/vuejs/core) - MIT
-- [@vue/runtime-core@3.5.40](https://github.com/vuejs/core) - MIT
-- [@vue/runtime-dom@3.5.40](https://github.com/vuejs/core) - MIT
-- [@vue/server-renderer@3.5.40](https://github.com/vuejs/core) - MIT
-- [@vue/shared@3.5.40](https://github.com/vuejs/core) - MIT
+- [@vue/reactivity@3.5.41](https://github.com/vuejs/core) - MIT
+- [@vue/runtime-core@3.5.41](https://github.com/vuejs/core) - MIT
+- [@vue/runtime-dom@3.5.41](https://github.com/vuejs/core) - MIT
+- [@vue/server-renderer@3.5.41](https://github.com/vuejs/core) - MIT
+- [@vue/shared@3.5.41](https://github.com/vuejs/core) - MIT
 - [agent-base@6.0.2](https://github.com/TooTallNate/node-agent-base) - MIT
 - [asynckit@0.4.0](https://github.com/alexindigo/asynckit) - MIT
-- [axios@1.18.1](https://github.com/axios/axios) - MIT
+- [axios@1.19.0](https://github.com/axios/axios) - MIT
 - [birpc@2.9.0](https://github.com/antfu-collective/birpc) - MIT
 - [call-bind-apply-helpers@1.0.2](https://github.com/ljharb/call-bind-apply-helpers) - MIT
 - [combined-stream@1.0.8](https://github.com/felixge/node-combined-stream) - MIT
@@ -122,26 +127,29 @@ is excluded because it is not distributed.
 - [https-proxy-agent@5.0.1](https://github.com/TooTallNate/node-https-proxy-agent) - MIT
 - [jiti@2.7.0](https://github.com/unjs/jiti) - MIT
 - [lightningcss-darwin-arm64@1.32.0](https://github.com/parcel-bundler/lightningcss) - MPL-2.0
+- [lightningcss-darwin-arm64@1.33.0](https://github.com/parcel-bundler/lightningcss) - MPL-2.0
 - [lightningcss@1.32.0](https://github.com/parcel-bundler/lightningcss) - MPL-2.0
+- [lightningcss@1.33.0](https://github.com/parcel-bundler/lightningcss) - MPL-2.0
 - [magic-string@0.30.21](https://github.com/Rich-Harris/magic-string) - MIT
 - [math-intrinsics@1.1.0](https://github.com/es-shims/math-intrinsics) - MIT
 - [mime-db@1.52.0](https://github.com/jshttp/mime-db) - MIT
 - [mime-types@2.1.35](https://github.com/jshttp/mime-types) - MIT
 - [ms@2.1.3](https://github.com/vercel/ms) - MIT
-- [nanoid@3.3.16](https://github.com/ai/nanoid) - MIT
+- [nanoid@3.3.17](https://github.com/ai/nanoid) - MIT
 - [nostics@1.2.0](https://github.com/vercel-labs/nostics) - MIT
 - [perfect-debounce@2.1.0](https://github.com/unjs/perfect-debounce) - MIT
 - [picocolors@1.1.1](https://github.com/alexeyraspopov/picocolors) - ISC
 - [picomatch@4.0.5](https://github.com/micromatch/picomatch) - MIT
 - [pinia@4.0.2](https://github.com/vuejs/pinia) - MIT
-- [postcss@8.5.22](https://github.com/postcss/postcss) - MIT
+- [postcss@8.5.25](https://github.com/postcss/postcss) - MIT
 - [proxy-from-env@2.1.0](https://github.com/Rob--W/proxy-from-env) - MIT
-- [rolldown@1.1.5](https://github.com/rolldown/rolldown) - MIT
+- [rolldown@1.2.3](https://github.com/rolldown/rolldown) - MIT
 - [source-map-js@1.2.1](https://github.com/7rulnik/source-map-js) - BSD-3-Clause
 - [tailwindcss@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [tapable@2.3.3](https://github.com/webpack/tapable) - MIT
 - [tinyglobby@0.2.17](https://github.com/SuperchupuDev/tinyglobby) - MIT
 - [typescript@6.0.3](https://github.com/microsoft/TypeScript) - Apache-2.0
 - [undici-types@8.3.0](https://github.com/nodejs/undici) - MIT
-- [vite@8.1.5](https://github.com/vitejs/vite) - MIT
-- [vue@3.5.40](https://github.com/vuejs/core) - MIT
+- [vite@8.2.0](https://github.com/vitejs/vite) - MIT
+- [vue-i18n@11.4.8](https://github.com/intlify/vue-i18n) - MIT
+- [vue@3.5.41](https://github.com/vuejs/core) - MIT
