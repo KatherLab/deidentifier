@@ -131,11 +131,33 @@
       </div>
     </section>
 
+    <!-- Texterkennung: force OCR (only when an OCR engine is configured). -->
+    <section v-if="ocrEnabled" class="space-y-3 border-t border-default pt-4">
+      <h3 class="text-sm font-semibold text-content">Texterkennung (OCR)</h3>
+      <label class="flex items-start gap-3">
+        <input
+          type="checkbox"
+          class="mt-0.5 h-4 w-4 shrink-0 rounded border-strong text-purple-600 focus:ring-ring"
+          :checked="session.forceOcr"
+          @change="onForceOcrChange($event)"
+        />
+        <span class="min-w-0">
+          <span class="text-sm font-medium text-content">OCR erzwingen</span>
+          <span class="mt-0.5 block text-xs text-content-subtle">
+            Liest hochgeladene PDFs immer per Texterkennung neu ein, statt eine vorhandene Textebene
+            zu verwenden. Sinnvoll für Scans mit fehlender oder fehlerhafter Textebene. Betrifft nur
+            PDF-Uploads (nicht Text/DOCX) und macht die Verarbeitung langsamer.
+          </span>
+        </span>
+      </label>
+    </section>
+
     <p class="text-xs text-content-subtle">Änderungen gelten für den nächsten Durchlauf.</p>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import ChipsInput from '@/components/common/ChipsInput.vue'
 import { useSessionStore } from '@/stores/session'
@@ -150,6 +172,13 @@ const session = useSessionStore()
 
 /** Row order follows the German label map (all 12 entity types). */
 const entityTypes = Object.keys(ENTITY_TYPE_LABELS) as EntityType[]
+
+/** Force-OCR only makes sense when the backend has an OCR engine configured. */
+const ocrEnabled = computed(() => (session.status?.ocr_engine ?? 'none') !== 'none')
+
+function onForceOcrChange(event: Event): void {
+  session.forceOcr = (event.target as HTMLInputElement).checked
+}
 
 function isCustomized(type: EntityType): boolean {
   return session.policy[type] !== DEFAULT_POLICY[type]

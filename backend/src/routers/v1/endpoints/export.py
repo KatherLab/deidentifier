@@ -75,6 +75,11 @@ async def _read_pdf_upload(form, settings: Settings) -> bytes:
     return data
 
 
+def _parse_bool(raw) -> bool:
+    """Parse a multipart boolean flag; accepts 'true'/'1'/'yes'/'on'."""
+    return isinstance(raw, str) and raw.strip().lower() in {"true", "1", "yes", "on"}
+
+
 def _parse_terms(raw) -> list[str] | None:
     if not isinstance(raw, str) or not raw.strip():
         return None
@@ -118,6 +123,7 @@ async def export_pdf(
     redact_terms = _parse_terms(form.get("redact_terms"))
     preserve_terms = _parse_terms(form.get("preserve_terms"))
     redact_areas = _parse_areas(form.get("redact_areas"))
+    force_ocr = _parse_bool(form.get("force_ocr"))
 
     file_hash = hashlib.sha256(data).hexdigest()
     request_id = form.get("request_id")
@@ -131,6 +137,7 @@ async def export_pdf(
         redact_terms,
         preserve_terms,
         settings,
+        force_ocr,
     )
 
     try:
@@ -190,6 +197,7 @@ async def _detect(
     redact_terms: list[str] | None,
     preserve_terms: list[str] | None,
     settings: Settings,
+    force_ocr: bool = False,
 ) -> tuple[AnonymizeResponse, list[LayoutLine], int, str]:
     """Reuse cached detection when the file matches; otherwise run the full
     pipeline (extraction incl. OCR + detection)."""
@@ -203,7 +211,7 @@ async def _detect(
                 return result, entry.layout, entry.page_count, entry.source_type
 
     try:
-        extracted = await extract_document(data, "export.pdf", settings)
+        extracted = await extract_document(data, "export.pdf", settings, force_ocr=force_ocr)
     except ExtractionError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
     try:

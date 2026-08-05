@@ -97,6 +97,41 @@ async def test_scanned_pdf_with_unavailable_engine():
     assert excinfo.value.status_code == 501
 
 
+async def test_force_ocr_bypasses_text_probe():
+    # A PDF WITH a good embedded text layer would normally extract locally as
+    # "pdf"; force_ocr must skip the probe and route to OCR instead. With no OCR
+    # engine that surfaces as the dedicated "OCR was requested" error (503) —
+    # proving the embedded text was deliberately ignored.
+    pdf = make_pdf(["Patient: Max Mustermann, geb. 01.02.1980"])
+    with pytest.raises(ExtractionError) as excinfo:
+        await extract_document(
+            pdf, "brief.pdf", settings_with(OCR_ENGINE="none"), force_ocr=True
+        )
+    assert excinfo.value.status_code == 503
+    assert "OCR was requested" in str(excinfo.value)
+
+
+async def test_force_ocr_routes_text_pdf_through_ocr_engine(monkeypatch):
+    # With an OCR engine available, force_ocr re-OCRs the text PDF: the result
+    # is the OCR output (source_type "pdf-ocr"), not the embedded text layer.
+    from backend.src.services import docling_serve_client
+
+    async def fake_convert(self, data, filename, *, do_ocr=False, force_ocr=False):
+        assert do_ocr and force_ocr
+        return "OCR: Herr Mustermann"
+
+    monkeypatch.setattr(docling_serve_client.DoclingServeClient, "convert_pdf", fake_convert)
+    pdf = make_pdf(["Patient: Max Mustermann, geb. 01.02.1980"])
+    doc = await extract_document(
+        pdf,
+        "brief.pdf",
+        settings_with(OCR_ENGINE="docling_tesseract", DOCLING_SERVE_URL="http://docling"),
+        force_ocr=True,
+    )
+    assert doc.source_type == "pdf-ocr"
+    assert doc.text == "OCR: Herr Mustermann"
+
+
 async def test_unknown_extension_rejected():
     with pytest.raises(ExtractionError) as excinfo:
         await extract_document(b"data", "tabelle.xlsx", settings_with())

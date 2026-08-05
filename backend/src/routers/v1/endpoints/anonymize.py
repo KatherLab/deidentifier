@@ -114,6 +114,7 @@ class _UploadInput:
     custom_instruction: str | None = None
     redact_terms: list[str] | None = None
     preserve_terms: list[str] | None = field(default=None)
+    force_ocr: bool = False
 
 
 async def _handle_upload(request: Request, settings: Settings) -> AnonymizeResponse:
@@ -129,6 +130,7 @@ async def _parse_upload(request: Request, settings: Settings) -> _UploadInput:
         custom_instruction = None
     redact_terms = _parse_terms_form(form.get("redact_terms"))
     preserve_terms = _parse_terms_form(form.get("preserve_terms"))
+    force_ocr = _parse_bool_form(form.get("force_ocr"))
     upload = form.get("file")
     if not isinstance(upload, UploadFile):
         raise HTTPException(status_code=400, detail="Multipart field 'file' is required.")
@@ -150,6 +152,7 @@ async def _parse_upload(request: Request, settings: Settings) -> _UploadInput:
         custom_instruction=custom_instruction,
         redact_terms=redact_terms,
         preserve_terms=preserve_terms,
+        force_ocr=force_ocr,
     )
 
 
@@ -159,7 +162,11 @@ async def _process_upload(
     started = time.perf_counter()
     try:
         extracted = await extract_document(
-            upload_input.data, upload_input.filename, settings, progress=progress
+            upload_input.data,
+            upload_input.filename,
+            settings,
+            progress=progress,
+            force_ocr=upload_input.force_ocr,
         )
     except ExtractionError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
@@ -316,6 +323,11 @@ def _parse_terms_form(raw) -> list[str] | None:
         return terms or None
     except (json.JSONDecodeError, ValueError):
         raise HTTPException(status_code=422, detail="Invalid terms payload.") from None
+
+
+def _parse_bool_form(raw) -> bool:
+    """Parse a multipart boolean flag; accepts 'true'/'1'/'yes'/'on'."""
+    return isinstance(raw, str) and raw.strip().lower() in {"true", "1", "yes", "on"}
 
 
 def _check_text_limits(text: str, settings: Settings) -> None:

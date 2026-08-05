@@ -54,7 +54,7 @@ class ExtractedDocument(BaseModel):
 
 
 async def extract_document(
-    data: bytes, filename: str, settings: Settings, progress=None
+    data: bytes, filename: str, settings: Settings, progress=None, force_ocr: bool = False
 ) -> ExtractedDocument:
     suffix = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if suffix == "txt":
@@ -62,7 +62,7 @@ async def extract_document(
     if suffix == "docx":
         return extract_docx(data)
     if suffix == "pdf":
-        return await extract_pdf(data, filename, settings, progress=progress)
+        return await extract_pdf(data, filename, settings, progress=progress, force_ocr=force_ocr)
     raise ExtractionError("Unsupported file type; allowed: .txt, .docx, .pdf", status_code=415)
 
 
@@ -153,9 +153,12 @@ def _docx_warnings(data: bytes) -> list[str]:
 
 
 async def extract_pdf(
-    data: bytes, filename: str, settings: Settings, progress=None
+    data: bytes, filename: str, settings: Settings, progress=None, force_ocr: bool = False
 ) -> ExtractedDocument:
-    if has_embedded_text(
+    # force_ocr skips the embedded-text probe entirely: the user knows the
+    # embedded text is untrustworthy (e.g. a scan with a broken/garbage text
+    # layer, or a mixed PDF) and wants every page re-OCR'd.
+    if not force_ocr and has_embedded_text(
         data,
         min_chars=settings.DOCLING_MIN_EXTRACTED_CHARS_PDF,
         max_pages_to_check=settings.PDF_MAX_PAGES_FOR_TEXT_PROBE,
@@ -176,9 +179,14 @@ async def extract_pdf(
                 return fallback
         return _extract_pdf_local(data)
 
-    # Likely scanned → OCR routing.
+    # Likely scanned (or force_ocr) → OCR routing.
     engine = settings.OCR_ENGINE
     if engine == "none":
+        if force_ocr:
+            raise ExtractionError(
+                "OCR was requested, but no OCR engine is enabled (OCR_ENGINE=none).",
+                status_code=503,
+            )
         raise ExtractionError(
             "This PDF appears to contain scanned images and no extractable text. "
             "OCR is not enabled (OCR_ENGINE=none)."

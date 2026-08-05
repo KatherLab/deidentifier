@@ -102,6 +102,8 @@ export interface SessionDocument {
   policy: PolicyMap | null
   /** Custom rules captured at submit — used for ALL re-runs/exports. */
   rules: CustomRules | null
+  /** Force-OCR flag captured at submit — re-sent on export (cache-miss parity). */
+  forceOcr: boolean
   /** Aborts the in-flight stream request on reset. */
   abort: AbortController | null
 }
@@ -181,6 +183,15 @@ export const useSessionStore = defineStore('session', () => {
   const customInstruction = ref('')
   const redactTerms = ref<string[]>([])
   const preserveTerms = ref<string[]>([])
+
+  /**
+   * Force OCR (advanced settings). Skips the embedded-text probe so every page
+   * of an uploaded PDF is re-OCR'd — for scans whose text layer is missing or
+   * garbage. Only meaningful for PDF uploads; ignored for text/DOCX. Captured
+   * at submit (fresh-run only, like redactTerms) and re-sent on export so a
+   * cache-miss re-extraction matches.
+   */
+  const forceOcr = ref(false)
 
   const status = ref<StatusResponse | null>(null)
 
@@ -315,8 +326,10 @@ export const useSessionStore = defineStore('session', () => {
     }
   })
 
-  /** True when policy OR custom rules deviate from the defaults (badge). */
-  const advancedCustomized = computed(() => policyCustomized.value || customRules.value !== null)
+  /** True when policy OR custom rules OR force-OCR deviate from the defaults. */
+  const advancedCustomized = computed(
+    () => policyCustomized.value || customRules.value !== null || forceOcr.value,
+  )
 
   function setPolicyTransformation(type: EntityType, transformation: TransformationType): void {
     policy.value = { ...policy.value, [type]: transformation }
@@ -328,6 +341,7 @@ export const useSessionStore = defineStore('session', () => {
     customInstruction.value = ''
     redactTerms.value = []
     preserveTerms.value = []
+    forceOcr.value = false
   }
 
   // ---------------------------------------------------------------------
@@ -338,6 +352,7 @@ export const useSessionStore = defineStore('session', () => {
     input: { file: File | null; text: string | null; name: string },
     batchPolicy: PolicyMap | null,
     batchRules: CustomRules | null,
+    batchForceOcr: boolean,
   ): SessionDocument {
     const doc: SessionDocument = {
       id: `doc-${++documentIdCounter}`,
@@ -367,6 +382,7 @@ export const useSessionStore = defineStore('session', () => {
       activePanels: ['source'],
       policy: batchPolicy,
       rules: batchRules,
+      forceOcr: batchForceOcr,
       abort: null,
     }
     // reactive() up front: the queue/stream callbacks hold direct references,
@@ -378,10 +394,13 @@ export const useSessionStore = defineStore('session', () => {
     if (inputs.length === 0) return
     // Defensive: a previous batch (should already be reset) is fully dropped.
     reset()
-    // Policy/custom rules are captured ONCE at submit for the whole batch.
+    // Policy/custom rules/force-OCR are captured ONCE at submit for the batch.
     const batchPolicy = policyOverrides.value
     const batchRules = customRules.value
-    documents.value = inputs.map((input) => createDocument(input, batchPolicy, batchRules))
+    const batchForceOcr = forceOcr.value
+    documents.value = inputs.map((input) =>
+      createDocument(input, batchPolicy, batchRules, batchForceOcr),
+    )
     activeDocumentId.value = documents.value[0]!.id
     phase.value = 'loading'
     pumpQueue()
@@ -438,7 +457,14 @@ export const useSessionStore = defineStore('session', () => {
     }
     try {
       const response = doc.file
-        ? await anonymizeFileStream(doc.file, doc.policy, doc.rules, onProgress, abort.signal)
+        ? await anonymizeFileStream(
+            doc.file,
+            doc.policy,
+            doc.rules,
+            doc.forceOcr,
+            onProgress,
+            abort.signal,
+          )
         : await anonymizeTextStream(doc.text ?? '', doc.policy, doc.rules, onProgress, abort.signal)
       if (token !== batchToken) return // batch was reset while streaming
       doc.result = response
@@ -612,6 +638,7 @@ export const useSessionStore = defineStore('session', () => {
         doc.policy,
         doc.rules,
         doc.redactAreas,
+        doc.forceOcr,
       )
       if (token !== doc.pdfPreviewToken) return
       if (doc.pdfPreviewUrl !== null) URL.revokeObjectURL(doc.pdfPreviewUrl)
@@ -871,6 +898,7 @@ export const useSessionStore = defineStore('session', () => {
     customInstruction,
     redactTerms,
     preserveTerms,
+    forceOcr,
     customRules,
     advancedCustomized,
     setPolicyTransformation,
