@@ -641,6 +641,10 @@ Podman.
   `PascalCase.vue`, `camelCase` identifiers.
 - Domain logic lives in `utils/`; `services/` is for **external integrations
   only** (llmaixweb convention).
+- **Dependencies are pinned exactly** — `==` in `pyproject.toml` (all three
+  groups), bare versions in `package.json`. Bumping one means editing the pin
+  and re-running `uv lock` / `npm install`, never widening the range;
+  Dependabot proposes the bumps.
 - Each OCR/LLM service class carries its own `*Error` exception with a
   `status_code`, and endpoints translate those to `HTTPException` — raw
   upstream errors are never echoed to the client.

@@ -3,36 +3,39 @@ name = "deidentifier"
 version = "0.1.0"
 description = "Locally deployable anonymizer for German clinical documents"
 requires-python = ">=3.13,<3.15"
+# Every dependency is pinned exactly, like the frontend's package.json: this is
+# a clinical tool that ships as a container, so the version an operator runs
+# should be the version that was tested. Dependabot proposes the bumps.
 dependencies = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.34",
-    "pydantic>=2.10",
-    "pydantic-settings>=2.7",
-    "python-multipart>=0.0.20",
-    "httpx>=0.28",
-    "openai>=2.0",
-    "pypdf>=5.0",
-    "python-docx>=1.1",
-    "pypdfium2>=4.30",
-    "pillow>=11.0",
-    "reportlab>=4.2",
-    "pymupdf>=1.25",
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.52.1",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.2",
+    "python-multipart==0.0.32",
+    "httpx==0.28.1",
+    "openai==2.53.0",
+    "pypdf==6.14.2",
+    "python-docx==1.2.0",
+    "pypdfium2==5.12.1",
+    "pillow==12.3.0",
+    "reportlab==5.0.0",
+    "pymupdf==1.28.0",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3",
-    "pytest-asyncio>=0.25",
-    "pytest-cov>=6.0",
-    "httpx>=0.28",
-    "ruff>=0.9",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
+    "httpx==0.28.1",
+    "ruff==0.16.1",
 ]
 # Documentation site (MkDocs Material). Installed on its own so neither the
 # runtime image nor the test environment pulls it in:
 #   uv run --only-group docs mkdocs serve
 docs = [
-    "mkdocs-material>=9.6",
-    "mkdocs-include-markdown-plugin>=7.1",
+    "mkdocs-material==9.7.7",
+    "mkdocs-include-markdown-plugin==7.3.0",
 ]
 
 [tool.ruff]

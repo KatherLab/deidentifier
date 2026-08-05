@@ -74,6 +74,12 @@ re-running `npm run screenshots`.
 **Changelog** — add an entry under `[Unreleased]` when the change affects users
 or setup. Skip internal refactors, tests, and CI.
 
+**Dependencies** — every dependency is pinned exactly (`==` in
+`pyproject.toml`, a bare version in `package.json`), so the version an operator
+runs is the version that was tested. Bumping one means editing the pin and
+re-running `uv lock` / `npm install`, not widening the range. Dependabot
+proposes the bumps weekly.
+
 ## Pull requests
 
 - One topic per PR; keep the diff readable.
