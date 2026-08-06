@@ -606,13 +606,19 @@ blocks any future MIT relicense), `THIRD_PARTY_NOTICES.md`, `CITATION.cff`,
 `CHANGELOG.md`, `.github/SECURITY.md`.
 
 **Keep `CHANGELOG.md` short.** It is read by users and by the admin setting the
-app up, so an entry earns its place only if it changes what they see or do: a
-new feature, a changed or removed configuration variable, an API or breaking
-change, a notable fix. One or two sentences each, no sub-bullets, no rationale
-— the details belong on the relevant `docs/` page, which the entry can link to.
+app up — not by developers, who have the git history. An entry earns its place
+only if it changes what those two see or do: a new feature, a changed or
+removed configuration variable, an API or breaking change, a notable fix.
 Internal refactors, tests, CI, documentation work, and dependency bumps are
-*not* changelog entries. When in doubt, leave it out; a release section that
-grew past roughly a screenful should be condensed rather than appended to.
+*not* changelog entries. When in doubt, leave it out.
+
+Concretely, per entry: **one bullet, one or two sentences, no sub-bullets, no
+rationale, no migration notes.** Name the setting or route that changed and
+link to the `docs/` page that explains it; that page, not the changelog, is
+where the detail belongs. A whole release section should fit on a screen
+(roughly 20 lines) — when it does not, condense the section rather than
+appending to it, and condense the older sections while you are there. Doing
+this is part of step 3 of "Releasing" below, not an optional cleanup.
 
 ---
 
@@ -643,11 +649,16 @@ Dependabot does not consume Actions minutes.
 1. Bump the version in `package.json`, `pyproject.toml`, `CITATION.cff`, and
    the `APP_VERSION` default in `core/config.py` (what `/api/v1/status`
    reports).
-2. `uv lock` if dependencies changed; re-run
+2. Refresh the lockfiles — they carry the project version too, so `uv lock` and
+   `npm install --package-lock-only` are needed for every bump, not only when
+   dependencies changed. Re-run
    `./scripts/generate-third-party-notices.sh` if production dependencies
-   changed.
+   changed, and update the version line at the top of `THIRD_PARTY_NOTICES.md`
+   and the `DEIDENTIFIER_IMAGE_TAG` examples in
+   `docs/operations/deployment.md`.
 3. Move the `[Unreleased]` entries in `CHANGELOG.md` into a dated section and
-   add the compare links.
+   add the compare links — condensing them to the short form described above,
+   since entries written during development are usually too long.
 4. Run the full local gate below, including `npm run test:e2e`.
 5. `git tag v0.2.0 && git push origin v0.2.0`, then publish the release —
    which is what `docker-publish.yml` reacts to (currently a manual run).
