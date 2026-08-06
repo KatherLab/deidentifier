@@ -17,6 +17,15 @@ endpoint is **not local** (document content will leave this machine) or that an
 enabled detector is **not configured** (it will fail the request rather than
 degrade). Click it for the details.
 
+!!! note "Following this on the default configuration"
+
+    With the unedited `.env.example` only the rule detector runs, so this
+    walkthrough will find dates, phone numbers and labelled IDs but leave
+    names in the prose untouched. That is the configuration behaving
+    correctly, not a bug — it is why
+    [LLM endpoints](../operations/llm-endpoints.md) is the next step after
+    this page.
+
 ## 2. Give it a document
 
 Either:

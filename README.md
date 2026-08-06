@@ -65,9 +65,14 @@ by step in the
 ## Quick start
 
 ```bash
-cp .env.example .env             # then edit — every variable is documented there
+cp .env.example .env
 docker compose up -d --build     # → http://localhost:8080
 ```
+
+That starts with rule-based detection and **no external services** — enough to
+see the workflow, not enough for real use, since rules alone miss names in
+running prose. Uncomment the LLM block in `.env` to add the primary detector;
+every variable is documented in that file.
 
 The stack runs in production mode by default (docs disabled, unsafe
 configurations refuse to start). The backend has no published port, a read-only

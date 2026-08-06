@@ -14,6 +14,18 @@ docker compose up -d --build     # → http://localhost:8080
 Both run as non-root. `DEIDENTIFIER_IMAGE_TAG` pins a version;
 `FRONTEND_PORT` changes the published port.
 
+`--build` builds both images from the checkout, which is what you want while
+the repository is private and the publish workflow is manual. Once a release
+has been published to `ghcr.io`, a deployment host can skip the build
+toolchain entirely:
+
+```bash
+DEIDENTIFIER_IMAGE_TAG=v0.1.0 docker compose pull
+DEIDENTIFIER_IMAGE_TAG=v0.1.0 docker compose up -d
+```
+
+You still need `compose.yml` and your `.env` on that host.
+
 nginx re-resolves the backend hostname per request, so recreating the backend
 container does not require restarting the frontend.
 
@@ -67,8 +79,17 @@ docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d
 | Endpoint | Purpose |
 |---|---|
 | `GET /health/live` | Process is up. Used by the container healthcheck. |
-| `GET /health/ready` | Configured backends are reachable. |
+| `GET /health/ready` | Every detector in `DETECTORS` is *configured* well enough to run. |
 | `GET /api/v1/status` | Detectors, OCR engine, endpoint hosts and their locality, limits. |
+
+!!! note "Readiness is a configuration check, not a reachability check"
+
+    `/health/ready` reports `degraded` when a detector is listed but
+    unconfigured — `llm` without `OPENAI_API_BASE`/`LLM_MODEL`, for instance.
+    It does **not** contact the LLM or OCR endpoints, so it stays `ready`
+    against a configured-but-dead endpoint. Monitor those endpoints
+    themselves; the app deliberately makes no network calls at startup or on
+    a health probe.
 
 `/api/v1/status` deliberately returns **hosts, not URLs**, and never keys or
 paths — it is what the frontend uses to raise the "content leaves this machine"

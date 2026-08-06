@@ -43,14 +43,25 @@ unsafe configuration. The three causes:
 The LLM endpoint is down, misconfigured, or blocked. Nothing partial is
 returned — that is deliberate.
 
+**Check `OPENAI_API_BASE` for `localhost` first.** In Docker that names the
+backend container itself, not your machine, so a local Ollama or LM Studio is
+unreachable no matter that it works in a browser on the host:
+
+| The LLM runs… | Use |
+|---|---|
+| in the same compose project | `http://vllm:8000/v1` — the service name |
+| on the Docker host | `http://host.docker.internal:11434/v1`, plus `extra_hosts: ["host.docker.internal:host-gateway"]` on the `backend` service (Linux) |
+| on another machine | its hostname or IP |
+
+Then verify the path from *inside* the container:
+
 ```bash
 docker compose exec backend python -c \
   "import httpx,os; print(httpx.get(os.environ['OPENAI_API_BASE'].rstrip('/')+'/models', timeout=10).status_code)"
 ```
 
-Check `OPENAI_API_BASE` (it must include the `/v1` suffix most servers expect),
-that `LLM_MODEL` exists on that server, and that the network path works from
-*inside* the container.
+Also check that `OPENAI_API_BASE` includes the `/v1` suffix most servers
+expect, and that `LLM_MODEL` names a model that server actually serves.
 
 ### *Dieses PDF scheint gescannt zu sein. OCR ist nicht aktiviert.*
 

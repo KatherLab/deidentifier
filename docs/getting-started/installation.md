@@ -12,11 +12,25 @@ unless you run the OCR sidecar.
 ```bash
 git clone https://github.com/KatherLab/deidentifier.git
 cd deidentifier
-cp .env.example .env    # then edit it — see Configuration
+cp .env.example .env
 docker compose up -d --build
 ```
 
 The app is at **<http://localhost:8080>**.
+
+`.env.example` is deliberately runnable unedited: it enables the rule detector
+only, so the stack starts with no external services at all. That finds
+structured identifiers — dates, phone numbers, IBANs, labelled IDs — but **not
+names in running prose**, so it is a demo, not a usable configuration. Adding
+the LLM detector is the next step: uncomment the four-line block in `.env` and
+see [LLM endpoints](../operations/llm-endpoints.md).
+
+!!! warning "`localhost` in `.env` means the backend container"
+
+    The most common first failure. A model server running on your machine is
+    *not* at `localhost` from inside the container — use
+    `host.docker.internal` or a compose service name. See
+    [Configuration](../operations/configuration.md#detection-llm).
 
 What that starts:
 
@@ -54,7 +68,8 @@ container, terminate TLS there, and do not publish port 8080 beyond it.
 
 ## Local development setup
 
-Prerequisites: Python 3.13+, [uv](https://docs.astral.sh/uv/), Node.js 22+.
+Prerequisites: Python 3.13 or 3.14 (`requires-python = ">=3.13,<3.15"`),
+[uv](https://docs.astral.sh/uv/), Node.js 22+.
 
 ```bash
 uv sync

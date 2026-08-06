@@ -6,10 +6,16 @@
 #
 # Inside the compose network there is no port collision with the backend —
 # the sidecar keeps vLLM's default port 8000 and is not published to the host.
+#
+# The backend settings below are set as `environment:`, which takes precedence
+# over `env_file`: while this overlay is active it overrides any OCR_ENGINE /
+# VISION_OCR_* you set in .env.
 
 services:
   unlimited-ocr:
-    image: vllm/vllm-openai:latest
+    # The `unlimited-ocr` tag, not `latest`: the model needs the custom vLLM
+    # build that ships the NGramPerReqLogitsProcessor referenced below.
+    image: vllm/vllm-openai:unlimited-ocr
     ipc: host
     shm_size: "8gb"
     volumes:

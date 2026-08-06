@@ -17,6 +17,16 @@ OPENAI_API_KEY=              # often empty for local servers
 LLM_MODEL=your-model-id
 ```
 
+!!! warning "Not `localhost`, unless the backend runs on the host"
+
+    In the Docker deployment the backend is a container, so
+    `http://localhost:11434/v1` resolves to that container rather than to your
+    machine. Use a compose service name (`http://vllm:8000/v1`) or
+    `http://host.docker.internal:11434/v1` — the latter needs
+    `extra_hosts: ["host.docker.internal:host-gateway"]` on the `backend`
+    service on Linux. `localhost` is right only for the local development
+    setup, where the backend runs directly on the host.
+
 !!! danger "Document content goes to this endpoint"
 
     Every detection request sends document text there, and the re-check sends
@@ -67,8 +77,10 @@ OPENAI_API_BASE=http://vllm:8000/v1
 LLM_MODEL=<your-model>
 ```
 
-Inside a compose network use the service name; the URL is a single-label host,
-which counts as local and raises no banner.
+Run that as a service in the same compose project and the service name is the
+host — a single-label host, which counts as local and raises no banner. Started
+standalone as above, it is reachable from the backend container at
+`http://host.docker.internal:8000/v1` instead.
 
 ## Tuning
 

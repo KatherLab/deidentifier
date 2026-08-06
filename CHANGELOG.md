@@ -13,11 +13,21 @@ documentation, and CI work are left out.
 
 ### Changed
 
+- `.env.example` now ships `DETECTORS=rules` and comments out the LLM block, so
+  `cp .env.example .env && docker compose up -d --build` starts a working
+  stack. Previously the shipped file enabled the `llm` detector without an
+  endpoint, which made production mode refuse to start.
+
 - Hospital units are now detected as `ORGANIZATION`: the LLM prompt covers
   department lines in a letterhead (`Klinik für Kardiologie`, `Station 4B`)
   instead of dismissing them as generic nouns, and new rule recognizers catch
   them independently of the model. Preserve individual units in the review
   view when a document needs them.
+
+### Fixed
+
+- The Unlimited-OCR overlay pulled `vllm/vllm-openai:latest`, which lacks the
+  logits processor the model requires; it now uses the `unlimited-ocr` tag.
 
 ## [0.1.0] — 2026-08-05
 

@@ -9,6 +9,10 @@ explains the consequences.
 set, otherwise `.env` in the repo root (the recommended location), otherwise
 `backend/.env`. Actual environment variables always win.
 
+The **Default** column below is the built-in default that applies when a
+variable is absent — not necessarily what `.env.example` writes into a fresh
+`.env`. Where the two differ, the table says so.
+
 ## Application
 
 | Variable | Default | Notes |
@@ -42,7 +46,7 @@ BANNER_COLOR=amber
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DETECTORS` | `rules` | Comma-separated: `rules`, `llm`, `mock`, `privacy_filter`. **Recommended for real use: `rules,llm`.** |
+| `DETECTORS` | `rules` | Comma-separated: `rules`, `llm`, `mock`, `privacy_filter`. `.env.example` ships `rules` so a fresh copy starts with no external services. **Recommended for real use: `rules,llm`.** |
 
 A detector that is listed but cannot run makes the request fail with 503 rather
 than returning a partial result. `mock` is for tests and offline development
@@ -52,9 +56,9 @@ and is refused in production. `privacy_filter` is not implemented yet.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `OPENAI_API_BASE` | `http://localhost:11434/v1` | Any OpenAI-compatible endpoint: Ollama, vLLM, LM Studio, a gateway. |
-| `OPENAI_API_KEY` | — | Empty is fine for most local servers. |
-| `LLM_MODEL` | — | Required when `llm` is enabled. |
+| `OPENAI_API_BASE` | *(empty)* | Any OpenAI-compatible endpoint: Ollama, vLLM, LM Studio, a gateway. Include the `/v1` suffix most servers expect. |
+| `OPENAI_API_KEY` | *(empty)* | Empty is fine for most local servers. |
+| `LLM_MODEL` | *(empty)* | Required when `llm` is enabled. |
 | `LLM_REQUEST_TIMEOUT_SECONDS` | `120` | Per request. |
 | `LLM_CHUNK_CHARS` | `16000` | Chunk size for long documents. Keep it well inside the model's context. |
 | `LLM_CHUNK_OVERLAP` | `500` | Overlap so entities are not cut at a boundary. |
@@ -62,13 +66,35 @@ and is refused in production. `privacy_filter` is not implemented yet.
 | `LLM_MAX_CONCURRENT_REQUESTS` | `4` | **Total** in-flight requests across all documents. The main throughput/pressure dial. |
 | `LLM_RECHECK_ENABLED` | `true` | The audit of the anonymized output. One extra call per document; produces warnings only. |
 
+!!! warning "`localhost` means the container, not your machine"
+
+    The backend runs in its own container, so `http://localhost:11434/v1`
+    points at the backend itself and the request fails with *"Der
+    KI-Erkennungsdienst ist nicht erreichbar"*. From a container, reach:
+
+    | The LLM runs… | Use |
+    |---|---|
+    | as a service in the same compose project | `http://vllm:8000/v1` — the service name |
+    | on the Docker host (a local Ollama, say) | `http://host.docker.internal:11434/v1` |
+    | on another machine | its hostname or IP |
+
+    On Linux, `host.docker.internal` resolves only if you add it to the
+    `backend` service in `compose.yml`:
+
+    ```yaml
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ```
+
+    `localhost` is correct only when you run the backend directly on the host,
+    as in the local development setup.
+
 Details and model recommendations: [LLM endpoints](llm-endpoints.md).
 
 ## Extraction & OCR
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DOCLING_SERVE_URL` | `http://localhost:5001` | Optional. Unset (or unreachable) falls back to local pypdf extraction. |
+| `DOCLING_SERVE_URL` | *(empty)* | Optional, and empty by default — nothing is contacted. Unset or unreachable falls back to local pypdf extraction. |
 | `DOCLING_MIN_EXTRACTED_CHARS_PDF` | `100` | Below this per page, a PDF counts as scanned. |
 | `PDF_MAX_PAGES_FOR_TEXT_PROBE` | `5` | How many pages the probe samples. |
 | `OCR_ENGINE` | `none` | `none`, `docling_tesseract`, `llm_vision`, `mistral_ocr` (not implemented). `none` rejects scanned PDFs with a clear message. |
@@ -80,6 +106,17 @@ Unlimited-OCR recipe: [OCR engines](ocr-engines.md).
 
 `PRIVACY_FILTER_ENABLED` / `PRIVACY_FILTER_BASE_URL` are placeholders for a
 planned additional detector. Leave them off.
+
+## Compose-level variables
+
+Read from the same `.env` by `compose.yml` itself rather than by the
+application, so they only apply to the Docker deployment.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `FRONTEND_PORT` | `8080` | The published port of the `frontend` container — the only published port of the stack. |
+| `DEIDENTIFIER_IMAGE_TAG` | `latest` | Image tag for both services. Pin a release rather than tracking `latest`. |
+| `APP_ENV` | `production` | `compose.yml` overrides the application default of `development`. |
 
 ## Changing configuration
 
