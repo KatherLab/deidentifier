@@ -12,6 +12,32 @@
         <h1 class="text-xl font-semibold text-content">{{ t('app.title') }}</h1>
 
         <div class="ml-auto flex items-center gap-1.5">
+          <!-- How long the server keeps the current result — and the way to
+               top it up BEFORE it runs low, so stepping away from the desk
+               does not cost a re-run. Always reachable while a result is on
+               screen; the last-minute warning lives in the result view. -->
+          <button
+            v-if="lifetime.remaining.value !== null"
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+            :class="lifetimeChipClass"
+            :disabled="!session.resultsCanExtend || session.extendingResults"
+            :aria-label="lifetimeLabel"
+            :title="lifetimeLabel"
+            @click="session.extendResults()"
+          >
+            <Timer class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span v-if="lifetime.isExpired.value">{{ t('result.lifetime.expired') }}</span>
+            <span v-else>{{
+              t('result.lifetime.remaining', { time: lifetime.formatted.value })
+            }}</span>
+            <Plus
+              v-if="session.resultsCanExtend && !lifetime.isExpired.value"
+              class="h-3.5 w-3.5 shrink-0"
+              aria-hidden="true"
+            />
+          </button>
+
           <!-- System hints (external endpoints / unready detectors): compact
                chip that opens a popover with the full details. -->
           <div v-if="systemHints.length > 0" ref="hintsContainer" class="relative">
@@ -117,19 +143,45 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertTriangle, Moon, Settings, Sun } from '@lucide/vue'
+import { AlertTriangle, Moon, Plus, Settings, Sun, Timer } from '@lucide/vue'
 import InputPanel from '@/components/anonymizer/InputPanel.vue'
 import ResultView from '@/components/anonymizer/ResultView.vue'
 import DeploymentBanner from '@/components/common/DeploymentBanner.vue'
 import LanguageSwitcher from '@/components/common/LanguageSwitcher.vue'
 import ToastContainer from '@/components/common/ToastContainer.vue'
 import { usePopover } from '@/composables/usePopover'
+import { useResultLifetime } from '@/composables/useResultLifetime'
 import { useSessionStore } from '@/stores/session'
 import { useSettingsStore } from '@/stores/settings'
 
 const { t } = useI18n()
 const session = useSessionStore()
 const settings = useSettingsStore()
+
+// ---------------------------------------------------------------------------
+// Result lifetime chip: the batch-wide countdown, extendable at any time
+// ---------------------------------------------------------------------------
+
+const lifetime = useResultLifetime(() => session.resultsExpireAt)
+
+/** Quiet while there is time, amber once the result is nearly gone. */
+const lifetimeChipClass = computed(() => {
+  if (lifetime.isExpiring.value || lifetime.isExpired.value) {
+    return 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40'
+  }
+  return 'border-default text-content-subtle hover:bg-surface-muted hover:text-content'
+})
+
+/**
+ * The chip shows only the time; the accessible name carries what it is and
+ * what pressing it does — including why it does nothing at the ceiling.
+ */
+const lifetimeLabel = computed(() => {
+  const time = lifetime.formatted.value
+  if (lifetime.isExpired.value) return t('result.lifetime.expired_hint')
+  if (!session.resultsCanExtend) return t('result.lifetime.extended_at_maximum', { time })
+  return t('result.lifetime.extend_hint', { time })
+})
 
 const hintsContainer = ref<HTMLElement | null>(null)
 const { open: hintsOpen, toggle: toggleHints } = usePopover(hintsContainer)
@@ -180,5 +232,10 @@ function toggleDarkMode() {
 
 onMounted(() => {
   void session.fetchStatus()
+  // Closing the tab should end the server-side copy too, not leave it to the
+  // cache TTL. `pagehide` fires where `beforeunload` is unreliable (mobile,
+  // bfcache); the handler lives for the life of the app, so it is never
+  // removed.
+  window.addEventListener('pagehide', () => session.forgetResultsOnUnload())
 })
 </script>

@@ -23,6 +23,45 @@ variable is absent — not necessarily what `.env.example` writes into a fresh
 | `APP_ALLOW_INSECURE_CONTENT_LOGGING` | `false` | **Dev only.** Allows document content in logs, prints a loud startup warning, and is refused in production. |
 | `APP_CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Only relevant for local development; in Docker the frontend proxies same-origin. |
 
+## Result retention
+
+How long a finished result stays in the backend's **memory** so the review UI
+can apply corrections without re-running detection. Nothing is written to disk
+at any setting — but while an entry lives, a copy of the document is in the
+process's memory, so these are retention controls, not performance tuning.
+Read [Data retention](../DATA_RETENTION.md) before raising them.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `RESULT_CACHE_TTL_MINUTES` | `15` | Lifetime of a fresh result. Short on purpose: most documents are reviewed and exported within minutes, and an expired result costs only a re-run. |
+| `RESULT_CACHE_EXTENSION_MINUTES` | `60` | What one press of **Verlängern** grants, from the moment it is pressed. Repeatable, so a reviewer who keeps working keeps the result. |
+| `RESULT_CACHE_MAX_LIFETIME_MINUTES` | `720` (12 h) | The ceiling no amount of extending can cross, measured from when the result was produced. **This is the number your retention statement rests on.** |
+| `RESULT_CACHE_MAX_ENTRIES` | `100` | How many results may be in memory at once; the oldest is dropped beyond it. Bounds the worst case regardless of the durations. |
+
+### Tightening it
+
+The defaults are chosen for a **research prototype**: they keep the tool
+pleasant to use, and the app was built so that restricting them is a
+configuration change rather than a code change. Pick what your setting needs:
+
+| Goal | Setting |
+|---|---|
+| Shorter windows | Lower `RESULT_CACHE_TTL_MINUTES` / `RESULT_CACHE_EXTENSION_MINUTES` |
+| A defensible outer bound | Lower `RESULT_CACHE_MAX_LIFETIME_MINUTES` — a shift length is a reasonable anchor |
+| No extending at all | `RESULT_CACHE_MAX_LIFETIME_MINUTES` = `RESULT_CACHE_TTL_MINUTES`. The API then reports `can_extend: false` from the start and the UI never offers the button |
+| Fewer documents resident | Lower `RESULT_CACHE_MAX_ENTRIES` |
+| The strictest usable setting | `TTL=1`, `MAX_LIFETIME=1`, `MAX_ENTRIES=1` |
+
+All of these cost only speed. An expired result is recomputed from the text the
+browser still holds, so nothing is lost — a correction after expiry just pays
+for a fresh detection pass. A ceiling configured *below* the TTL is allowed and
+simply shortens every window to the ceiling: misconfiguration fails toward less
+retention, never more.
+
+Tightening also applies to what is already in memory. The bounds are read once
+at startup, so a restart with stricter values immediately drops whatever no
+longer fits.
+
 ## Deployment banner
 
 A bar above the header for a deployment-wide notice — "Research Use Only!",

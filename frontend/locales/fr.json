@@ -144,6 +144,17 @@
     "background_progress_label": "Progression globale du traitement en arrière-plan",
     "background_progress": "Traitement en arrière-plan : {done} sur {total} terminés",
     "rerunning": "Recalcul en cours …",
+    "lifetime": {
+      "remaining": "Résultat disponible : encore {time}",
+      "expiring": "Le serveur supprimera ce résultat dans {time}. Toute modification ultérieure nécessitera une nouvelle exécution.",
+      "expired": "Résultat expiré",
+      "expired_hint": "Le serveur a supprimé le document. La prochaine modification relancera l’anonymisation.",
+      "extend": "Prolonger",
+      "at_maximum": "Durée de conservation maximale atteinte — prolongation impossible.",
+      "extend_hint": "Résultat disponible : encore {time}. Cliquez pour le prolonger.",
+      "extended": "Prolongé — résultat disponible : encore {time}.",
+      "extended_at_maximum": "Durée de conservation maximale atteinte — résultat disponible : encore {time}."
+    },
     "reset_one": "Nouveau document",
     "reset_many": "Nouveaux documents",
     "processed_in": "Traité en {ms} ms",

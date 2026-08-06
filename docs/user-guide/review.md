@@ -15,6 +15,35 @@ was redacted, why, and lets you correct it.
   visible ([Exporting](export.md)).
 - **Neues Dokument** — discards everything and returns to the input screen.
 
+## How long the result stays available
+
+While you review, the server keeps the detected entities and the extracted text
+in memory so every correction is instant instead of a fresh model run. The
+**Ergebnis verfügbar: noch m:ss** chip in the top bar shows how much of that
+window is left — **15 minutes** from when the result appeared.
+
+That chip is also a button: press it at any time and the result is yours for
+**another hour**, counted from the press. Do it before you step away rather
+than after; a toast confirms the new time. One press covers every document of
+the batch, since their windows run together, and you can press it as often as
+you need.
+
+If the time does run low, a warning appears above the panels with the same
+**Verlängern** button. No result is held longer than **12 hours** after it was
+produced; from then on the chip reports that the maximum has been reached.
+
+!!! note "Your deployment may differ"
+
+    All three durations are set by whoever runs the app
+    ([Configuration](../operations/configuration.md)), so a stricter site may
+    show shorter windows.
+
+Letting it expire costs nothing but time: your corrections stay in the browser,
+and the next change re-runs the anonymization from the text your browser still
+holds. Pressing **Neues Dokument**, closing a document, or closing the tab
+deletes the server-side copy immediately — see
+[Data retention](../DATA_RETENTION.md).
+
 ## The panels
 
 Chips above the panels toggle up to three views side by side:

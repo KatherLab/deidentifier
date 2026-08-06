@@ -271,6 +271,96 @@ def test_override_rerun_with_expired_id(client):
     assert response.status_code == 410
 
 
+def test_response_reports_how_long_the_result_lives(client):
+    body = client.post("/api/v1/anonymize", json={"text": SAMPLE_TEXT}).json()
+    lifetime = body["lifetime"]
+    assert 840 < lifetime["expires_in_seconds"] <= 900
+    assert lifetime["can_extend"] is True
+
+
+def test_extend_grants_more_time(client):
+    """The review UI offers this shortly before the countdown runs out."""
+    first = client.post("/api/v1/anonymize", json={"text": SAMPLE_TEXT}).json()
+
+    response = client.post(f"/api/v1/anonymize/{first['request_id']}/extend")
+    assert response.status_code == 200
+    assert response.json()["expires_in_seconds"] > 0
+    # Still usable afterwards.
+    rerun = client.post(
+        "/api/v1/anonymize", json={"request_id": first["request_id"], "overrides": []}
+    )
+    assert rerun.status_code == 200
+
+
+def test_extending_an_unknown_id_is_gone_not_granted(client):
+    response = client.post("/api/v1/anonymize/no-such-id/extend")
+    assert response.status_code == 410
+
+
+def test_extension_is_bounded_by_the_configured_ceiling(client, monkeypatch):
+    """Whatever the UI does, a document leaves memory at the configured
+    maximum. Set to 30 minutes here so the test does not have to simulate a
+    12-hour day."""
+    import backend.src.utils.cache as cache_module
+    from backend.src.core.config import get_settings
+    from backend.src.utils.cache import request_cache
+
+    monkeypatch.setenv("RESULT_CACHE_TTL_MINUTES", "15")
+    monkeypatch.setenv("RESULT_CACHE_EXTENSION_MINUTES", "60")
+    monkeypatch.setenv("RESULT_CACHE_MAX_LIFETIME_MINUTES", "30")
+    get_settings.cache_clear()
+    request_cache.configure(get_settings())  # what the app's lifespan does
+
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(cache_module.time, "monotonic", lambda: clock["now"])
+
+    first = client.post("/api/v1/anonymize", json={"text": SAMPLE_TEXT}).json()
+    request_id = first["request_id"]
+
+    # One press already asks for more than the ceiling allows.
+    granted = client.post(f"/api/v1/anonymize/{request_id}/extend").json()
+    assert granted["expires_in_seconds"] == 30 * 60
+    assert granted["can_extend"] is False
+
+    clock["now"] = 1000.0 + 30 * 60 + 1
+    assert client.post(f"/api/v1/anonymize/{request_id}/extend").status_code == 410
+    assert (
+        client.post(
+            "/api/v1/anonymize", json={"request_id": request_id, "overrides": []}
+        ).status_code
+        == 410
+    )
+
+
+def test_delete_forgets_the_cached_document(client):
+    """The review UI calls this when a document is closed: the text must stop
+    living in server memory then, not at the end of the TTL."""
+    first = client.post("/api/v1/anonymize", json={"text": SAMPLE_TEXT}).json()
+    request_id = first["request_id"]
+
+    assert client.delete(f"/api/v1/anonymize/{request_id}").status_code == 204
+    # The document is gone: a re-run now has nothing to work from.
+    rerun = client.post("/api/v1/anonymize", json={"request_id": request_id, "overrides": []})
+    assert rerun.status_code == 410
+
+
+def test_delete_of_an_unknown_id_reveals_nothing(client):
+    """Same answer either way — whether an id exists is not something an
+    unrelated caller should be able to probe."""
+    assert client.delete("/api/v1/anonymize/no-such-id").status_code == 204
+
+
+def test_request_id_is_not_written_to_the_log(client, caplog):
+    """Anyone holding a request id can fetch the cached document, so it must
+    not travel to wherever the logs go."""
+    import logging
+
+    with caplog.at_level(logging.INFO):
+        body = client.post("/api/v1/anonymize", json={"text": SAMPLE_TEXT}).json()
+    assert body["request_id"] not in caplog.text
+    assert "anonymize_request" in caplog.text
+
+
 def test_export_pdf_native_with_cached_detection(client):
     from backend.tests.pdf_builder import make_pdf
 
@@ -303,6 +393,30 @@ def test_export_pdf_native_with_cached_detection(client):
     )
     assert "Max Mustermann" not in extracted
     assert "komplikationslos" in extracted  # clinical text stays selectable
+
+
+def test_export_without_a_cached_detection_leaves_nothing_behind(client):
+    """An export that has to run detection itself caches under an id the client
+    never sees. That entry is unreachable, so it must not linger."""
+    from backend.src.utils.cache import request_cache
+    from backend.tests.pdf_builder import make_pdf
+
+    pdf = make_pdf(
+        [
+            "Patient: Max Mustermann, geb. 01.02.1980",
+            "Der Patient wurde stationaer aufgenommen und komplikationslos behandelt.",
+            "Die Entlassung erfolgte in gutem Allgemeinzustand nach Hause.",
+        ]
+    )
+    request_cache.clear()
+
+    response = client.post(
+        "/api/v1/export/pdf",
+        files={"file": ("brief.pdf", pdf, "application/pdf")},
+        data={"overrides": "[]"},
+    )
+    assert response.status_code == 200
+    assert request_cache._entries == {}
 
 
 def test_custom_policy_overlays_defaults(client):

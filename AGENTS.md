@@ -241,7 +241,7 @@ show it in the user's language — see "Internationalization".
 
 ### 7. The request cache (`utils/cache.py`)
 
-`request_cache` is an in-memory, TTL-bounded (15 min, 100 entries) map from
+`request_cache` is an in-memory, TTL-bounded (15 min default, 100 entries) map from
 `request_id` to the detection result. It exists so review-UI overrides can
 re-run the cheap deterministic stages without repeating LLM detection, and so
 a PDF export can skip OCR when the re-sent file's SHA-256 matches.
@@ -249,6 +249,31 @@ a PDF export can skip OCR when the re-sent file's SHA-256 matches.
 **This is the only place document text lives between requests, and it lives in
 process memory only.** An expired entry yields HTTP 410; the frontend
 transparently re-posts the full source text.
+
+Retention rules that are security properties, not tuning knobs:
+
+- The TTL is **absolute** — `expires_at`, set at creation and never refreshed on
+  read. A read that extended the window would let a review session keep a
+  document resident indefinitely.
+- The one thing that moves `expires_at` is `extend()`, driven by the reviewer
+  pressing the countdown chip in the header (or **Verlängern** in the
+  low-on-time warning). It grants `RESULT_CACHE_EXTENSION_MINUTES` from *now*
+  and is repeatable, but can never push past the ceiling
+  (`RESULT_CACHE_MAX_LIFETIME_MINUTES` after `created_at`).
+- The durations and the entry bound are operator-configurable and `configure()`
+  is called once from the lifespan; the ceiling is the retention promise in
+  `docs/DATA_RETENTION.md`, so a change to its default belongs in that page and
+  in `docs/operations/configuration.md`. A ceiling below the TTL shortens the
+  first window rather than being ignored — misconfiguration must fail toward
+  *less* retention. `MAX_LIFETIME == TTL` is the supported way to switch
+  extending off, and it is covered by a test — keep it working.
+- A lifespan task calls `sweep()` every minute and `clear()` on shutdown, so an
+  idle process does not hold the last documents it saw.
+- `discard()` backs the `DELETE` route; the UI uses it to end the server-side
+  copy when the user is done.
+- **`request_id` is a capability.** It is the only thing standing between a
+  caller and the cached document (the app has no sessions), so it is in
+  `FORBIDDEN_FIELDS`: log `ref=log_reference(request_id)` instead.
 
 ---
 
@@ -262,6 +287,8 @@ All under `/api/v1` (`routers/v1/api.py`), no auth:
 |---|---|
 | `POST /api/v1/anonymize` | Multipart (`file`) or JSON (`text`), dispatched by content type. JSON without `text` but with `request_id` + `overrides` is a **cheap re-run** from the cache. |
 | `POST /api/v1/anonymize/stream` | Same inputs, streams NDJSON `{"event":"progress"…}` lines then `{"event":"result"…}`. Inputs are parsed *before* streaming starts, so malformed requests still fail with normal HTTP errors. A client disconnect cancels the pipeline. |
+| `POST /api/v1/anonymize/{request_id}/extend` | Keep a cached result for another TTL, never past the hard lifetime ceiling. 410 when it is already gone. Backs the review view's countdown + **Verlängern**. |
+| `DELETE /api/v1/anonymize/{request_id}` | Forget one cached detection now. Always 204 (an unknown id must not be distinguishable). Called by the UI when a document is closed, reset, or the tab unloads. |
 | `POST /api/v1/export/pdf` | Redacted-PDF export. The client **re-sends the original file** (nothing is stored); `request_id` + matching hash avoids re-running OCR/detection. |
 | `POST /api/v1/export/pdf/pages` | Renders pages as PNGs for the area-redaction editor, with embedded-image boxes as one-click suggestions. |
 | `GET /api/v1/status` | Configured detectors + OCR engine, endpoint **hosts** and their locality, limits. Never returns paths, keys, or full URLs. |
@@ -337,7 +364,10 @@ hints, expert-mode popover, dark-mode toggle) and switches between
   selection, active panels — and runs as one independent
   `/anonymize/stream` request; up to `MAX_CONCURRENT_STREAMS` (5) stream at
   once and the rest wait as `queued`. All entity/preview/export actions
-  operate on the **active** document.
+  operate on the **active** document. The **result lifetime** is the exception
+  and is batch-wide on purpose: `resultsExpireAt` counts down to whichever
+  document expires first and `extendResults()` extends them all, so the header
+  can state one number and one button for the work in front of the reviewer.
 - **`settings.ts`** — expert mode + keep-original-filenames. The *only* store
   that touches `localStorage`.
 - **`toast.ts`** — global toast queue.

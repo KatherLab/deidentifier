@@ -144,6 +144,17 @@
     "background_progress_label": "Overall progress of background processing",
     "background_progress": "Processing in the background: {done} of {total} completed",
     "rerunning": "Recalculating …",
+    "lifetime": {
+      "remaining": "Result available: {time} left",
+      "expiring": "The server deletes this result in {time}. Changes after that need a new run.",
+      "expired": "Result expired",
+      "expired_hint": "The server has deleted the document. The next change recomputes the anonymization.",
+      "extend": "Extend",
+      "at_maximum": "Maximum retention reached — cannot be extended further.",
+      "extend_hint": "Result available: {time} left. Click to extend it.",
+      "extended": "Extended — result available: {time} left.",
+      "extended_at_maximum": "Maximum retention reached — result available: {time} left."
+    },
     "reset_one": "New document",
     "reset_many": "New documents",
     "processed_in": "Processed in {ms} ms",

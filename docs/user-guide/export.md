@@ -41,7 +41,7 @@ on top, in both paths.
     Nothing is stored on the server, so the browser uploads the original PDF
     again for the export. When it matches the document you just anonymized, the
     server reuses its cached detection — no second OCR or LLM run. After the
-    cache expires (15 minutes) the export takes as long as the original run.
+    cache expires the export takes as long as the original run.
 
 ## Filenames
 

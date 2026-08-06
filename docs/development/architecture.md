@@ -77,7 +77,8 @@ caps.
 ## The cache
 
 `utils/cache.py` holds `request_id → CachedDetection` (text, resolved spans,
-OCR layout, file hash) for 15 minutes, bounded at 100 entries, in process
+OCR layout, file hash) for 15 minutes — extendable by the reviewer up to a
+configurable ceiling — bounded at 100 entries, in process
 memory. It exists so a correction in the review view re-runs only the cheap
 deterministic stages, and so a PDF export can skip re-OCR when the re-sent
 file's hash matches. Expiry surfaces as HTTP 410 and the frontend re-posts the

@@ -144,6 +144,17 @@
     "background_progress_label": "Gesamtfortschritt der Verarbeitung im Hintergrund",
     "background_progress": "Verarbeitung im Hintergrund: {done} von {total} abgeschlossen",
     "rerunning": "Wird neu berechnet …",
+    "lifetime": {
+      "remaining": "Ergebnis verfügbar: noch {time}",
+      "expiring": "Das Ergebnis wird in {time} vom Server gelöscht. Änderungen brauchen danach einen neuen Durchlauf.",
+      "expired": "Ergebnis abgelaufen",
+      "expired_hint": "Der Server hat das Dokument gelöscht. Die nächste Änderung berechnet die Anonymisierung neu.",
+      "extend": "Verlängern",
+      "at_maximum": "Maximale Haltedauer erreicht — nicht weiter verlängerbar.",
+      "extend_hint": "Ergebnis verfügbar: noch {time}. Klicken, um die Verfügbarkeit zu verlängern.",
+      "extended": "Verlängert — Ergebnis verfügbar: noch {time}.",
+      "extended_at_maximum": "Maximale Haltedauer erreicht — Ergebnis verfügbar: noch {time}."
+    },
     "reset_one": "Neues Dokument",
     "reset_many": "Neue Dokumente",
     "processed_in": "Verarbeitet in {ms} ms",

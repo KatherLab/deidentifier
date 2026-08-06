@@ -10,7 +10,7 @@ import time
 import uuid
 
 from ..core.config import Settings
-from ..schemas.anonymize import AnonymizeResponse, EntityOverride, TimingMs
+from ..schemas.anonymize import AnonymizeResponse, CacheLifetime, EntityOverride, TimingMs
 from ..schemas.entities import (
     EntitySpan,
     EntityType,
@@ -200,6 +200,11 @@ async def _finalize(
         validation = ValidationResult(status=compute_status(all_warnings), warnings=all_warnings)
     t3 = time.perf_counter()
 
+    # Reported so the review UI can show how long the result stays available.
+    # An entry the export path already discarded reports "gone" rather than a
+    # countdown nobody can act on.
+    expires_in, can_extend = request_cache.lifetime(request_id) or (0, False)
+
     return AnonymizeResponse(
         request_id=request_id,
         source_type=source_type,
@@ -216,6 +221,7 @@ async def _finalize(
             validation=round((t3 - t2) * 1000, 2),
             total=round(extraction_ms + detection_ms + (t3 - t1) * 1000, 2),
         ),
+        lifetime=CacheLifetime(expires_in_seconds=expires_in, can_extend=can_extend),
     )
 
 

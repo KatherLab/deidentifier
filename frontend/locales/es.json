@@ -144,6 +144,17 @@
     "background_progress_label": "Progreso general del procesamiento en segundo plano",
     "background_progress": "Procesamiento en segundo plano: {done} de {total} completados",
     "rerunning": "Recalculando …",
+    "lifetime": {
+      "remaining": "Resultado disponible: quedan {time}",
+      "expiring": "El servidor eliminará este resultado en {time}. Los cambios posteriores requerirán una nueva ejecución.",
+      "expired": "Resultado caducado",
+      "expired_hint": "El servidor ha eliminado el documento. El próximo cambio volverá a calcular la anonimización.",
+      "extend": "Ampliar",
+      "at_maximum": "Se alcanzó la retención máxima: no se puede ampliar más.",
+      "extend_hint": "Resultado disponible: quedan {time}. Haga clic para ampliarlo.",
+      "extended": "Ampliado: resultado disponible durante {time} más.",
+      "extended_at_maximum": "Se alcanzó la retención máxima: resultado disponible durante {time} más."
+    },
     "reset_one": "Documento nuevo",
     "reset_many": "Documentos nuevos",
     "processed_in": "Procesado en {ms} ms",

@@ -8,17 +8,18 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from starlette.datastructures import UploadFile
 
 from ....core.config import Settings, get_settings
-from ....schemas.anonymize import AnonymizeResponse, AnonymizeTextRequest
+from ....schemas.anonymize import AnonymizeResponse, AnonymizeTextRequest, CacheLifetime
+from ....utils.cache import request_cache
 from ....utils.detection import DetectorError
 from ....utils.extraction import ExtractionError, extract_document
 from ....utils.pipeline import rerun_with_overrides, run_anonymization
-from ....utils.safe_logging import get_safe_logger
+from ....utils.safe_logging import get_safe_logger, log_reference
 
 router = APIRouter()
 logger = get_safe_logger(__name__)
@@ -45,7 +46,7 @@ async def anonymize(
 
     logger.info(
         "anonymize_request",
-        request_id=response.request_id,
+        ref=log_reference(response.request_id),
         source_type=response.source_type,
         chars=len(response.source_text),
         entities=len(response.entities),
@@ -233,6 +234,38 @@ async def _run(
         )
     except DetectorError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+
+
+@router.post("/anonymize/{request_id}/extend", response_model=CacheLifetime)
+async def extend_result(request_id: str) -> CacheLifetime:
+    """Keep a cached result available for another TTL.
+
+    Offered by the review UI shortly before the countdown runs out, so a
+    document stays in memory while it is actually being worked on and no
+    longer. Bounded: past the hard lifetime ceiling this returns the remaining
+    time with `can_extend: false` instead of granting more.
+    """
+    granted = request_cache.extend(request_id)
+    if granted is None:
+        raise HTTPException(
+            status_code=410,
+            detail="The cached result has expired; please re-run the anonymization.",
+        )
+    expires_in, can_extend = granted
+    return CacheLifetime(expires_in_seconds=expires_in, can_extend=can_extend)
+
+
+@router.delete("/anonymize/{request_id}", status_code=204)
+async def forget_result(request_id: str) -> Response:
+    """Drop the cached detection for one request.
+
+    The review UI calls this when a document is reset or the tab goes away, so
+    the text stops living in server memory at that moment instead of at the end
+    of its TTL. Always 204: whether an id existed is not something an unrelated
+    caller should be able to probe.
+    """
+    request_cache.discard(request_id)
+    return Response(status_code=204)
 
 
 @router.post("/anonymize/stream")

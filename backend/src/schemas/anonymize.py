@@ -101,6 +101,20 @@ class AnonymizeTextRequest(BaseModel):
         return self
 
 
+class CacheLifetime(BaseModel):
+    """How much longer the server will hold this result, and whether the user
+    may ask for more.
+
+    The review UI counts this down and offers an extension shortly before it
+    runs out — the document is only in memory while someone is working on it.
+    `can_extend` goes false at the hard lifetime ceiling, so the UI can explain
+    why the button stopped working instead of silently failing.
+    """
+
+    expires_in_seconds: int = Field(ge=0)
+    can_extend: bool
+
+
 class TimingMs(BaseModel):
     extraction: float
     detection: float
@@ -122,6 +136,8 @@ class AnonymizeResponse(BaseModel):
     # Each carries a stable `code` the UI translates, plus English `message`.
     warnings: list[Notice] = Field(default_factory=list)
     timing_ms: TimingMs
+    # How long this result stays available for cheap override re-runs.
+    lifetime: CacheLifetime
 
 
 class DetectorStatus(BaseModel):

@@ -11,7 +11,37 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+### Security
+
+- The frontend container now mounts `/tmp` as a `tmpfs` and nginx no longer
+  buffers `/api/` responses: uploads and results were being spooled to
+  temporary files on the container's writable layer. If you run the frontend
+  image outside `compose.yml`, mount a `tmpfs` at `/tmp` yourself — see
+  [Data retention](docs/DATA_RETENTION.md).
+
+- Request ids are no longer written to the backend log (a short hash is logged
+  instead). While a cached result lives, its id is enough to retrieve the
+  document from the API.
+
 ### Changed
+
+- The detection cache now expires 15 minutes after a result was created rather
+  than 15 minutes after it was last used, sweeps expired entries on a timer,
+  and is emptied at shutdown.
+
+- The top bar shows how long the server keeps the current result and, when
+  pressed, extends it by an hour from that moment — repeatably, so stepping
+  away does not cost a re-run. The result view warns separately once the time
+  runs low. New `RESULT_CACHE_TTL_MINUTES` (15), `RESULT_CACHE_EXTENSION_MINUTES`
+  (60), `RESULT_CACHE_MAX_LIFETIME_MINUTES` (720 = 12 h, the ceiling no
+  extension can cross) and `RESULT_CACHE_MAX_ENTRIES` (100). The defaults suit a
+  research prototype; see
+  [Tightening it](docs/operations/configuration.md#tightening-it) for stricter
+  deployments.
+
+- New `DELETE /api/v1/anonymize/{request_id}`: the review UI calls it when a
+  document is closed or the tab goes away, so the server-side copy ends then
+  instead of at the end of its TTL.
 
 - `.env.example` now ships `DETECTORS=rules` and comments out the LLM block, so
   `cp .env.example .env && docker compose up -d --build` starts a working
