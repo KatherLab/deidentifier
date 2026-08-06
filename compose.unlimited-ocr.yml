@@ -13,9 +13,10 @@
 
 services:
   unlimited-ocr:
-    # The `unlimited-ocr` tag, not `latest`: the model needs the custom vLLM
-    # build that ships the NGramPerReqLogitsProcessor referenced below.
-    image: vllm/vllm-openai:unlimited-ocr
+    # Upstream vLLM ships Unlimited-OCR (and the NGramPerReqLogitsProcessor
+    # referenced below) since v0.25.0, so the stock image works — pin a tag
+    # instead of `latest` if you need a reproducible deployment.
+    image: vllm/vllm-openai:latest
     ipc: host
     shm_size: "8gb"
     volumes:

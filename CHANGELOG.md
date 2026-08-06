@@ -30,11 +30,6 @@ documentation, and CI work are left out.
   / `PRIVACY_FILTER_BASE_URL` settings. Listing it in `DETECTORS` now fails as
   an unknown detector rather than as a permanently unready one.
 
-### Fixed
-
-- The Unlimited-OCR overlay pulled `vllm/vllm-openai:latest`, which lacks the
-  logits processor the model requires; it now uses the `unlimited-ocr` tag.
-
 ## [0.1.0] — 2026-08-05
 
 First tagged version.

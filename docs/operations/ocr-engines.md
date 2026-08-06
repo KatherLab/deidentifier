@@ -62,8 +62,10 @@ transcript that would look complete.
 
 ### The Unlimited-OCR sidecar
 
-`compose.unlimited-ocr.yml` runs `baidu/Unlimited-OCR` on vLLM and wires it up
-automatically (NVIDIA GPU + Container Toolkit required):
+`compose.unlimited-ocr.yml` runs `baidu/Unlimited-OCR` on the stock
+`vllm/vllm-openai` image — the model is supported by upstream vLLM since
+v0.25.0 — and wires it up automatically (NVIDIA GPU + Container Toolkit
+required):
 
 ```bash
 docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d
@@ -74,7 +76,7 @@ the backend.
 
 ```bash
 docker run --rm --gpus all --network host --ipc host \
-  vllm/vllm-openai:unlimited-ocr baidu/Unlimited-OCR \
+  vllm/vllm-openai:latest baidu/Unlimited-OCR \
   --port 8100 --trust-remote-code \
   --logits_processors vllm.model_executor.models.unlimited_ocr:NGramPerReqLogitsProcessor \
   --no-enable-prefix-caching --mm-processor-cache-gb 0
