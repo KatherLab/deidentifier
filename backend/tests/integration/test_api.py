@@ -50,6 +50,22 @@ def test_anonymize_txt_upload(client):
     assert "Erika Musterfrau" not in body["anonymized_text"]
 
 
+def test_letterhead_department_is_masked(client):
+    """The unit line of a hospital letterhead is as identifying as the
+    institution's name and must not survive the address block."""
+    letterhead = (
+        "Beispielklinikum Musterstadt\n"
+        "Klinik und Poliklinik für Innere Medizin\n"
+        "Musterstraße 74\n"
+        "01307 Musterstadt\n"
+    )
+    response = client.post("/api/v1/anonymize", json={"text": letterhead})
+    assert response.status_code == 200
+    anonymized = response.json()["anonymized_text"]
+    assert "Klinik und Poliklinik für Innere Medizin" not in anonymized
+    assert "[ORGANISATION]" in anonymized
+
+
 def test_no_store_headers_on_api_routes(client):
     response = client.post("/api/v1/anonymize", json={"text": "Kein PII hier."})
     assert response.headers["Cache-Control"] == "no-store"

@@ -46,6 +46,38 @@ _STREET_SUFFIX = (
     r"(?:[Ss]traße|[Ss]trasse|[Ss]tr\.|[Ww]eg|[Pp]latz|[Aa]llee|[Gg]asse|[Rr]ing|[Dd]amm|[Uu]fer)"
 )
 
+# Organizational units of a hospital. They carry no proper name of their own
+# ("Klinik für Kardiologie"), so an LLM easily reads them as generic nouns —
+# yet in a letterhead they sit right in the address block and narrow the
+# institution down as much as its name does.
+_ORG_UNIT = (
+    r"(?:Klinik(?:[ \t]+und[ \t]+Poliklinik)?|Poliklinik|Tagesklinik|Abteilung"
+    r"|Institut|Zentrum|Sektion|Ambulanz)"
+)
+_ORG_UNIT_BARE = r"(?:Poliklinik|Tagesklinik|Abteilung|Institut|Zentrum|Sektion|Ambulanz)"
+# The adjective that makes a bare unit noun a named one: "Medizinische Klinik".
+# Defined below the stop words, which keep articles out of it ("Die Klinik").
+_ORG_ADJECTIVE_BODY = r"[A-ZÄÖÜ][a-zäöüß]+e"
+# Words that end a unit name rather than belong to it — without them the
+# specialty would run on into the next sentence or into a physician's title.
+_ORG_STOP = (
+    r"(?:Prof|Dr|Herr|Frau|Sehr|Tel|Fax|Chefarzt|Chefärztin|Oberarzt|Oberärztin"
+    r"|Der|Die|Das|Dem|Den|Ein|Eine|Es|Wir|Am|Im|In|Bei|Nach|Von|Vom|Zur|Zum"
+    r"|Unsere|Unserer|Diese|Dieser|Seine|Ihre|Jede|Alle|Keine"
+    # German capitalizes every noun, so a unit name would otherwise run on into
+    # the date that so often follows it ("… Ende März").
+    r"|Ende|Anfang|Mitte|Uhr|Datum|Januar|Februar|März|April|Mai|Juni|Juli"
+    r"|August|September|Oktober|November|Dezember)\b"
+)
+# A specialty word, optionally left half of a compound ("Viszeral-, Thorax- und
+# Gefäßchirurgie"). Separators stay on the line: a newline ends the unit name.
+_ORG_WORD = rf"(?!{_ORG_STOP})[A-ZÄÖÜ][A-Za-zÄÖÜäöüß]*-?"
+# A comma continues the name only inside such a compound enumeration; anywhere
+# else it ends the field ("… und Dermatologie, Station K1").
+_ORG_SEP = r"(?:(?<=-),[ \t]*|[ \t]+und[ \t]+|[ \t]+)"
+_ORG_SPECIALTY = rf"{_ORG_WORD}(?:{_ORG_SEP}{_ORG_WORD}){{0,5}}"
+_ORG_ADJECTIVE = rf"(?!{_ORG_STOP}){_ORG_ADJECTIVE_BODY}"
+
 RULES: list[Rule] = [
     Rule(
         "de.email.v1",
@@ -119,6 +151,35 @@ RULES: list[Rule] = [
         EntityType.ADDRESS,
         0.85,
         metadata={"subtype": "plz_city"},
+    ),
+    Rule(
+        "de.org.department.v1",
+        re.compile(
+            rf"\b(?:{_ORG_ADJECTIVE}[ \t]+)?{_ORG_UNIT}[ \t]+für[ \t]+{_ORG_SPECIALTY}",
+        ),
+        EntityType.ORGANIZATION,
+        0.85,
+        metadata={"subtype": "department"},
+    ),
+    Rule(
+        # A named unit without the "für <Fach>" tail: "Medizinische Klinik I",
+        # "Sektion Rheumatologie". The second branch omits "Klinik", which is
+        # too often a bare noun in running text ("in unserer Klinik Ende März").
+        "de.org.unit.v1",
+        re.compile(
+            rf"\b(?:{_ORG_ADJECTIVE}[ \t]+{_ORG_UNIT}(?:[ \t]+(?:[IVX]{{1,4}}|\d{{1,2}})\b)?"
+            rf"|{_ORG_UNIT_BARE}[ \t]+{_ORG_WORD}(?:{_ORG_SEP}{_ORG_WORD})?)"
+        ),
+        EntityType.ORGANIZATION,
+        0.75,
+        metadata={"subtype": "department"},
+    ),
+    Rule(
+        "de.org.ward.v1",
+        re.compile(r"\b(?:Station|Haus)[ \t]+[A-Z0-9][A-Za-z0-9ÄÖÜäöüß\-/]{0,15}\b"),
+        EntityType.ORGANIZATION,
+        0.75,
+        metadata={"subtype": "ward"},
     ),
 ]
 

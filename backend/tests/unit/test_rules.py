@@ -40,11 +40,61 @@ async def detect_types(text: str) -> dict[str, EntityType]:
         ("Adresse: Berliner Straße 12a, Dresden", "Berliner Straße 12a", EntityType.ADDRESS),
         ("in der Hauptstr. 5 wohnhaft", "Hauptstr. 5", EntityType.ADDRESS),
         ("PLZ 01307 Dresden angegeben", "01307 Dresden", EntityType.ADDRESS),
+        (
+            "Klinik für Kardiologie, Musterstadt",
+            "Klinik für Kardiologie",
+            EntityType.ORGANIZATION,
+        ),
+        (
+            "Klinik und Poliklinik für Innere Medizin\nMusterstraße 74",
+            "Klinik und Poliklinik für Innere Medizin",
+            EntityType.ORGANIZATION,
+        ),
+        (
+            "Klinik für Viszeral-, Thorax- und Gefäßchirurgie",
+            "Klinik für Viszeral-, Thorax- und Gefäßchirurgie",
+            EntityType.ORGANIZATION,
+        ),
+        ("Medizinische Klinik I, Chefarzt", "Medizinische Klinik I", EntityType.ORGANIZATION),
+        ("Sektion Rheumatologie am Haus", "Sektion Rheumatologie", EntityType.ORGANIZATION),
+        ("Verlegung auf Station 4B erfolgt", "Station 4B", EntityType.ORGANIZATION),
+        ("Ambulanz in Haus 12 gelegen", "Haus 12", EntityType.ORGANIZATION),
     ],
 )
 async def test_recognizers(text: str, expected_text: str, expected_type: EntityType):
     found = await detect_types(text)
     assert found.get(expected_text) == expected_type, f"got {found}"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Bare nouns in running text are not organizational units.
+        "Der Patient wurde im Krankenhaus behandelt und auf die Station gebracht.",
+        "Wiedervorstellung in der Ambulanz Anfang Mai",
+        "Die Klinik hat den Befund übermittelt.",
+    ],
+)
+async def test_no_generic_units_detected(text: str):
+    spans = (await detector.detect(text)).spans
+    assert [s for s in spans if s.entity_type == EntityType.ORGANIZATION] == []
+
+
+async def test_unit_name_stops_at_the_next_field():
+    """A unit name may not run on past its own line or field — a comma
+    continues it only inside a compound enumeration ("Viszeral-, Thorax-")."""
+    found = await detect_types(
+        "Zentrum für Innere Medizin und Dermatologie, Station K1\nProf. Dr. Anna Beispiel"
+    )
+    assert found.get("Zentrum für Innere Medizin und Dermatologie") == EntityType.ORGANIZATION
+    assert found.get("Station K1") == EntityType.ORGANIZATION
+
+
+async def test_department_carries_subtype():
+    spans = (await detector.detect("Abteilung für Neurologie, Station 3")).spans
+    subtypes = {s.text: s.metadata.get("subtype") for s in spans}
+    assert subtypes["Abteilung für Neurologie"] == "department"
+    assert subtypes["Station 3"] == "ward"
 
 
 async def test_dob_label_beats_generic_date():

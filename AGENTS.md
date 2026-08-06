@@ -148,8 +148,8 @@ Every detector returns exactly this. 12 deliberately coarse types; sub-typing
 
 ```python
 class EntitySpan(BaseModel):
-    start: int          # Unicode CODE POINT offset, inclusive
-    end: int            # exclusive
+    start: int  # Unicode CODE POINT offset, inclusive
+    end: int  # exclusive
     text: str
     entity_type: EntityType
     confidence: float
@@ -274,7 +274,7 @@ extensions `.txt/.docx/.pdf`. `Cache-Control: no-store` on content routes
 | `core/config.py` | `Settings(BaseSettings)`, `ENV_PATH` → `.env` → `backend/.env`, `@lru_cache get_settings()`, `validate_production_settings()`. **No network checks at startup** — readiness is reported by `/health/ready`, not by refusing to boot. |
 | `utils/pipeline.py` | `run_anonymization()` / `rerun_with_overrides()` — the orchestrator. |
 | `utils/detection.py` | Detector protocol, registry, `MockDetector`, `TermListDetector`, `validate_spans`. |
-| `utils/rules.py` | German recognizers (dates, phones, IBAN, postal codes, labelled IDs). |
+| `utils/rules.py` | German recognizers (dates, phones, IBAN, postal codes, labelled IDs, hospital units such as `Klinik für …` / `Station 4B`). |
 | `utils/llm_detection.py` | Prompts, structured output, chunking, passes, retries, `recheck_output()`. |
 | `utils/grounding.py` | LLM mention strings → validated source offsets. |
 | `utils/resolver.py` | Merge + overlap resolution. |

@@ -45,7 +45,7 @@ Twelve deliberately coarse types. Each has a default transformation:
 | `EMAIL` | E-Mail | `TYPE_MASK` | `[E-MAIL]` |
 | `URL` | URL | `TYPE_MASK` | `[URL]` |
 | `ID_NUMBER` | ID-Nummer | `TYPE_MASK` | `[ID]` |
-| `ORGANIZATION` | Organisation | `TYPE_MASK` | `[ORGANISATION]` |
+| `ORGANIZATION` | Organisation | `TYPE_MASK` | `[ORGANISATION]` — hospitals, practices, employers, and the units inside them (`Klinik für Kardiologie`, `Station 4B`) |
 | `PROFESSION` | Beruf | `TYPE_MASK` | `[BERUF]` |
 | `OTHER_PII` | Sonstige | `TYPE_MASK` | `[PII]` |
 
@@ -70,7 +70,7 @@ and fixed at submit — an English run writes `[DATE_OF_BIRTH]` and `[REDACTED]`
 
 | Detector | What it is good at |
 |---|---|
-| `rules` | Structured identifiers where a model might drift on format: e-mail, URL, phone/fax, IBAN, postal codes, numeric dates, and labelled IDs (`Pat.-Nr.`, `Fallnummer`, `Versichertennummer`, `geb.`, …). Context-aware — a bare number is not an ID without a label. |
+| `rules` | Structured identifiers where a model might drift on format: e-mail, URL, phone/fax, IBAN, postal codes, numeric dates, labelled IDs (`Pat.-Nr.`, `Fallnummer`, `Versichertennummer`, `geb.`, …), and hospital units (`Klinik für …`, `Abteilung für …`, `Station 4B`). Context-aware — a bare number is not an ID without a label, and a generic `die Station` in running text is not a unit. |
 | `llm` | Everything unstructured, above all names in German clinical prose. This is the primary detector. |
 | `mock` | Fixed fixture strings, for tests and offline development. Production refuses to start with it enabled. |
 

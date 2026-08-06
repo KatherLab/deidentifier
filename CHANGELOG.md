@@ -11,6 +11,14 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+### Changed
+
+- Hospital units are now detected as `ORGANIZATION`: the LLM prompt covers
+  department lines in a letterhead (`Klinik für Kardiologie`, `Station 4B`)
+  instead of dismissing them as generic nouns, and new rule recognizers catch
+  them independently of the model. Preserve individual units in the review
+  view when a document needs them.
+
 ## [0.1.0] — 2026-08-05
 
 First tagged version.
