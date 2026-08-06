@@ -1,36 +1,24 @@
 """Detector protocol, shared detection types, mock detector, and registry."""
 
 import re
-from typing import Protocol
 
 from ..core.config import Settings
 from ..schemas.entities import EntitySpan, EntityType, Notice
+from .detector_base import DetectionOutcome, DetectorError, SpanDetector
+from .llm_detection import LLMDetector
 from .notices import INVALID_SPAN_REJECTED, notice
+from .rules import RuleBasedDetector
 
-
-class DetectionOutcome:
-    """Spans plus non-fatal warnings from one detector run."""
-
-    def __init__(self, spans: list[EntitySpan], warnings: list[Notice] | None = None):
-        self.spans = spans
-        self.warnings = warnings or []
-
-
-class DetectorError(Exception):
-    """A configured detector cannot run; the request must fail (recall-first:
-    never silently degrade to fewer detectors)."""
-
-    def __init__(self, message: str, status_code: int = 502):
-        super().__init__(message)
-        self.status_code = status_code
-
-
-class SpanDetector(Protocol):
-    name: str
-    version: str
-
-    async def detect(self, text: str) -> DetectionOutcome: ...
-
+__all__ = [
+    "DetectionOutcome",
+    "DetectorError",
+    "MockDetector",
+    "SpanDetector",
+    "TermListDetector",
+    "build_detectors",
+    "detector_ready",
+    "validate_spans",
+]
 
 # Fixture values recognized by the mock detector (tests/offline development only).
 MOCK_FIXTURES: dict[str, EntityType] = {
@@ -127,9 +115,6 @@ def build_detectors(
     silently proceeding with fewer detectors would report a document as
     anonymized when it was not fully checked.
     """
-    from .llm_detection import LLMDetector
-    from .rules import RuleBasedDetector
-
     detectors: list[SpanDetector] = []
     if redact_terms:
         detectors.append(TermListDetector(redact_terms))

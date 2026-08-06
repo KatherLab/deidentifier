@@ -155,8 +155,11 @@ def _docx_warnings(data: bytes) -> list[Notice]:
             for marker, code in _DOCX_WARNING_MARKERS:
                 if marker in document_xml:
                     warnings.append(notice(code))
-    except Exception:
-        pass
+    except (zipfile.BadZipFile, KeyError, OSError):
+        # Best-effort inspection of the raw OPC package: python-docx has already
+        # parsed this archive successfully and the extracted text is unaffected,
+        # so an unreadable part only costs us these advisory warnings.
+        return warnings
     return warnings
 
 

@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass, field
 
 from ..schemas.entities import EntitySpan, EntityType
-from .detection import DetectionOutcome
+from .detector_base import DetectionOutcome
 
 
 @dataclass(frozen=True)

@@ -10,6 +10,7 @@ from backend.src.schemas.entities import (
     SpanStatus,
     TransformationType,
 )
+from backend.src.utils import pdf_export
 from backend.src.utils.extraction import LayoutLine
 from backend.src.utils.pdf_export import (
     ExportError,
@@ -132,8 +133,6 @@ def test_native_true_redaction_scrubs_metadata():
 
 def test_native_raster_fallback_when_true_redaction_fails(monkeypatch):
     import pypdfium2 as pdfium
-
-    import backend.src.utils.pdf_export as pdf_export
 
     def boom(data, entities, settings):
         raise RuntimeError("simulated pymupdf failure")
@@ -324,8 +323,6 @@ def test_native_area_redaction_erases_embedded_image():
 
 
 def test_raster_fallback_applies_area(monkeypatch):
-    import backend.src.utils.pdf_export as pdf_export
-
     def boom(data, entities, settings, areas=None):
         raise RuntimeError("simulated pymupdf failure")
 
@@ -580,7 +577,10 @@ def test_native_true_locates_needle_split_by_injected_whitespace():
 
     pdf, needle = _space_split_pdf()
     # search_for cannot find it (the text layer has a space the needle lacks).
-    assert pymupdf.open(stream=pdf, filetype="pdf")[0].search_for(needle) == []
+    source = pymupdf.open(stream=pdf, filetype="pdf")
+    hits = source[0].search_for(needle)
+    source.close()
+    assert hits == []
 
     output = redact_native_pdf(pdf, [applied(needle, 0)], native_settings())
     document = pymupdf.open(stream=output, filetype="pdf")

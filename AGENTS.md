@@ -167,7 +167,10 @@ recomputes offsets from modified text.
 
 ### 3. Detection (`utils/detection.py` + friends)
 
-`SpanDetector` protocol: `name`, `version`, `async detect(text) ->
+`SpanDetector` protocol (`utils/detector_base.py`, together with
+`DetectionOutcome` and `DetectorError` — kept out of `detection.py` so
+detectors can import the contract without an import cycle): `name`, `version`,
+`async detect(text) ->
 DetectionOutcome`. `build_detectors(settings, ...)` instantiates the configured
 list and **raises `DetectorError` for a detector that is enabled but cannot
 run** (principle 5). Detectors:
@@ -275,7 +278,8 @@ extensions `.txt/.docx/.pdf`. `Cache-Control: no-store` on content routes
 | `main.py` | FastAPI app, lifespan (`validate_production_settings`), CORS, security headers, error handlers, router wiring. Docs/OpenAPI disabled when `APP_ENV=production`. |
 | `core/config.py` | `Settings(BaseSettings)`, `ENV_PATH` → `.env` → `backend/.env`, `@lru_cache get_settings()`, `validate_production_settings()`. **No network checks at startup** — readiness is reported by `/health/ready`, not by refusing to boot. |
 | `utils/pipeline.py` | `run_anonymization()` / `rerun_with_overrides()` — the orchestrator. |
-| `utils/detection.py` | Detector protocol, registry, `MockDetector`, `TermListDetector`, `validate_spans`. |
+| `utils/detector_base.py` | The detector contract: `SpanDetector`, `DetectionOutcome`, `DetectorError`. Depends on nothing but the schemas. |
+| `utils/detection.py` | Detector registry (`build_detectors`), `MockDetector`, `TermListDetector`, `validate_spans`; re-exports the contract. |
 | `utils/rules.py` | German recognizers (dates, phones, IBAN, postal codes, labelled IDs, hospital units such as `Klinik für …` / `Station 4B`). |
 | `utils/llm_detection.py` | Prompts, structured output, chunking, passes, retries, `recheck_output()`. |
 | `utils/grounding.py` | LLM mention strings → validated source offsets. |

@@ -303,8 +303,6 @@ async def anonymize_stream(
 
 def _parse_policy_form(raw) -> dict | None:
     """Parse the multipart 'policy' field (JSON object) if present."""
-    import json
-
     from pydantic import TypeAdapter
 
     from ....schemas.entities import EntityType, TransformationType
@@ -319,8 +317,6 @@ def _parse_policy_form(raw) -> dict | None:
 
 def _parse_terms_form(raw) -> list[str] | None:
     """Parse a multipart terms field (JSON array of strings) if present."""
-    import json
-
     if not isinstance(raw, str) or not raw.strip():
         return None
     try:

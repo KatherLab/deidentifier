@@ -26,7 +26,7 @@ from ..schemas.entities import (
     ValidationWarning,
 )
 from .concurrency import global_semaphore
-from .detection import DetectionOutcome, DetectorError
+from .detector_base import DetectionOutcome, DetectorError
 from .grounding import Mention, ground_mentions
 from .notices import (
     LLM_RECHECK_FAILED,
