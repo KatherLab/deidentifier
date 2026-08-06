@@ -46,11 +46,11 @@ BANNER_COLOR=amber
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DETECTORS` | `rules` | Comma-separated: `rules`, `llm`, `mock`, `privacy_filter`. `.env.example` ships `rules` so a fresh copy starts with no external services. **Recommended for real use: `rules,llm`.** |
+| `DETECTORS` | `rules` | Comma-separated: `rules`, `llm`, `mock`. `.env.example` ships `rules` so a fresh copy starts with no external services. **Recommended for real use: `rules,llm`.** |
 
 A detector that is listed but cannot run makes the request fail with 503 rather
-than returning a partial result. `mock` is for tests and offline development
-and is refused in production. `privacy_filter` is not implemented yet.
+than returning a partial result, as does a name the build does not know.
+`mock` is for tests and offline development and is refused in production.
 
 ## Detection LLM
 
@@ -101,11 +101,6 @@ Details and model recommendations: [LLM endpoints](llm-endpoints.md).
 
 Engine-specific variables (`MISTRAL_*`, `VISION_OCR_*`), including the
 Unlimited-OCR recipe: [OCR engines](ocr-engines.md).
-
-## Second-net detector
-
-`PRIVACY_FILTER_ENABLED` / `PRIVACY_FILTER_BASE_URL` are placeholders for a
-planned additional detector. Leave them off.
 
 ## Compose-level variables
 

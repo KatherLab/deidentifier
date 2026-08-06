@@ -112,7 +112,7 @@ def detector_ready(name: str, settings: Settings) -> bool:
         return True
     if name == "llm":
         return bool(settings.OPENAI_API_BASE and settings.LLM_MODEL)
-    return False  # privacy_filter arrives in Milestone 3
+    return False  # an unknown name is never ready; build_detectors rejects it
 
 
 def build_detectors(

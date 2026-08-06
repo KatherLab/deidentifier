@@ -24,6 +24,12 @@ documentation, and CI work are left out.
   them independently of the model. Preserve individual units in the review
   view when a document needs them.
 
+### Removed
+
+- The unimplemented `privacy_filter` detector and its `PRIVACY_FILTER_ENABLED`
+  / `PRIVACY_FILTER_BASE_URL` settings. Listing it in `DETECTORS` now fails as
+  an unknown detector rather than as a permanently unready one.
+
 ### Fixed
 
 - The Unlimited-OCR overlay pulled `vllm/vllm-openai:latest`, which lacks the

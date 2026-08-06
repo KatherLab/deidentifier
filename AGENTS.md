@@ -178,7 +178,9 @@ run** (principle 5). Detectors:
 | `llm` | `utils/llm_detection.py` | The primary detector. Any OpenAI-compatible endpoint. |
 | `mock` | `utils/detection.py` | Fixed fixture strings, tests/offline only. Production refuses to start with it. |
 | `user_terms` | `utils/detection.py` | `TermListDetector` — the user's always-redact terms; word-bounded, case-insensitive, entirely independent of the model. Added implicitly when `redact_terms` are sent. |
-| `privacy_filter` | — | Planned second net (Milestone 3); `detector_ready()` returns False. |
+
+Any other name in `DETECTORS` is rejected by `build_detectors()` with a
+`DetectorError` — there are no placeholder detectors.
 
 **The LLM returns strings, never offsets.** `utils/grounding.py` locates each
 returned mention in the source deterministically (exact → umlaut variants →

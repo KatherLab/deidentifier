@@ -40,10 +40,6 @@ async def status(settings: Settings = Depends(get_settings)) -> StatusResponse:
         ("docling", settings.DOCLING_SERVE_URL if settings.OCR_ENGINE != "none" else ""),
         ("mistral_ocr", settings.MISTRAL_API_BASE if settings.OCR_ENGINE == "mistral_ocr" else ""),
         ("vision_ocr", settings.VISION_OCR_API_BASE if settings.OCR_ENGINE == "llm_vision" else ""),
-        (
-            "privacy_filter",
-            settings.PRIVACY_FILTER_BASE_URL if settings.PRIVACY_FILTER_ENABLED else "",
-        ),
     ]
     endpoints = []
     for name, url in candidates:

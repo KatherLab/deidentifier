@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     BANNER_TEXT: str = ""
     BANNER_COLOR: str = "amber"  # amber | red | blue | green | gray
 
-    # Detectors: comma-separated (mock | rules | llm | privacy_filter)
+    # Detectors: comma-separated (mock | rules | llm)
     DETECTORS: str = "rules"
 
     # Primary PII detection LLM (OpenAI-compatible) — Milestone 2
@@ -100,10 +100,6 @@ class Settings(BaseSettings):
     VISION_OCR_MAX_CONCURRENT_PAGES: int = Field(default=2, ge=1, le=16)
     # Page render scale: 1.0 = 72 dpi; 2.8 ≈ 200 dpi.
     VISION_OCR_RENDER_SCALE: float = Field(default=2.8, ge=1.0, le=6.0)
-
-    # Optional second-net detector — Milestone 3
-    PRIVACY_FILTER_ENABLED: bool = False
-    PRIVACY_FILTER_BASE_URL: str = ""
 
     @property
     def detector_names(self) -> list[str]:
