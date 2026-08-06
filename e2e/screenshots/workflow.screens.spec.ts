@@ -199,7 +199,9 @@ test('captures the documentation screenshots', async ({ page }) => {
     // Long enough for the "images blacked out" toast to auto-dismiss.
     await page.waitForTimeout(4500)
     await shoot(page, 'result-pdf-area-editor')
-    await page.getByRole('button', { name: /Bereiche schwärzen/ }).click()
+    // The header is a two-view segmented control, so leaving means picking the
+    // other view — clicking "Bereiche schwärzen" again would keep us here.
+    await page.getByRole('button', { name: 'Vorschau', exact: true }).click()
   })
 
   // --- Batch run (two documents) ------------------------------------------

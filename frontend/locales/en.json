@@ -184,7 +184,14 @@
       "hint": "Click a highlighted span for details – or select any text to redact it manually."
     },
     "pdf": {
-      "areas": "Redact areas",
+      "view_label": "Choose view",
+      "view_preview": "Preview",
+      "view_areas": "Redact areas",
+      "areas_badge_label": "1 marked area | {count} marked areas",
+      "areas_invite": "Signature, stamp or logo still visible? The text check does not detect image content like that.",
+      "areas_invite_action": "Redact areas yourself",
+      "areas_marked": "1 additional area redacted. | {count} additional areas redacted.",
+      "areas_edit": "Edit areas",
       "reconstructed": "Reconstructed document – layout approximated, the original pixels are discarded.",
       "generating": "Generating PDF …",
       "preview_title": "Redacted PDF (preview)",

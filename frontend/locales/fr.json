@@ -184,7 +184,14 @@
       "hint": "Cliquez sur un passage surligné pour voir les détails – ou sélectionnez n’importe quel texte pour le masquer manuellement."
     },
     "pdf": {
-      "areas": "Masquer des zones",
+      "view_label": "Choisir la vue",
+      "view_preview": "Aperçu",
+      "view_areas": "Masquer des zones",
+      "areas_badge_label": "1 zone marquée | {count} zones marquées",
+      "areas_invite": "Signature, tampon ou logo encore visible ? La vérification du texte ne détecte pas ce type de contenu graphique.",
+      "areas_invite_action": "Masquer des zones vous-même",
+      "areas_marked": "1 zone masquée en plus. | {count} zones masquées en plus.",
+      "areas_edit": "Modifier les zones",
       "reconstructed": "Document reconstruit – mise en page approximative, les pixels d’origine sont supprimés.",
       "generating": "Génération du PDF …",
       "preview_title": "PDF caviardé (aperçu)",

@@ -184,7 +184,14 @@
       "hint": "Haga clic en un pasaje resaltado para ver los detalles, o seleccione cualquier texto para ocultarlo manualmente."
     },
     "pdf": {
-      "areas": "Ocultar zonas",
+      "view_label": "Elegir vista",
+      "view_preview": "Vista previa",
+      "view_areas": "Ocultar zonas",
+      "areas_badge_label": "1 zona marcada | {count} zonas marcadas",
+      "areas_invite": "¿Sigue viéndose una firma, un sello o un logotipo? La revisión del texto no detecta ese contenido gráfico.",
+      "areas_invite_action": "Ocultar zonas usted mismo",
+      "areas_marked": "1 zona ocultada adicionalmente. | {count} zonas ocultadas adicionalmente.",
+      "areas_edit": "Editar zonas",
       "reconstructed": "Documento reconstruido: diseño aproximado, los píxeles originales se descartan.",
       "generating": "Generando el PDF …",
       "preview_title": "PDF censurado (vista previa)",

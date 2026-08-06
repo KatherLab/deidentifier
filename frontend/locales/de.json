@@ -184,7 +184,14 @@
       "hint": "Klicken Sie auf eine markierte Stelle für Details – oder markieren Sie beliebigen Text, um ihn manuell zu schwärzen."
     },
     "pdf": {
-      "areas": "Bereiche schwärzen",
+      "view_label": "Ansicht wählen",
+      "view_preview": "Vorschau",
+      "view_areas": "Bereiche schwärzen",
+      "areas_badge_label": "1 markierter Bereich | {count} markierte Bereiche",
+      "areas_invite": "Unterschrift, Stempel oder Logo noch sichtbar? Solche Bildinhalte erkennt die Textprüfung nicht.",
+      "areas_invite_action": "Bereiche selbst schwärzen",
+      "areas_marked": "1 Bereich zusätzlich geschwärzt. | {count} Bereiche zusätzlich geschwärzt.",
+      "areas_edit": "Bereiche bearbeiten",
       "reconstructed": "Rekonstruiertes Dokument – Layout angenähert, Originalpixel werden verworfen.",
       "generating": "PDF wird erzeugt …",
       "preview_title": "Geschwärztes PDF (Vorschau)",

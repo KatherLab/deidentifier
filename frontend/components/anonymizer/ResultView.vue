@@ -222,55 +222,112 @@
              the ORIGINAL pages; they apply to the export and this preview. -->
         <section v-if="isVisible('pdf')" :class="panelCardClass">
           <header class="shrink-0 border-b border-default bg-surface-muted px-4 py-2.5">
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <h3 class="text-sm font-semibold text-content">{{ t('result.panels.pdf') }}</h3>
-              <button
+              <!-- Two VIEWS of this one panel, not an on/off switch: opening
+                   the editor replaces the preview, so the header shows both
+                   sides and which one is showing. -->
+              <div
                 v-if="session.sourceFile !== null"
-                type="button"
-                :aria-pressed="areaEditing"
-                class="inline-flex items-center gap-1.5 rounded-card px-2 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="
-                  areaEditing
-                    ? 'bg-surface text-content shadow-sm'
-                    : 'text-content-muted hover:text-content'
-                "
-                @click="areaEditing = !areaEditing"
+                role="group"
+                :aria-label="t('result.pdf.view_label')"
+                class="inline-flex items-center gap-0.5 rounded-card bg-surface-sunken p-0.5"
               >
-                <EyeOff class="h-3.5 w-3.5" aria-hidden="true" />
-                {{ t('result.pdf.areas') }}
-                <span v-if="session.redactAreas.length > 0">
-                  ({{ session.redactAreas.length }})
-                </span>
-              </button>
+                <button
+                  type="button"
+                  :aria-pressed="!areaEditing"
+                  :class="pdfViewTabClass(!areaEditing)"
+                  @click="areaEditing = false"
+                >
+                  {{ t('result.pdf.view_preview') }}
+                </button>
+                <button
+                  type="button"
+                  :aria-pressed="areaEditing"
+                  :class="pdfViewTabClass(areaEditing)"
+                  @click="areaEditing = true"
+                >
+                  <SquareDashedMousePointer class="h-3.5 w-3.5" aria-hidden="true" />
+                  {{ t('result.pdf.view_areas') }}
+                  <span
+                    v-if="session.redactAreas.length > 0"
+                    class="rounded-full bg-primary px-1.5 text-[11px] leading-4 font-semibold text-white"
+                    :aria-label="
+                      t(
+                        'result.pdf.areas_badge_label',
+                        { count: session.redactAreas.length },
+                        session.redactAreas.length,
+                      )
+                    "
+                  >
+                    {{ session.redactAreas.length }}
+                  </span>
+                </button>
+              </div>
             </div>
             <p v-if="result.source_type === 'pdf-ocr'" class="text-xs text-content-subtle">
               {{ t('result.pdf.reconstructed') }}
             </p>
           </header>
           <PdfAreaEditor v-if="areaEditing" class="min-h-0 flex-1" @done="areaEditing = false" />
-          <div
-            v-else-if="session.pdfPreviewLoading"
-            class="flex flex-1 items-center justify-center gap-2 p-4 text-sm text-content-subtle"
-            aria-live="polite"
-          >
-            <LoadingSpinner size="small" color="gray" inline label="" />
-            {{ t('result.pdf.generating') }}
-          </div>
-          <div v-else-if="session.pdfPreviewError" class="space-y-3 p-4">
-            <p class="rounded-card px-3 py-2 text-sm" :class="getBannerClass('red')">
-              {{ session.pdfPreviewError }}
+          <template v-else>
+            <div
+              v-if="session.pdfPreviewLoading"
+              class="flex flex-1 items-center justify-center gap-2 p-4 text-sm text-content-subtle"
+              aria-live="polite"
+            >
+              <LoadingSpinner size="small" color="gray" inline label="" />
+              {{ t('result.pdf.generating') }}
+            </div>
+            <div v-else-if="session.pdfPreviewError" class="space-y-3 p-4">
+              <p class="rounded-card px-3 py-2 text-sm" :class="getBannerClass('red')">
+                {{ session.pdfPreviewError }}
+              </p>
+              <BaseButton size="sm" variant="secondary" @click="session.refreshPdfPreview()">
+                {{ t('common.retry') }}
+              </BaseButton>
+            </div>
+            <iframe
+              v-else-if="session.pdfPreviewUrl"
+              :src="session.pdfPreviewUrl"
+              :title="t('result.pdf.preview_title')"
+              class="min-h-0 w-full flex-1"
+            ></iframe>
+            <p v-else class="min-h-0 flex-1 p-6 text-sm text-content-subtle">
+              {{ t('result.pdf.no_preview') }}
             </p>
-            <BaseButton size="sm" variant="secondary" @click="session.refreshPdfPreview()">
-              {{ t('common.retry') }}
-            </BaseButton>
-          </div>
-          <iframe
-            v-else-if="session.pdfPreviewUrl"
-            :src="session.pdfPreviewUrl"
-            :title="t('result.pdf.preview_title')"
-            class="min-h-0 w-full flex-1"
-          ></iframe>
-          <p v-else class="p-6 text-sm text-content-subtle">{{ t('result.pdf.no_preview') }}</p>
+            <!-- What the text pipeline cannot do: signatures, stamps and logos
+                 stay in the pixels. Say so here, where the reviewer sees them. -->
+            <p
+              v-if="session.sourceFile !== null"
+              class="shrink-0 border-t border-default px-4 py-2.5 text-xs text-content-subtle"
+            >
+              <template v-if="session.redactAreas.length === 0">
+                {{ t('result.pdf.areas_invite') }}
+              </template>
+              <template v-else>
+                {{
+                  t(
+                    'result.pdf.areas_marked',
+                    { count: session.redactAreas.length },
+                    session.redactAreas.length,
+                  )
+                }}
+              </template>
+              {{ ' ' }}
+              <button
+                type="button"
+                class="rounded-sm font-medium text-primary underline underline-offset-2 transition-colors hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                @click="areaEditing = true"
+              >
+                {{
+                  session.redactAreas.length === 0
+                    ? t('result.pdf.areas_invite_action')
+                    : t('result.pdf.areas_edit')
+                }}
+              </button>
+            </p>
+          </template>
         </section>
 
         <!-- Anonymized output as plain selectable text. -->
@@ -376,9 +433,9 @@ import {
   ChevronDown,
   Copy,
   Download,
-  EyeOff,
   FileDown,
   FileX,
+  SquareDashedMousePointer,
   XCircle,
 } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
@@ -424,7 +481,7 @@ const isPdfSource = computed(
   () => result.value?.source_type === 'pdf' || result.value?.source_type === 'pdf-ocr',
 )
 
-/** Area-redaction editor in the Original panel (per view; off on doc switch). */
+/** Which view of the redacted-PDF panel is showing (off on doc switch). */
 const areaEditing = ref(false)
 watch(
   () => session.activeDocumentId,
@@ -432,6 +489,14 @@ watch(
     areaEditing.value = false
   },
 )
+
+/** Segmented control in the PDF panel header: preview ↔ area editor. */
+function pdfViewTabClass(active: boolean): string {
+  return [
+    'inline-flex items-center gap-1.5 rounded-card px-2 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+    active ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content',
+  ].join(' ')
+}
 
 // ---------------------------------------------------------------------------
 // Header: status headline + export menu

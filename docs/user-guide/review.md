@@ -94,8 +94,9 @@ document of a batch — use *Immer schwärzen* in the
 ## Blacking out areas of a PDF
 
 Signatures, letterheads, stamps, and photos are pixels, not text, so no text
-detector can find them. In the **Geschwärztes PDF** panel, press **Bereiche
-schwärzen** and drag a rectangle over anything that should be covered:
+detector can find them. The **Geschwärztes PDF** panel has two views: switch it
+from **Vorschau** to **Bereiche schwärzen** and drag a rectangle over anything
+that should be covered:
 
 <figure markdown>
   ![The area redaction editor](../assets/screenshots/result-pdf-area-editor.png)
@@ -105,6 +106,8 @@ The editor shows the **original** pages, not the redacted preview — the text
 redaction is applied to the export on top of the areas you draw here.
 
 - Click an existing rectangle to remove it.
+- **Fertig** (or the **Vorschau** view) takes you back to the redacted preview;
+  every change applies immediately, so nothing is lost either way.
 - **Alle Bilder schwärzen** covers every embedded image the backend found, in
   one click.
 - Areas apply to the redacted-PDF preview and export only; text exports are
