@@ -52,6 +52,27 @@ Document → extraction → rule + LLM detection → span merging
 - All model and OCR backends are configurable base URLs, local by default. The
   UI shows a banner whenever a configured endpoint is not local.
 
+## Citation
+
+Cite the software itself with the metadata in
+[`CITATION.cff`](https://github.com/KatherLab/deidentifier/blob/main/CITATION.cff).
+
+The approach it builds on was introduced in the LLM-Anonymizer paper — cite
+that too when you refer to the method:
+
+> Wiest IC, Leßmann M-E, Wolf F, Ferber D, Van Treeck M, Zhu J, Ebert MP,
+> Westphalen CB, Wermke M, Kather JN. *Deidentifying Medical Documents with
+> Local, Privacy-Preserving Large Language Models: The LLM-Anonymizer.* NEJM AI
+> 2025;2(4):AIdbp2400537.
+> [doi:10.1056/AIdbp2400537](https://doi.org/10.1056/AIdbp2400537)
+
+!!! note "This is a follow-up, not the paper's code"
+
+    This repository is an independent reimplementation with a different
+    architecture — it is not the artifact evaluated in that paper, and the
+    accuracy reported there does not describe this tool. Measure it on your own
+    documents with the [evaluation harness](evaluation/index.md).
+
 ## Where to go next
 
 <div class="grid cards" markdown>

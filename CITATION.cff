@@ -2,7 +2,10 @@ cff-version: 1.2.0
 title: "Medical Document Anonymizer (deidentifier)"
 message: >-
   If you use this software in your research, please cite it using the metadata
-  from this file.
+  from this file. This is a follow-up implementation and not the code evaluated
+  in the LLM-Anonymizer paper (Wiest et al., NEJM AI 2025, listed under
+  "references"); please cite that paper as well when referring to the
+  underlying approach.
 type: software
 
 authors:
@@ -44,3 +47,44 @@ keywords:
 license: "AGPL-3.0-or-later"
 version: "0.1.0"
 date-released: "2026-08-05"
+
+references:
+  - type: article
+    title: >-
+      Deidentifying Medical Documents with Local, Privacy-Preserving Large
+      Language Models: The LLM-Anonymizer
+    authors:
+      - family-names: "Wiest"
+        given-names: "Isabella C."
+      - family-names: "Leßmann"
+        given-names: "Marie-Elisabeth"
+      - family-names: "Wolf"
+        given-names: "Fabian"
+      - family-names: "Ferber"
+        given-names: "Dyke"
+      - family-names: "Van Treeck"
+        given-names: "Marko"
+      - family-names: "Zhu"
+        given-names: "Jiefu"
+      - family-names: "Ebert"
+        given-names: "Matthias P."
+      - family-names: "Westphalen"
+        given-names: "Christoph Benedikt"
+      - family-names: "Wermke"
+        given-names: "Martin"
+      - family-names: "Kather"
+        given-names: "Jakob Nikolas"
+    journal: "NEJM AI"
+    year: 2025
+    volume: 2
+    issue: 4
+    number: "AIdbp2400537"
+    doi: "10.1056/AIdbp2400537"
+    url: "https://ai.nejm.org/doi/full/10.1056/AIdbp2400537"
+    notes: >-
+      The predecessor work this software builds on. It established the
+      approach — local, privacy-preserving LLMs proposing identifiers in
+      clinical documents — and reported the accuracy figures for that
+      implementation. This repository is an independent reimplementation with a
+      different architecture, and its behavior and accuracy are not those
+      measured in the paper.

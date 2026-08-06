@@ -134,6 +134,24 @@ See [Evaluation](https://katherlab.github.io/deidentifier/evaluation/).
 | [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | Bundled OSS components and licenses |
 | [`CITATION.cff`](CITATION.cff) | Citation metadata |
 
+## Citation
+
+Cite the software itself with the metadata in [`CITATION.cff`](CITATION.cff).
+
+The approach it builds on was introduced in the LLM-Anonymizer paper — cite
+that too when you refer to the method:
+
+> Wiest IC, Leßmann M-E, Wolf F, Ferber D, Van Treeck M, Zhu J, Ebert MP,
+> Westphalen CB, Wermke M, Kather JN. *Deidentifying Medical Documents with
+> Local, Privacy-Preserving Large Language Models: The LLM-Anonymizer.* NEJM AI
+> 2025;2(4):AIdbp2400537.
+> [doi:10.1056/AIdbp2400537](https://doi.org/10.1056/AIdbp2400537)
+
+**This repository is a follow-up, not the code evaluated in that paper.** It is
+an independent reimplementation with a different architecture, so the accuracy
+reported there does not describe this tool. Measure it on your own documents
+with the [evaluation harness](https://katherlab.github.io/deidentifier/evaluation/).
+
 ## License
 
 AGPL-3.0-or-later. See [`LICENSE`](LICENSE).
