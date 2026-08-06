@@ -3,8 +3,9 @@
 uv run uvicorn backend.src.main:app --reload --host 0.0.0.0 --port 8000
 """
 
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,10 +15,24 @@ from .middleware.error_handlers import register_error_handlers
 from .middleware.security_headers import SecurityHeadersMiddleware
 from .routers.v1.api import api_router
 from .routers.v1.endpoints.health import health_router
+from .utils.cache import request_cache
 from .utils.safe_logging import get_safe_logger
 
 logging.basicConfig(level=logging.INFO)
 logger = get_safe_logger(__name__)
+
+#: How often the expired-entry sweep runs. Without it, eviction would only
+#: happen on the next request — an idle process would hold the last documents
+#: it saw well past their TTL.
+CACHE_SWEEP_INTERVAL_SECONDS = 60
+
+
+async def _sweep_cache_periodically() -> None:
+    while True:
+        await asyncio.sleep(CACHE_SWEEP_INTERVAL_SECONDS)
+        removed = request_cache.sweep()
+        if removed:
+            logger.info("cache_swept", removed=removed)
 
 
 @asynccontextmanager
@@ -29,8 +44,23 @@ async def lifespan(app: FastAPI):
             "insecure_content_logging_enabled",
             note="DOCUMENT CONTENT MAY APPEAR IN LOGS - development use only",
         )
-    logger.info("startup", env=settings.APP_ENV, detectors=settings.DETECTORS)
-    yield
+    request_cache.configure(settings)
+    logger.info(
+        "startup",
+        env=settings.APP_ENV,
+        detectors=settings.DETECTORS,
+        result_ttl_minutes=settings.RESULT_CACHE_TTL_MINUTES,
+        result_max_lifetime_minutes=settings.RESULT_CACHE_MAX_LIFETIME_MINUTES,
+    )
+    sweeper = asyncio.create_task(_sweep_cache_periodically())
+    try:
+        yield
+    finally:
+        sweeper.cancel()
+        with suppress(asyncio.CancelledError):
+            await sweeper
+        # Nothing outlives the process, and nothing waits for a TTL either.
+        request_cache.clear()
 
 
 _settings = get_settings()

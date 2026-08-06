@@ -35,7 +35,7 @@ from ....utils.pdf_export import (
 )
 from ....utils.pipeline import rerun_with_overrides, run_anonymization
 from ....utils.policy import EXPORT_FILENAMES
-from ....utils.safe_logging import get_safe_logger
+from ....utils.safe_logging import get_safe_logger, log_reference
 
 router = APIRouter()
 logger = get_safe_logger(__name__)
@@ -160,7 +160,7 @@ async def export_pdf(
 
     logger.info(
         "export_pdf",
-        request_id=result.request_id,
+        ref=log_reference(result.request_id),
         source_type=source_type,
         entities=len(result.entities),
         areas=len(redact_areas),
@@ -245,4 +245,8 @@ async def _detect(
         )
     except DetectorError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+    # That run cached its detection under a fresh id the client never learns
+    # (an export returns PDF bytes, not JSON), so the entry is unreachable —
+    # it could only sit there holding the document text until its TTL ran out.
+    request_cache.discard(result.request_id)
     return result, extracted.layout, len(extracted.pages), extracted.source_type

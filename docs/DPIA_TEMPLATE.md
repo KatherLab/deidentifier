@@ -31,7 +31,8 @@ and insurance numbers.
 documents.
 
 **Retention.** No server-side persistence. Documents live in request memory
-plus a bounded in-process cache (≤15 minutes). See
+plus a bounded in-process cache (15 minutes, extendable by the reviewer up to
+a configurable ceiling of 12 hours). See
 [Data retention](DATA_RETENTION.md).
 
 ## 2. Necessity and proportionality

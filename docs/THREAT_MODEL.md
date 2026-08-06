@@ -125,13 +125,22 @@ rectangle.
 
 *Vector:* one user seeing another's document.
 
-*Controls:* nothing is stored; results are keyed by an unguessable request id
-held only by the submitting browser; the cache is bounded and short-lived; no
+*Controls:* nothing is stored; results are keyed by a random 122-bit request id
+(`uuid4`), which is the capability for that document and is therefore kept out
+of the backend's logs — they carry a hash of it instead; the cache is bounded
+and expires 15 minutes after creation regardless of use — a reviewer may extend
+that explicitly, but never past the configured ceiling (12 hours by default);
+the UI deletes its entry when a document is closed or the tab goes away; no
 listing endpoint exists.
 
-*Residual:* an attacker who obtained a valid request id within 15 minutes could
-re-run a transformation on that cached document. The id never leaves the
-submitting browser and the proxy authenticates callers.
+*Residual:* the request id is the *only* thing protecting a cached document —
+there is no session, and the API does not check who is asking. Anyone who
+obtains one within the cache window gets the full original text back, not
+merely a re-run: `POST /api/v1/anonymize` with `{request_id, overrides}`
+returns `source_text` and every detected entity. Guessing one is infeasible, so
+this is a disclosure risk, not an access-control bypass — but it means the id
+must be handled like a credential (see [Data retention](DATA_RETENTION.md)),
+and it is why the proxy in front of the app has to authenticate callers.
 
 ### T9 — Supply chain
 

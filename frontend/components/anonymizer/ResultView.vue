@@ -126,6 +126,46 @@
         </div>
       </div>
 
+      <!-- The result is about to leave the server's memory. Non-blocking: the
+           reviewer can keep working and extend when they get to it. Nothing is
+           lost either way — an expired result is recomputed from the text the
+           browser still holds — but the re-run costs a full detection pass. -->
+      <div
+        v-if="lifetime.isExpiring.value || lifetime.isExpired.value"
+        class="flex flex-wrap items-center gap-3 rounded-card border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700/60 dark:bg-amber-900/30"
+        role="status"
+        aria-live="polite"
+      >
+        <AlertTriangle
+          class="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300"
+          aria-hidden="true"
+        />
+        <p class="text-sm text-amber-900 dark:text-amber-100">
+          <template v-if="lifetime.isExpired.value">{{
+            t('result.lifetime.expired_hint')
+          }}</template>
+          <template v-else>
+            {{ t('result.lifetime.expiring', { time: lifetime.formatted.value }) }}
+          </template>
+        </p>
+        <BaseButton
+          v-if="canExtend"
+          size="sm"
+          variant="secondary"
+          class="ml-auto"
+          :loading="session.extendingResults"
+          @click="session.extendResults()"
+        >
+          {{ t('result.lifetime.extend') }}
+        </BaseButton>
+        <p
+          v-else-if="!lifetime.isExpired.value"
+          class="ml-auto text-xs text-amber-800 dark:text-amber-200"
+        >
+          {{ t('result.lifetime.at_maximum') }}
+        </p>
+      </div>
+
       <!-- Subdued meta line: batch progress, plus diagnostics in expert mode. -->
       <p v-if="metaLine" class="text-xs text-content-subtle" aria-live="polite">{{ metaLine }}</p>
 
@@ -451,6 +491,7 @@ import { useSessionStore } from '@/stores/session'
 import type { ResultPanelId } from '@/stores/session'
 import { useSettingsStore } from '@/stores/settings'
 import { usePopover } from '@/composables/usePopover'
+import { useResultLifetime } from '@/composables/useResultLifetime'
 import { useToast } from '@/composables/useToast'
 import { useFileDownload } from '@/composables/useFileDownload'
 import { anonymizeApi } from '@/services/anonymizeApi'
@@ -497,6 +538,22 @@ function pdfViewTabClass(active: boolean): string {
     active ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content',
   ].join(' ')
 }
+
+// ---------------------------------------------------------------------------
+// Result lifetime: how long the server still holds this document
+// ---------------------------------------------------------------------------
+
+/**
+ * The batch's countdown — the same one the header chip shows, so the running
+ * total is stated once. This view owns only the alarm: the banner that appears
+ * in the final minute, where the reviewer is actually looking.
+ */
+const lifetime = useResultLifetime(() => session.resultsExpireAt)
+
+/** The extension is only offered while there is something left to extend. */
+const canExtend = computed(
+  () => session.resultsCanExtend && !lifetime.isExpired.value && !session.rerunning,
+)
 
 // ---------------------------------------------------------------------------
 // Header: status headline + export menu

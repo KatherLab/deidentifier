@@ -27,10 +27,13 @@ import {
   isExpiredResultError,
 } from '@/utils/errors'
 import { DEFAULT_POLICY, policyDeviations } from '@/utils/policy'
+import { formatRemaining, remainingSeconds } from '@/utils/lifetime'
+import { useToast } from '@/composables/useToast'
 import type {
   AnonymizeResponse,
   AnonymizedEntity,
   Banner,
+  CacheLifetime,
   CustomRules,
   DetectorStatus,
   EntityType,
@@ -114,6 +117,17 @@ export interface SessionDocument {
    * language while reviewing never rewrites a finished document.
    */
   outputLanguage: OutputLanguage
+  /**
+   * When the backend's cached detection for this document expires, as an
+   * absolute client clock time (epoch ms) derived from the `expires_in_seconds`
+   * the server reported. Absolute, so the countdown survives a tab the OS
+   * suspended; null before the first result.
+   */
+  expiresAt: number | null
+  /** False once the entry hit its hard lifetime ceiling — no more extending. */
+  canExtend: boolean
+  /** True while an extension request is in flight. */
+  extending: boolean
   /** Aborts the in-flight stream request on reset. */
   abort: AbortController | null
 }
@@ -429,6 +443,9 @@ export const useSessionStore = defineStore('session', () => {
       rules: batchRules,
       forceOcr: batchForceOcr,
       outputLanguage: batchOutputLanguage,
+      expiresAt: null,
+      canExtend: false,
+      extending: false,
       abort: null,
     }
     // reactive() up front: the queue/stream callbacks hold direct references,
@@ -524,6 +541,7 @@ export const useSessionStore = defineStore('session', () => {
           )
       if (token !== batchToken) return // batch was reset while streaming
       doc.result = response
+      adoptLifetime(doc, response.lifetime)
       doc.overrides = new Map()
       doc.selectedEntityIndex = null
       // Default panel selection: source review + result side by side (the
@@ -581,10 +599,15 @@ export const useSessionStore = defineStore('session', () => {
     pumpQueue()
   }
 
-  /** Abort any in-flight work and revoke this document's object URLs. */
+  /**
+   * Abort any in-flight work, revoke this document's object URLs, and tell the
+   * backend to forget its cached detection now rather than at the end of the
+   * TTL — the document is going away here, so the server-side copy should too.
+   */
   function cleanupDocument(doc: SessionDocument): void {
     doc.abort?.abort()
     doc.abort = null
+    if (doc.result !== null) void anonymizeApi.forgetResult(doc.result.request_id)
     doc.pdfPreviewToken += 1 // ignore any in-flight preview response
     if (doc.pdfPreviewUrl !== null) URL.revokeObjectURL(doc.pdfPreviewUrl)
     doc.pdfPreviewUrl = null
@@ -610,6 +633,102 @@ export const useSessionStore = defineStore('session', () => {
       activeDocumentId.value = neighbor?.id ?? null
     }
     if (documents.value.length === 0) phase.value = 'idle'
+  }
+
+  // ---------------------------------------------------------------------
+  // Result lifetime (the backend holds the detection for a bounded window)
+  // ---------------------------------------------------------------------
+
+  /**
+   * When the FIRST of the batch's results expires. The whole batch is treated
+   * as one lifetime: the documents were submitted together, they expire within
+   * seconds of each other, and a reviewer asking "how long do I have?" means
+   * their work, not one tab of it. Null while nothing has finished.
+   */
+  const resultsExpireAt = computed<number | null>(() => {
+    const deadlines = documents.value
+      .filter((doc) => doc.result !== null && doc.expiresAt !== null)
+      .map((doc) => doc.expiresAt as number)
+    return deadlines.length === 0 ? null : Math.min(...deadlines)
+  })
+
+  /** True while any result still has headroom below its lifetime ceiling. */
+  const resultsCanExtend = computed(() =>
+    documents.value.some((doc) => doc.result !== null && doc.canExtend),
+  )
+
+  /** True while an extension is in flight (the buttons show a spinner). */
+  const extendingResults = computed(() => documents.value.some((doc) => doc.extending))
+
+  /**
+   * Turn the server's "expires in N seconds" into an absolute deadline on the
+   * client clock. Absolute so the countdown stays right across a suspended tab;
+   * derived from a duration so the two clocks never have to agree.
+   */
+  function adoptLifetime(doc: SessionDocument, lifetime: CacheLifetime): void {
+    doc.expiresAt = Date.now() + lifetime.expires_in_seconds * 1000
+    doc.canExtend = lifetime.can_extend
+  }
+
+  /** Mark a document's server-side copy as gone (410, or the clock ran out). */
+  function markExpired(doc: SessionDocument): void {
+    doc.expiresAt = Date.now()
+    doc.canExtend = false
+  }
+
+  /**
+   * Keep the batch's results alive for another window.
+   *
+   * Extends EVERY document that still has one, not just the active one: the
+   * documents of a batch expire within seconds of each other, and a reviewer
+   * who asks for more time means the work in front of them, not one tab of it.
+   * A document the backend has already forgotten is marked expired rather than
+   * retried — the next edit re-sends its source text anyway.
+   *
+   * Always confirms the outcome with a toast. Someone who extends before
+   * leaving their desk needs to know it worked, and needs to be told when the
+   * hard ceiling means it did not.
+   */
+  async function extendResults(): Promise<void> {
+    const live = documents.value.filter((doc) => doc.result !== null && !doc.extending)
+    if (live.length === 0) return
+    for (const doc of live) doc.extending = true
+    try {
+      await Promise.all(
+        live.map(async (doc) => {
+          try {
+            const { data } = await anonymizeApi.extendResult(doc.result!.request_id)
+            adoptLifetime(doc, data)
+          } catch {
+            markExpired(doc)
+          }
+        }),
+      )
+    } finally {
+      for (const doc of live) doc.extending = false
+    }
+
+    const toast = useToast()
+    const left = remainingSeconds(resultsExpireAt.value, Date.now())
+    const time = formatRemaining(left)
+    if (left === null || left === 0) {
+      toast.error(t('result.lifetime.expired_hint'))
+    } else if (!resultsCanExtend.value) {
+      toast.info(t('result.lifetime.extended_at_maximum', { time }))
+    } else {
+      toast.success(t('result.lifetime.extended', { time }))
+    }
+  }
+
+  /**
+   * Forget every cached detection because the page itself is going away
+   * (`pagehide`). Uses the keepalive variant, since a normal request would die
+   * with the document. Best effort — the entries expire on their own.
+   */
+  function forgetResultsOnUnload(): void {
+    for (const doc of documents.value) {
+      if (doc.result !== null) anonymizeApi.forgetResultOnUnload(doc.result.request_id)
+    }
   }
 
   /**
@@ -850,6 +969,7 @@ export const useSessionStore = defineStore('session', () => {
         ).data
       }
       doc.result = response
+      adoptLifetime(doc, response.lifetime)
       // Re-select the same entity by offsets (indices may shift on re-runs).
       doc.selectedEntityIndex =
         selectedKey === null ? null : indexOfEntityKey(response.entities, selectedKey)
@@ -1003,5 +1123,10 @@ export const useSessionStore = defineStore('session', () => {
     resetEntityOverride,
     rerunOverrides,
     reset,
+    resultsExpireAt,
+    resultsCanExtend,
+    extendingResults,
+    extendResults,
+    forgetResultsOnUnload,
   }
 })

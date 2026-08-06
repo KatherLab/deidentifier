@@ -29,6 +29,11 @@ from .notices import (
     notice,
 )
 
+#: The name PDFs are uploaded under to an extraction/OCR service. The user's
+#: own file name is never forwarded: clinical file names routinely contain the
+#: patient's name, and the receiving service may log or store it.
+_OUTBOUND_FILENAME = "document.pdf"
+
 
 class ExtractionError(Exception):
     def __init__(self, message: str, status_code: int = 422):
@@ -180,7 +185,7 @@ async def extract_pdf(
         if settings.DOCLING_SERVE_URL:
             try:
                 client = DoclingServeClient(settings.DOCLING_SERVE_URL)
-                text = await client.convert_pdf(data, filename, do_ocr=False)
+                text = await client.convert_pdf(data, _OUTBOUND_FILENAME, do_ocr=False)
                 return ExtractedDocument(
                     text=text,
                     source_type="pdf",
@@ -212,7 +217,7 @@ async def extract_pdf(
             )
         try:
             client = DoclingServeClient(settings.DOCLING_SERVE_URL)
-            text = await client.convert_pdf(data, filename, do_ocr=True, force_ocr=True)
+            text = await client.convert_pdf(data, _OUTBOUND_FILENAME, do_ocr=True, force_ocr=True)
         except DoclingServeError as exc:
             raise ExtractionError(f"OCR failed: {exc}", status_code=502) from exc
         if not text.strip():

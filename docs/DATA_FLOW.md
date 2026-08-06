@@ -9,16 +9,16 @@ Browser ──(1)── nginx ──(2)── backend ──(3)── LLM endpoi
                                  │
                                  └──(4)── OCR endpoint (scanned PDFs only)
                                  │
-                                 └──(5)── in-memory cache (≤15 min)
+                                 └──(5)── in-memory cache (15 min, ≤12 h)
 ```
 
 | # | Hop | Content | Notes |
 |---|---|---|---|
 | 1 | Browser → frontend | The document (multipart or JSON) | Over your TLS-terminating proxy. |
-| 2 | nginx → backend | The same request | Internal to the compose network; the backend publishes no port. |
+| 2 | nginx → backend | The same request | Internal to the compose network; the backend publishes no port. nginx may spool a large body or response through `/tmp`, which is a `tmpfs` — see [Data retention](DATA_RETENTION.md). |
 | 3 | Backend → LLM | Document text, in chunks; then the anonymized output for the re-check | Only when `llm` is enabled. `OPENAI_API_BASE`. |
 | 4 | Backend → OCR | Rendered page images | Only for scanned PDFs, only when an OCR engine is configured. |
-| 5 | Backend → memory | Extracted text + detected spans, keyed by request id | TTL 15 min, max 100 entries, process memory only. |
+| 5 | Backend → memory | Extracted text + detected spans, keyed by request id | 15 min, extendable by the reviewer up to 12 h (configurable); max 100 entries, process memory only. |
 | ← | Backend → browser | Source text, anonymized text, entities, warnings | `Cache-Control: no-store`. |
 
 Content flows nowhere else. There is no database, no object storage, no volume,
@@ -32,6 +32,8 @@ no telemetry endpoint, no CDN, and no analytics.
 | `POST /api/v1/anonymize/stream` | Same | Same, as NDJSON with progress events | Same |
 | `POST /api/v1/export/pdf` | The original PDF (re-sent) + overrides | The redacted PDF | Only on a cache miss (re-runs extraction/detection) |
 | `POST /api/v1/export/pdf/pages` | The original PDF (re-sent) | Page PNGs + image boxes | No |
+| `POST /api/v1/anonymize/{id}/extend` | A request id | Remaining seconds + whether more is possible | No — it only postpones the cache eviction |
+| `DELETE /api/v1/anonymize/{id}` | A request id | Nothing (204 either way) | No — it only forgets the cached detection |
 | `GET /api/v1/status` | — | Detector states, OCR engine, endpoint **hosts** + locality, limits | No |
 | `GET /health/live`, `/health/ready` | — | Status only | Readiness may probe configured endpoints |
 
@@ -52,12 +54,15 @@ ever persisted client-side.
 
 ## What is logged
 
-Per request: request id, source type, character count, entity count,
-validation status, timings; for exports also the byte size and the number of
-redaction areas.
+Per request: a short hash of the request id (`ref=`), source type, character
+count, entity count, validation status, timings; for exports also the byte size
+and the number of redaction areas.
 
 Never logged: document text, extracted text, anonymized text, entity text,
-prompts, filenames. A structured logger drops these field names before the line
+prompts, filenames — and the **request id itself**, which is a capability: for
+as long as the cache entry lives, whoever holds it can ask the API for the
+document. The `ref=` hash is there so log lines about one request can still be
+correlated. A structured logger drops all these field names before the line
 is written and records `rejected_fields=…` instead. The escape hatch
 (`APP_ALLOW_INSECURE_CONTENT_LOGGING`) prints a loud warning at startup and is
 refused in production mode.
@@ -69,8 +74,9 @@ refused in production mode.
 | Browser memory | Until reload or **Neues Dokument** |
 | Browser `localStorage` | UI preferences only, indefinitely |
 | Backend memory (request) | The request |
-| Backend cache | ≤15 minutes, or until eviction (100 entries) or restart |
+| Backend cache | 15 minutes from creation, extendable by the reviewer in 1 h steps up to 12 h (all configurable), or until the UI drops it, eviction (100 entries), or restart |
 | Backend disk | **Nothing.** Read-only filesystem, `tmpfs` for `/tmp`, no volumes |
+| Frontend (nginx) disk | **Nothing.** Spooled bodies/responses go to `/tmp`, mounted as a `tmpfs`, and are deleted when the request ends |
 | Backend logs | Metadata only, per your log retention |
 | LLM / OCR endpoint | **Whatever that service does** — see below |
 

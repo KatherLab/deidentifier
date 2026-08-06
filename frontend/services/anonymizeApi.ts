@@ -4,6 +4,7 @@ import type {
   AnonymizeRerunRequest,
   AnonymizeResponse,
   AnonymizeTextRequest,
+  CacheLifetime,
   CustomRules,
   OutputLanguage,
   Override,
@@ -83,6 +84,43 @@ export const anonymizeApi = {
     // (the backend also remembers the run's language for cached re-runs).
     if (outputLanguage) body.output_language = outputLanguage
     return api.post<AnonymizeResponse>('/anonymize', body)
+  },
+
+  /**
+   * Keep a cached result available for another window. Rejects with 410 once
+   * the entry is gone (the caller then falls back to re-sending the text), and
+   * resolves with `can_extend: false` once the hard ceiling is reached.
+   */
+  extendResult(requestId: string): Promise<AxiosResponse<CacheLifetime>> {
+    return api.post<CacheLifetime>(`/anonymize/${encodeURIComponent(requestId)}/extend`)
+  },
+
+  /**
+   * Ask the backend to forget one cached detection now, instead of letting it
+   * expire. Fire-and-forget: the entry is short-lived either way, so a failure
+   * here is never worth interrupting the user for.
+   */
+  forgetResult(requestId: string): Promise<void> {
+    return api
+      .delete(`/anonymize/${encodeURIComponent(requestId)}`)
+      .then(() => undefined)
+      .catch(() => undefined)
+  },
+
+  /**
+   * Same, but from a page that is going away (`pagehide`). axios is XHR-based
+   * and its request would be cancelled with the document, so this uses fetch's
+   * `keepalive` — the browser finishes it after the page is gone.
+   */
+  forgetResultOnUnload(requestId: string): void {
+    try {
+      void fetch(`${api.defaults.baseURL}/anonymize/${encodeURIComponent(requestId)}`, {
+        method: 'DELETE',
+        keepalive: true,
+      }).catch(() => undefined)
+    } catch {
+      /* the page is unloading — nothing left to report to */
+    }
   },
 
   /** Anonymize an uploaded file (multipart/form-data, field `file`). */

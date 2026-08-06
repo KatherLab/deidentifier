@@ -1,10 +1,11 @@
 """Structured logger that refuses document content.
 
-Fields with names known to carry document content are dropped (and noted as
-rejected) unless APP_ALLOW_INSECURE_CONTENT_LOGGING is enabled. This is the
-only logger the application code may use.
+Fields with names known to carry document content — or a credential for it —
+are dropped (and noted as rejected) unless APP_ALLOW_INSECURE_CONTENT_LOGGING
+is enabled. This is the only logger the application code may use.
 """
 
+import hashlib
 import logging
 
 FORBIDDEN_FIELDS = {
@@ -16,7 +17,17 @@ FORBIDDEN_FIELDS = {
     "entity_text",
     "anonymized_text",
     "source_text",
+    # Not content, but the only key to it: anyone holding a request id can ask
+    # the API for the cached document while the entry lives. Log
+    # `ref=log_reference(request_id)` instead.
+    "request_id",
 }
+
+
+def log_reference(value: str) -> str:
+    """A short, non-reversible handle for correlating log lines about one
+    request, safe to write where the request id itself is not."""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
 
 
 class SafeLogger:

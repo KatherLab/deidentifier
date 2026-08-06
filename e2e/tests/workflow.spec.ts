@@ -78,6 +78,39 @@ test.describe('anonymization workflow', () => {
     await expect(outputPanel).not.toContainText('Max Mustermann', { timeout: 30_000 })
   })
 
+  test('shows how long the server keeps the result and lets the user extend it', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await page.getByLabel('Text einfügen').fill(DISCHARGE_LETTER)
+    await page.getByRole('button', { name: 'Anonymisieren' }).click()
+    await waitForResult(page)
+
+    // The countdown sits in the top bar from the start: a copy of the document
+    // is in the server's memory, and the reviewer can see for how much longer.
+    const countdown = page.getByRole('button', { name: /Ergebnis verfügbar: noch \d+ Min\./ })
+    await expect(countdown).toBeVisible()
+
+    // Extending is available immediately — before anything runs low, so a
+    // reviewer can top it up on the way out of the room. One press buys a full
+    // extension window (an hour by default), not just another 15 minutes.
+    await countdown.click()
+    await expect(page.getByText(/Verlängert — Ergebnis verfügbar/)).toBeVisible()
+    await expect(countdown).toContainText(/1 Std\.|59 Min\./)
+
+    // Drive the clock into the warning window instead of waiting an hour: the
+    // deadline is absolute, so moving the browser clock forward is enough.
+    await page.clock.install()
+    await page.clock.fastForward('59:10')
+
+    const banner = page.getByRole('status').filter({ hasText: 'gelöscht' })
+    await expect(banner).toBeVisible()
+
+    await banner.getByRole('button', { name: 'Verlängern' }).click()
+    await expect(banner).toBeHidden()
+    await expect(countdown).toBeVisible()
+  })
+
   test('offers the text export for a pasted document', async ({ page }) => {
     await page.goto('/')
     await page.getByLabel('Text einfügen').fill(DISCHARGE_LETTER)
@@ -99,9 +132,7 @@ test.describe('anonymization workflow', () => {
   test('anonymizes an uploaded PDF and exports a redacted PDF', async ({ page }) => {
     await page.goto('/')
 
-    await page
-      .locator('input[type="file"]')
-      .setInputFiles(path.join(FIXTURES, '9874562_text.pdf'))
+    await page.locator('input[type="file"]').setInputFiles(path.join(FIXTURES, '9874562_text.pdf'))
     await page.getByRole('button', { name: 'Anonymisieren' }).click()
     await waitForResult(page)
 
@@ -161,9 +192,7 @@ test.describe('anonymization workflow', () => {
 
     // The output language is an advanced setting, captured at submit.
     await page.getByRole('button', { name: 'Erweiterte Einstellungen' }).click()
-    await page
-      .getByLabel('Sprache der Platzhalter')
-      .selectOption({ label: 'Français' })
+    await page.getByLabel('Sprache der Platzhalter').selectOption({ label: 'Français' })
     await page.getByLabel('Text einfügen').fill(DISCHARGE_LETTER)
     await page.getByRole('button', { name: 'Anonymisieren' }).click()
     await waitForResult(page)

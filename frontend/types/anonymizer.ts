@@ -217,6 +217,16 @@ export interface TimingMs {
   total: number
 }
 
+/**
+ * How much longer the backend holds this result for cheap override re-runs.
+ * `can_extend` is false once the entry has been pushed to its hard lifetime
+ * ceiling — the UI then explains that instead of offering a dead button.
+ */
+export interface CacheLifetime {
+  expires_in_seconds: number
+  can_extend: boolean
+}
+
 export interface AnonymizeResponse {
   request_id: string
   source_type: SourceType
@@ -228,6 +238,7 @@ export interface AnonymizeResponse {
   validation: ValidationResult
   warnings: Notice[]
   timing_ms: TimingMs
+  lifetime: CacheLifetime
 }
 
 export interface DetectorStatus {

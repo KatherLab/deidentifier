@@ -15,7 +15,8 @@ size.
 
 RAM scales with concurrent documents, not with corpus size. The dominant
 consumers are the rendered page images of a scanned PDF during OCR and the
-detection cache (bounded at 100 entries / 15 minutes).
+detection cache (bounded at 100 entries; 15 minutes, extendable up to the
+configured ceiling).
 
 Supported platforms: Linux with Docker or Podman. macOS works for development.
 

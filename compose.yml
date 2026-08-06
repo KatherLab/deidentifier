@@ -54,6 +54,13 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-8080}:8080"
+    # nginx spools request bodies and large proxied responses to
+    # /tmp/{client,proxy}_temp — both carry document content. On a tmpfs they
+    # stay in RAM; without it they land on the container's writable layer, i.e.
+    # on disk. (The container itself cannot be read_only: the entrypoint
+    # rewrites /etc/nginx/conf.d/default.conf to inject the DNS resolver.)
+    tmpfs:
+      - /tmp
     depends_on:
       backend:
         condition: service_healthy

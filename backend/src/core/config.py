@@ -41,11 +41,27 @@ class Settings(BaseSettings):
 
     # Application
     APP_ENV: str = "development"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = "0.1.1"
     APP_MAX_UPLOAD_MB: int = Field(default=20, ge=1)
     APP_MAX_TEXT_CHARS: int = Field(default=500_000, ge=1)
     APP_ALLOW_INSECURE_CONTENT_LOGGING: bool = False
     APP_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+
+    # How long a finished result stays in memory for cheap review-UI re-runs.
+    # This is a retention setting, not a performance one: while an entry lives,
+    # a copy of the document is in the process's memory. See
+    # docs/DATA_RETENTION.md before raising any of the three.
+    RESULT_CACHE_TTL_MINUTES: int = Field(default=15, ge=1)
+    # What one press of "Verlängern" grants, counted from the moment of the
+    # press. Repeatable, so a reviewer who keeps working keeps the result.
+    RESULT_CACHE_EXTENSION_MINUTES: int = Field(default=60, ge=1)
+    # The ceiling no amount of extending can cross, counted from when the
+    # result was produced. 720 minutes = 12 hours (a long shift).
+    # Setting this equal to RESULT_CACHE_TTL_MINUTES turns extending off.
+    RESULT_CACHE_MAX_LIFETIME_MINUTES: int = Field(default=720, ge=1)
+    # How many results may be in memory at once; the oldest is dropped beyond
+    # it. Bounds the worst-case amount of document text the process holds.
+    RESULT_CACHE_MAX_ENTRIES: int = Field(default=100, ge=1)
 
     # Deployment banner shown above the header (e.g. "Research Use Only!").
     # The text is operator-authored and displayed verbatim in every interface

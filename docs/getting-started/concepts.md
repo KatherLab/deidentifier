@@ -101,7 +101,8 @@ Findings become warnings and set the status — `FAIL` for anything critical,
 ## Nothing is stored
 
 There is no database. A document lives in memory for the duration of the
-request, plus a short-lived in-process cache (15 minutes) that exists so your
+request, plus a short-lived in-process cache (15 minutes, extendable while you
+work) that exists so your
 review-view corrections do not have to repeat the expensive detection step.
 When that cache entry expires the app simply re-sends the source text from your
 browser. See [Data retention](../DATA_RETENTION.md).
