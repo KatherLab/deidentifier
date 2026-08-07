@@ -192,7 +192,7 @@
       "unavailable": "Die Originaldatei ist nicht mehr verfügbar."
     },
     "source": {
-      "hint": "Klicken Sie auf eine markierte Stelle für Details – oder markieren Sie beliebigen Text, um ihn manuell zu schwärzen."
+      "hint": "Klicken Sie auf eine markierte Stelle für Details – Strg/Cmd-Klick wählt mehrere aus, Umschalt-Klick einen ganzen Bereich. Oder markieren Sie beliebigen Text, um ihn manuell zu schwärzen."
     },
     "pdf": {
       "view_label": "Ansicht wählen",
@@ -221,6 +221,7 @@
     "warning_title": "Warnung · möglicherweise nicht erkannte personenbezogene Daten",
     "mark_label": "Entität: {type}, {status}",
     "mark_label_overridden": "Entität: {type}, {status}, geändert",
+    "selected_short": "ausgewählt",
     "redact": "Schwärzen",
     "redact_label": "Auswahl manuell schwärzen"
   },
@@ -233,7 +234,18 @@
     "preserve": "Beibehalten",
     "redact": "Schwärzen",
     "change_type": "Entitätstyp ändern",
+    "select_all_occurrences": "Alle {count} Vorkommen wählen",
     "close": "Details schließen"
+  },
+  "selection": {
+    "panel_label": "Aktionen für die ausgewählten Stellen",
+    "count": "1 Stelle ausgewählt | {count} Stellen ausgewählt",
+    "redact": "1 schwärzen | {count} schwärzen",
+    "preserve": "1 beibehalten | {count} beibehalten",
+    "change_type": "Typ aller ausgewählten ändern",
+    "reset": "1 zurücksetzen | {count} zurücksetzen",
+    "clear": "Auswahl aufheben",
+    "preview_more": "und {count} weitere"
   },
   "areas": {
     "hint": "Angezeigt werden die Originalseiten. Ziehen Sie ein Rechteck über einen Bereich (z. B. Unterschrift, Logo oder Stempel), um ihn zusätzlich zu schwärzen – Klick auf einen Bereich entfernt ihn wieder. Jede Änderung wird sofort übernommen.",
@@ -333,6 +345,7 @@
       "invalid_span_rejected": "Eine ungültige Fundstelle des Detektors „{detector}“ wurde verworfen (Offset-Konflikt).",
       "override_not_matched": "Eine Anpassung passte zu keiner erkannten Stelle und wurde ignoriert.",
       "manual_selection_ignored": "Eine manuelle Auswahl passt nicht mehr zum Quelltext und wurde ignoriert.",
+      "pdf_preserve_not_honoured": "Eine beibehaltene Stelle kommt anderswo geschwärzt vor. Das geschwärzte PDF schwärzt jedes Vorkommen eines geschwärzten Textes – dort bleibt sie also verdeckt, auch wenn der Textexport sie zeigt. Wählen Sie alle Vorkommen aus und behalten Sie sie gemeinsam bei, wenn sie im PDF sichtbar sein soll. | {count} beibehaltene Stellen kommen anderswo geschwärzt vor. Das geschwärzte PDF schwärzt jedes Vorkommen eines geschwärzten Textes – dort bleiben sie also verdeckt, auch wenn der Textexport sie zeigt. Wählen Sie alle Vorkommen aus und behalten Sie sie gemeinsam bei, wenn sie im PDF sichtbar sein sollen.",
       "residual_identifier": "Geschwärzter Inhalt vom Typ {entity_type} scheint im Ergebnis noch vorhanden zu sein.",
       "revalidation_hit": "Eine Regel erkennt im Ergebnis weiterhin eine mögliche Stelle vom Typ {entity_type}.",
       "labelled_field": "Auf ein beschriftetes Feld folgt offenbar nicht geschwärzter Inhalt.",
@@ -361,6 +374,7 @@
     "zip_downloaded": "{count} Dateien als ZIP heruntergeladen.",
     "zip_failed": "Das ZIP-Archiv konnte nicht erstellt werden.",
     "selection_too_long": "Bitte eine kürzere Auswahl treffen.",
+    "selection_preserved": "1 Stelle beibehalten – sie steht wieder im Ergebnis. | {count} Stellen beibehalten – sie stehen wieder im Ergebnis.",
     "images_already_marked": "Alle erkannten Bilder sind bereits geschwärzt.",
     "images_marked": "1 Bild zum Schwärzen markiert. | {count} Bilder zum Schwärzen markiert."
   },

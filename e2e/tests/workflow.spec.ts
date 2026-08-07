@@ -78,6 +78,89 @@ test.describe('anonymization workflow', () => {
     await expect(outputPanel).not.toContainText('Max Mustermann', { timeout: 30_000 })
   })
 
+  test('selects several finds at once and changes them in one go', async ({ page }) => {
+    await page.goto('/')
+
+    await page.getByLabel('Text einfügen').fill(DISCHARGE_LETTER)
+    await page.getByRole('button', { name: 'Anonymisieren' }).click()
+    await waitForResult(page)
+
+    const output = page.getByRole('heading', { name: 'Anonymisierter Text' })
+    const outputPanel = page.locator('section', { has: output }).last()
+    await expect(outputPanel).not.toContainText('Max Mustermann')
+    await expect(outputPanel).not.toContainText('Erika Musterfrau')
+
+    // Click one name, Ctrl/Cmd-click the other: the single-entity detail panel
+    // gives way to the bulk bar.
+    await page.locator('[data-entity-index]', { hasText: 'Max Mustermann' }).first().click()
+    await page
+      .locator('[data-entity-index]', { hasText: 'Erika Musterfrau' })
+      .first()
+      .click({ modifiers: ['ControlOrMeta'] })
+
+    const bar = page.getByLabel('Aktionen für die ausgewählten Stellen')
+    await expect(bar).toBeVisible()
+    await expect(bar).toContainText('2 Stellen ausgewählt')
+
+    // One click, one re-run, both names back in the output.
+    await bar.getByRole('button', { name: '2 beibehalten' }).click()
+    await expect(outputPanel).toContainText('Max Mustermann', { timeout: 30_000 })
+    await expect(outputPanel).toContainText('Erika Musterfrau')
+
+    // The selection survives the re-run it caused, so taking it back is one
+    // more click on the same two entities.
+    await expect(bar).toContainText('2 Stellen ausgewählt')
+    await bar.getByRole('button', { name: '2 zurücksetzen' }).click()
+    await expect(outputPanel).not.toContainText('Max Mustermann', { timeout: 30_000 })
+    await expect(outputPanel).not.toContainText('Erika Musterfrau')
+  })
+
+  test('wraps a highlight that spans a line break instead of boxing it', async ({ page }) => {
+    await page.goto('/')
+
+    await page.getByLabel('Text einfügen').fill(DISCHARGE_LETTER)
+    await page.getByRole('button', { name: 'Anonymisieren' }).click()
+    await waitForResult(page)
+
+    // Redact a passage that straddles a line break. Selecting is scripted
+    // rather than dragged so the offsets are exact; the component still sees
+    // an ordinary mouseup with a live window selection.
+    await page.evaluate(() => {
+      const segment = document.querySelector('[data-start]')
+      const container = segment?.closest('div')
+      if (!container) throw new Error('source review not found')
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+      let from: { node: Node; offset: number } | null = null
+      let to: { node: Node; offset: number } | null = null
+      while (walker.nextNode()) {
+        const node = walker.currentNode
+        const text = node.textContent ?? ''
+        const start = text.indexOf('bis zum')
+        if (start !== -1 && !from) from = { node, offset: start }
+        const end = text.indexOf('in unserer')
+        if (end !== -1 && from) to = { node, offset: end + 2 }
+      }
+      if (!from || !to) throw new Error('anchor text not found')
+      const range = document.createRange()
+      range.setStart(from.node, from.offset)
+      range.setEnd(to.node, to.offset)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    })
+
+    await page.getByRole('button', { name: 'Auswahl manuell schwärzen' }).click()
+
+    // The manual span now covers a newline. As an inline box it fragments into
+    // one rectangle per line; as a button (display:inline-block, which browsers
+    // force on form controls) it would be a single two-line-tall block.
+    const manual = page.locator('[data-entity-index]', { hasText: 'bis zum' }).first()
+    await expect(manual).toBeVisible({ timeout: 30_000 })
+    const fragments = await manual.evaluate((el) => el.getClientRects().length)
+    expect(fragments).toBeGreaterThan(1)
+  })
+
   test('shows how long the server keeps the result and lets the user extend it', async ({
     page,
   }) => {
@@ -149,6 +232,34 @@ test.describe('anonymization workflow', () => {
       .getByRole('menuitem', { name: 'Als PDF' })
       .click()
     expect((await download).suggestedFilename()).toContain('.pdf')
+  })
+
+  test('says when a kept passage stays black in the redacted PDF anyway', async ({ page }) => {
+    await page.goto('/')
+
+    await page.locator('input[type="file"]').setInputFiles(path.join(FIXTURES, '9874562_text.pdf'))
+    await page.getByRole('button', { name: 'Anonymisieren' }).click()
+    await waitForResult(page)
+
+    // "Ashley Park" occurs several times. Keep exactly one of them.
+    await page.locator('[data-entity-index]', { hasText: 'Ashley Park' }).first().click()
+    const details = page.getByLabel('Details zur ausgewählten Entität')
+    await expect(details).toBeVisible()
+    await details.getByRole('button', { name: 'Beibehalten' }).click()
+
+    // True redaction searches the page for each redacted string, so this one
+    // occurrence cannot come back in the PDF — the panel says so where the
+    // reviewer is looking at the very PDF that hides it.
+    const pdfPanel = page
+      .locator('section', { has: page.getByRole('heading', { name: 'Geschwärztes PDF' }) })
+      .last()
+    await expect(pdfPanel).toContainText('jedes Vorkommen', { timeout: 30_000 })
+
+    // Keeping ALL occurrences is the way out, and it clears the warning.
+    await details.getByRole('button', { name: /Alle \d+ Vorkommen wählen/ }).click()
+    const bar = page.getByLabel('Aktionen für die ausgewählten Stellen')
+    await bar.getByRole('button', { name: /^\d+ beibehalten$/ }).click()
+    await expect(pdfPanel).not.toContainText('jedes Vorkommen', { timeout: 30_000 })
   })
 
   test('rejects an unsupported file type before uploading', async ({ page }) => {

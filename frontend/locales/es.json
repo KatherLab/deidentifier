@@ -192,7 +192,7 @@
       "unavailable": "El archivo original ya no está disponible."
     },
     "source": {
-      "hint": "Haga clic en un pasaje resaltado para ver los detalles, o seleccione cualquier texto para ocultarlo manualmente."
+      "hint": "Haga clic en un hallazgo resaltado para ver los detalles: Ctrl/Cmd-clic selecciona varios y Mayús-clic un rango completo. O seleccione cualquier texto para ocultarlo manualmente."
     },
     "pdf": {
       "view_label": "Elegir vista",
@@ -221,6 +221,7 @@
     "warning_title": "Advertencia · datos personales posiblemente no detectados",
     "mark_label": "Entidad: {type}, {status}",
     "mark_label_overridden": "Entidad: {type}, {status}, modificada",
+    "selected_short": "seleccionado",
     "redact": "Ocultar",
     "redact_label": "Ocultar la selección manualmente"
   },
@@ -233,7 +234,18 @@
     "preserve": "Conservar",
     "redact": "Ocultar",
     "change_type": "Cambiar el tipo de entidad",
+    "select_all_occurrences": "Seleccionar las {count} apariciones",
     "close": "Cerrar los detalles"
+  },
+  "selection": {
+    "panel_label": "Acciones para los hallazgos seleccionados",
+    "count": "1 hallazgo seleccionado | {count} hallazgos seleccionados",
+    "redact": "Ocultar 1 | Ocultar {count}",
+    "preserve": "Conservar 1 | Conservar {count}",
+    "change_type": "Cambiar el tipo de todos los seleccionados",
+    "reset": "Restablecer 1 | Restablecer {count}",
+    "clear": "Anular la selección",
+    "preview_more": "y {count} más"
   },
   "areas": {
     "hint": "Se muestran las páginas originales. Arrastre un rectángulo sobre una zona (p. ej. firma, logotipo o sello) para ocultarla también; al hacer clic en una zona se elimina de nuevo. Cada cambio se aplica de inmediato.",
@@ -333,6 +345,7 @@
       "invalid_span_rejected": "Se ha descartado un pasaje no válido del detector «{detector}» (desfase incoherente).",
       "override_not_matched": "Un ajuste no coincidía con ningún pasaje detectado y se ha ignorado.",
       "manual_selection_ignored": "Una selección manual ya no coincide con el texto original y se ha ignorado.",
+      "pdf_preserve_not_honoured": "Un pasaje conservado aparece en otro lugar de forma oculta. El PDF con ocultaciones tapa todas las apariciones de un texto ocultado, así que allí sigue cubierto aunque la exportación de texto lo muestre. Seleccione todas las apariciones y consérvelas juntas si debe verse en el PDF. | {count} pasajes conservados aparecen en otro lugar de forma oculta. El PDF con ocultaciones tapa todas las apariciones de un texto ocultado, así que allí siguen cubiertos aunque la exportación de texto los muestre. Seleccione todas las apariciones y consérvelas juntas si deben verse en el PDF.",
       "residual_identifier": "Parece que en el resultado sigue habiendo contenido oculto del tipo {entity_type}.",
       "revalidation_hit": "Una regla sigue detectando en el resultado un posible pasaje del tipo {entity_type}.",
       "labelled_field": "Un campo etiquetado parece ir seguido de contenido no oculto.",
@@ -361,6 +374,7 @@
     "zip_downloaded": "{count} archivos descargados como archivo ZIP.",
     "zip_failed": "No se ha podido crear el archivo ZIP.",
     "selection_too_long": "Haga una selección más corta.",
+    "selection_preserved": "1 hallazgo conservado: vuelve a aparecer en el resultado. | {count} hallazgos conservados: vuelven a aparecer en el resultado.",
     "images_already_marked": "Todas las imágenes detectadas ya están ocultas.",
     "images_marked": "1 imagen marcada para ocultar. | {count} imágenes marcadas para ocultar."
   },

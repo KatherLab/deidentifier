@@ -111,6 +111,21 @@ test('captures the documentation screenshots', async ({ page }) => {
     await shoot(review, 'result-review-panel')
   })
 
+  // Ctrl-clicking a second find swaps the detail bar for the selection bar.
+  await capture('result-entities-selected', async () => {
+    await page
+      .locator('[data-entity-index]', { hasText: 'Erika Musterfrau' })
+      .first()
+      .click({ modifiers: ['ControlOrMeta'] })
+    await expect(page.getByLabel('Aktionen für die ausgewählten Stellen')).toBeVisible()
+    const review = page
+      .locator('section', { has: page.getByRole('heading', { name: 'Quellprüfung' }) })
+      .last()
+    await shoot(review, 'result-entities-selected')
+    // Leave the review panel unselected for the shots that follow.
+    await page.keyboard.press('Escape')
+  })
+
   await capture('result-export-menu', async () => {
     await page.getByRole('button', { name: 'Exportieren' }).click()
     await expect(page.getByRole('menu', { name: 'Exportieren' })).toBeVisible()

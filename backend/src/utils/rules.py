@@ -22,6 +22,18 @@ class Rule:
     metadata: dict[str, str] = field(default_factory=dict)
 
 
+# Horizontal whitespace only. A field never runs past the end of its line: with
+# plain `\s` a multi-word city swallows the first word of the line below
+# ("01307 Dresden\nPat"), and a wrapped phone number swallows the digits after
+# the break. Not `[ \t]` — text extracted from PDFs is full of non-breaking
+# spaces, and those do separate words.
+_HSPACE = r"[^\S\r\n]"
+# The same idea for use INSIDE another character class, where `_HSPACE` cannot
+# go — a negated class does not nest, it would silently degrade into literals.
+# Spelled out rather than derived: space, tab, and the non-breaking space that
+# PDF extraction and typeset phone numbers are full of.
+_HSPACE_CHARS = r" \t\xa0"
+
 _DAY = r"(?:0?[1-9]|[12]\d|3[01])"
 _MONTH_NUM = r"(?:0?[1-9]|1[0-2])"
 _MONTH_NAME = (
@@ -93,7 +105,9 @@ RULES: list[Rule] = [
     ),
     Rule(
         "de.iban.v1",
-        re.compile(r"\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}(?:\s?[A-Z0-9]{1,3})?\b"),
+        re.compile(
+            rf"\b[A-Z]{{2}}\d{{2}}(?:{_HSPACE}?[A-Z0-9]{{4}}){{3,7}}(?:{_HSPACE}?[A-Z0-9]{{1,3}})?\b"
+        ),
         EntityType.ID_NUMBER,
         0.95,
         metadata={"subtype": "iban"},
@@ -101,7 +115,8 @@ RULES: list[Rule] = [
     Rule(
         "de.phone.labelled.v1",
         re.compile(
-            r"\b" + _PHONE_LABEL + r"\s*[:.]?\s*(\+?[\d(][\d\s()/\-]{4,20}\d)", re.IGNORECASE
+            rf"\b{_PHONE_LABEL}\s*[:.]?\s*(\+?[\d(][\d{_HSPACE_CHARS}()/\-]{{4,20}}\d)",
+            re.IGNORECASE,
         ),
         EntityType.PHONE,
         0.95,
@@ -109,7 +124,7 @@ RULES: list[Rule] = [
     ),
     Rule(
         "de.phone.intl.v1",
-        re.compile(r"\+49[\d\s/\-()]{5,16}\d"),
+        re.compile(rf"\+49[\d{_HSPACE_CHARS}/\-()]{{5,16}}\d"),
         EntityType.PHONE,
         0.90,
     ),
@@ -139,7 +154,8 @@ RULES: list[Rule] = [
     Rule(
         "de.address.street.v1",
         re.compile(
-            rf"\b(?:[A-ZÄÖÜ][\wäöüß\-]*\s+){{0,2}}[\wäöüß\-]*{_STREET_SUFFIX}\s+\d{{1,4}}(?:\s?[a-hA-H])?\b"
+            rf"\b(?:[A-ZÄÖÜ][\wäöüß\-]*{_HSPACE}+){{0,2}}[\wäöüß\-]*{_STREET_SUFFIX}"
+            rf"{_HSPACE}+\d{{1,4}}(?:{_HSPACE}?[a-hA-H])?\b"
         ),
         EntityType.ADDRESS,
         0.90,
@@ -147,7 +163,7 @@ RULES: list[Rule] = [
     ),
     Rule(
         "de.address.plz_city.v1",
-        re.compile(r"\b\d{5}\s+[A-ZÄÖÜ][a-zäöüß]+(?:[\s\-][A-ZÄÖÜ][a-zäöüß]+)*"),
+        re.compile(rf"\b\d{{5}}{_HSPACE}+[A-ZÄÖÜ][a-zäöüß]+(?:(?:{_HSPACE}|-)[A-ZÄÖÜ][a-zäöüß]+)*"),
         EntityType.ADDRESS,
         0.85,
         metadata={"subtype": "plz_city"},

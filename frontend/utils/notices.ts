@@ -32,5 +32,9 @@ function localizeParams(params: NoticeParams): NoticeParams {
 export function noticeMessage(notice: Notice | ValidationWarning): string {
   const key = `warnings.codes.${notice.code}`
   if (!notice.code || !hasMessage(key)) return notice.message
-  return t(key, localizeParams(notice.params ?? {}))
+  const params = localizeParams(notice.params ?? {})
+  // A `count` param also drives plural selection, so each catalog can inflect
+  // its own way ("1 Stelle kommt" / "3 Stellen kommen") instead of falling back
+  // to an "(n)" that reads wrong in every language at once.
+  return typeof params.count === 'number' ? t(key, params, params.count) : t(key, params)
 }

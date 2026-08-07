@@ -22,6 +22,7 @@ _PARAMS = {
     notices.REVALIDATION_HIT: {"entity_type": "PHONE"},
     notices.LLM_RECHECK_REMAINING: {"entity_type": "ADDRESS"},
     notices.RECHECK_RISK: {"risk": "high"},
+    notices.PDF_PRESERVE_NOT_HONOURED: {"count": 2},
 }
 
 

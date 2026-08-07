@@ -1,7 +1,8 @@
 <template>
-  <!-- Compact footer bar inside the Quellprüfung card for the selected entity. -->
+  <!-- Details and actions for the ONE selected entity, floated next to its
+       mark by EntityHighlights. -->
   <aside
-    class="shrink-0 border-t border-default bg-surface-muted px-4 py-3"
+    class="rounded-card border border-strong bg-surface px-3 py-2.5 shadow-lg"
     :aria-label="t('detail.panel_label')"
   >
     <div class="flex items-start gap-2">
@@ -83,6 +84,18 @@
           >
             {{ t('common.reset') }}
           </BaseButton>
+          <!-- The discoverable way into a multi-selection: one click turns
+               "this name" into "all 14 of it", then the selection bar takes
+               over. Only offered when there is more than one occurrence. -->
+          <BaseButton
+            v-if="occurrenceCount > 1"
+            size="sm"
+            variant="ghost"
+            :disabled="rerunning"
+            @click="session.selectMatchingEntities(entity)"
+          >
+            {{ t('detail.select_all_occurrences', { count: occurrenceCount }, occurrenceCount) }}
+          </BaseButton>
           <span
             v-if="rerunning"
             class="inline-flex items-center gap-1.5 text-xs text-content-subtle"
@@ -139,6 +152,8 @@ const toast = useToast()
 const typeSelectId = 'entity-type-select'
 
 const confidenceLabel = computed(() => formatPercent(props.entity.confidence * 100))
+/** How often this exact text was found — drives "Alle N Vorkommen wählen". */
+const occurrenceCount = computed(() => session.countMatchingEntities(props.entity))
 const rerunning = computed(() => session.rerunning)
 const hasOverride = computed(() => session.overrideFor(props.entity) !== undefined)
 const isOverridden = computed(() => props.entity.metadata?.overridden === true || hasOverride.value)

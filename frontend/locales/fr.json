@@ -192,7 +192,7 @@
       "unavailable": "Le fichier original n’est plus disponible."
     },
     "source": {
-      "hint": "Cliquez sur un passage surligné pour voir les détails – ou sélectionnez n’importe quel texte pour le masquer manuellement."
+      "hint": "Cliquez sur un élément surligné pour les détails – Ctrl/Cmd-clic en sélectionne plusieurs, Maj-clic une plage entière. Ou sélectionnez du texte pour le caviarder manuellement."
     },
     "pdf": {
       "view_label": "Choisir la vue",
@@ -221,6 +221,7 @@
     "warning_title": "Avertissement · données personnelles peut-être non détectées",
     "mark_label": "Entité : {type}, {status}",
     "mark_label_overridden": "Entité : {type}, {status}, modifiée",
+    "selected_short": "sélectionné",
     "redact": "Masquer",
     "redact_label": "Masquer manuellement la sélection"
   },
@@ -233,7 +234,18 @@
     "preserve": "Conserver",
     "redact": "Masquer",
     "change_type": "Changer le type d’entité",
+    "select_all_occurrences": "Sélectionner les {count} occurrences",
     "close": "Fermer les détails"
+  },
+  "selection": {
+    "panel_label": "Actions pour les éléments sélectionnés",
+    "count": "1 élément sélectionné | {count} éléments sélectionnés",
+    "redact": "Caviarder 1 | Caviarder {count}",
+    "preserve": "Conserver 1 | Conserver {count}",
+    "change_type": "Changer le type de tous les éléments sélectionnés",
+    "reset": "Réinitialiser 1 | Réinitialiser {count}",
+    "clear": "Annuler la sélection",
+    "preview_more": "et {count} de plus"
   },
   "areas": {
     "hint": "Les pages originales sont affichées. Tracez un rectangle sur une zone (p. ex. signature, logo ou tampon) pour la masquer également – un clic sur une zone la supprime. Chaque modification est appliquée immédiatement.",
@@ -333,6 +345,7 @@
       "invalid_span_rejected": "Un passage invalide du détecteur « {detector} » a été rejeté (décalage incohérent).",
       "override_not_matched": "Une modification ne correspondait à aucun passage détecté et a été ignorée.",
       "manual_selection_ignored": "Une sélection manuelle ne correspond plus au texte source et a été ignorée.",
+      "pdf_preserve_not_honoured": "Un passage conservé apparaît ailleurs sous forme caviardée. Le PDF caviardé masque chaque occurrence d'un texte caviardé : il y reste donc couvert, même si l'export texte l'affiche. Sélectionnez toutes les occurrences et conservez-les ensemble s'il doit être visible dans le PDF. | {count} passages conservés apparaissent ailleurs sous forme caviardée. Le PDF caviardé masque chaque occurrence d'un texte caviardé : ils y restent donc couverts, même si l'export texte les affiche. Sélectionnez toutes les occurrences et conservez-les ensemble s'ils doivent être visibles dans le PDF.",
       "residual_identifier": "Du contenu masqué de type {entity_type} semble subsister dans le résultat.",
       "revalidation_hit": "Une règle détecte encore un possible passage de type {entity_type} dans le résultat.",
       "labelled_field": "Un champ étiqueté semble suivi de contenu non masqué.",
@@ -361,6 +374,7 @@
     "zip_downloaded": "{count} fichiers téléchargés sous forme d’archive ZIP.",
     "zip_failed": "L’archive ZIP n’a pas pu être créée.",
     "selection_too_long": "Veuillez faire une sélection plus courte.",
+    "selection_preserved": "1 élément conservé – il figure de nouveau dans le résultat. | {count} éléments conservés – ils figurent de nouveau dans le résultat.",
     "images_already_marked": "Toutes les images détectées sont déjà masquées.",
     "images_marked": "1 image marquée pour masquage. | {count} images marquées pour masquage."
   },

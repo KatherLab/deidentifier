@@ -23,7 +23,17 @@ from ..schemas.entities import (
 from .cache import CachedDetection, request_cache
 from .detection import build_detectors, validate_spans
 from .leakage import compute_status, validate_output
-from .notices import LLM_RECHECK_SKIPPED, MANUAL_SELECTION_IGNORED, notice, validation_warning
+from .notices import (
+    LLM_RECHECK_SKIPPED,
+    MANUAL_SELECTION_IGNORED,
+    PDF_PRESERVE_NOT_HONOURED,
+    notice,
+    validation_warning,
+)
+
+# Only for the predicate describing what true redaction will black out;
+# pymupdf itself is imported lazily inside that module's export functions.
+from .pdf_export import preserved_texts_at_risk
 from .policy import merge_policy, resolve_output_language
 from .resolver import resolve_spans
 from .transformation import apply_policy
@@ -171,6 +181,16 @@ async def _finalize(
         output_language=language,
     )
     override_warnings = manual_warnings + override_warnings
+    # The redacted PDF locates text by searching for it, so keeping ONE of
+    # several identical passages cannot show through there — say so rather than
+    # letting the PDF and the text export disagree in silence. Native PDFs
+    # only: the scanned reconstruction applies replacements by offset.
+    if source_type == "pdf":
+        at_risk = preserved_texts_at_risk(applied)
+        if at_risk:
+            override_warnings = override_warnings + [
+                notice(PDF_PRESERVE_NOT_HONOURED, count=len(at_risk))
+            ]
     t2 = time.perf_counter()
     validation = await validate_output(
         anonymized, applied, policy=active_policy, detector_warnings=detector_warnings

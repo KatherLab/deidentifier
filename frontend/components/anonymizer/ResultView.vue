@@ -240,16 +240,26 @@
             :source-text="result.source_text"
             :entities="result.entities"
             :warnings="result.validation.warnings"
-            :selected-index="session.selectedEntityIndex"
+            :selected-indices="session.selectedEntityIndices"
+            :focus-index="session.selectedEntityIndex"
             @select="session.selectEntity($event)"
-          />
-          <EntityDetailPanel
-            v-if="session.selectedEntity"
-            :entity="session.selectedEntity"
-            @close="session.selectEntity(null)"
-          />
+            @toggle="session.toggleEntitySelection($event)"
+            @range="session.selectEntityRange($event)"
+            @clear="session.clearSelection()"
+          >
+            <!-- Anchored next to the marks, not at the foot of the card: one
+                 selected entity → its details, several → the bulk actions. -->
+            <template #actions>
+              <EntityDetailPanel
+                v-if="session.selectedEntity"
+                :entity="session.selectedEntity"
+                @close="session.clearSelection()"
+              />
+              <EntitySelectionBar v-else-if="session.selectedEntityIndices.length > 1" />
+            </template>
+          </EntityHighlights>
           <p
-            v-else
+            v-if="session.selectedEntityIndices.length === 0"
             class="shrink-0 border-t border-default px-4 py-2.5 text-xs text-content-subtle"
           >
             {{ t('result.source.hint') }}
@@ -309,6 +319,20 @@
               {{ t('result.pdf.reconstructed') }}
             </p>
           </header>
+          <!-- The one place where this PDF differs from the text result: true
+               redaction blacks out every occurrence of a redacted string, so a
+               single kept occurrence stays covered here. Repeated from the
+               warnings list on purpose — that list is collapsed when the
+               validation passed, and this is where the reviewer will be looking
+               when they wonder why it is still black. -->
+          <p
+            v-if="pdfPreserveNotice"
+            class="shrink-0 border-b border-default px-4 py-2.5 text-xs"
+            :class="getBannerClass('amber')"
+            role="status"
+          >
+            {{ noticeMessage(pdfPreserveNotice) }}
+          </p>
           <PdfAreaEditor v-if="areaEditing" class="min-h-0 flex-1" @done="areaEditing = false" />
           <template v-else>
             <div
@@ -484,6 +508,7 @@ import ProgressBar from '@/components/common/ProgressBar.vue'
 import DocumentBar from '@/components/anonymizer/DocumentBar.vue'
 import EntityHighlights from '@/components/anonymizer/EntityHighlights.vue'
 import EntityDetailPanel from '@/components/anonymizer/EntityDetailPanel.vue'
+import EntitySelectionBar from '@/components/anonymizer/EntitySelectionBar.vue'
 import PdfAreaEditor from '@/components/anonymizer/PdfAreaEditor.vue'
 import ProcessingCard from '@/components/anonymizer/ProcessingCard.vue'
 import WarningsList from '@/components/anonymizer/WarningsList.vue'
@@ -498,6 +523,7 @@ import { anonymizeApi } from '@/services/anonymizeApi'
 import { extractPdfExportErrorMessage } from '@/utils/errors'
 import { getBannerClass } from '@/utils/statusStyles'
 import { entityTypeLabel, sourceTypeLabel } from '@/utils/entityLabels'
+import { noticeMessage } from '@/utils/notices'
 import type { EntityType, OutputLanguage } from '@/types/anonymizer'
 
 const { t } = useI18n()
@@ -696,6 +722,16 @@ const gridClass = computed(() => {
       return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'
   }
 })
+
+/**
+ * The backend's notice that this PDF blacks out passages the reviewer chose
+ * to keep. Matched by CODE, never re-derived here: the condition depends on
+ * how the exporter searches for text, which only the backend knows.
+ */
+const pdfPreserveNotice = computed(
+  () =>
+    result.value?.warnings.find((warning) => warning.code === 'pdf_preserve_not_honoured') ?? null,
+)
 
 /** Bring the source review on screen (both modes: just activate the panel). */
 function showSourcePanel(): void {

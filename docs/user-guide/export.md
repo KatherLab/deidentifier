@@ -36,6 +36,23 @@ redacted but is not.
 Any [areas you blacked out](review.md#blacking-out-areas-of-a-pdf) are applied
 on top, in both paths.
 
+!!! warning "A native PDF redacts by text, not by position"
+
+    The native path has no character offsets to work from — it finds each
+    redacted passage by **searching every page for that text**. So if the same
+    string occurs several times and you kept only one of them, that one stays
+    blacked out in the PDF, even though the text export shows it. The app says
+    so above the **Geschwärztes PDF** panel whenever it applies.
+
+    To make a passage visible in the PDF, keep **every** occurrence of it:
+    select one, press **Alle N Vorkommen wählen**, then **N beibehalten**
+    ([Correcting several finds at once](review.md#correcting-several-finds-at-once)).
+    Once no occurrence is redacted, there is nothing left for the export to
+    search for.
+
+    Scanned PDFs are not affected — they are rebuilt line by line from the
+    anonymized text, so a single kept occurrence comes through correctly.
+
 !!! note "The original file is re-sent"
 
     Nothing is stored on the server, so the browser uploads the original PDF

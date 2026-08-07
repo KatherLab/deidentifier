@@ -11,6 +11,29 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+### Added
+
+- The source review takes multiple finds at once: Ctrl/Cmd-click and
+  Shift-click build a selection that can be redacted, kept, retyped or reset in
+  a single re-run — see [Reviewing the result](docs/user-guide/review.md).
+
+### Changed
+
+- The entity actions in the source review now appear next to the selected mark
+  instead of at the foot of the panel.
+
+- The result view now says when a passage you kept will stay blacked out in the
+  redacted PDF anyway, because a native PDF is redacted by searching for the
+  text — see [Exporting](docs/user-guide/export.md#redacted-pdf).
+
+### Fixed
+
+- Addresses, phone numbers and IBANs no longer run past the end of their line
+  and swallow the first word below them — a city followed by `Pat.-Nr.:` was
+  redacted as `01307 Dresden\nPat`.
+- A highlight covering a line break now wraps per line instead of rendering as
+  one oversized box across the paragraph.
+
 ## [0.1.1] — 2026-08-06
 
 ### Security

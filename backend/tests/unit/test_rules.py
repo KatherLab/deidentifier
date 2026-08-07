@@ -121,3 +121,42 @@ async def test_every_span_carries_rule_id():
     assert spans
     for span in spans:
         assert span.metadata.get("rule_id", "").startswith("de.")
+
+
+# A recognizer must never run past the end of its line. Line breaks in a
+# clinical letter separate fields — a letterhead puts the city above the
+# patient number, and a wrapped paragraph can put half a phone number on the
+# next line. `\s` matches "\n", so a greedy field swallows what follows it and
+# the review UI shows one highlight straddling two lines.
+async def test_no_span_crosses_a_line_break():
+    text = (
+        "Anschrift: Musterstraße 12, 01307 Dresden\n"
+        "Pat.-Nr.: PAT-123456\n"
+        "\n"
+        "Sehr geehrte Frau\n"
+        "Musterstraße 12\n"
+        "\n"
+        "Rückfragen an Tel.: 0351 458\n"
+        "0 und Fax 0351 458-1\n"
+        "\n"
+        "IBAN: DE02 1203 0000 0000 2020\n"
+        "51 lautet wie folgt.\n"
+    )
+    crossing = [s for s in (await detector.detect(text)).spans if "\n" in s.text]
+    assert crossing == [], [(s.metadata.get("rule_id"), s.text) for s in crossing]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_text"),
+    [
+        # \xa0 spelled out, not pasted: PDF extraction is full of non-breaking
+        # spaces and they separate words exactly like a plain space, so
+        # excluding the line break must not exclude them along with it.
+        ("Wohnhaft in 01307\xa0Dresden-Neustadt.", "01307\xa0Dresden-Neustadt"),
+        ("Anschrift: Musterstraße 12a", "Musterstraße 12a"),
+        ("Rückfragen: +49 351 458-0", "+49 351 458-0"),
+    ],
+)
+async def test_fields_still_match_within_one_line(text: str, expected_text: str):
+    spans = (await detector.detect(text)).spans
+    assert expected_text in [s.text for s in spans]

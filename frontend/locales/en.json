@@ -192,7 +192,7 @@
       "unavailable": "The original file is no longer available."
     },
     "source": {
-      "hint": "Click a highlighted span for details – or select any text to redact it manually."
+      "hint": "Click a highlighted find for details – Ctrl/Cmd-click selects several, Shift-click a whole range. Or select any text to redact it manually."
     },
     "pdf": {
       "view_label": "Choose view",
@@ -221,6 +221,7 @@
     "warning_title": "Warning · possibly undetected personal data",
     "mark_label": "Entity: {type}, {status}",
     "mark_label_overridden": "Entity: {type}, {status}, changed",
+    "selected_short": "selected",
     "redact": "Redact",
     "redact_label": "Redact the selection manually"
   },
@@ -233,7 +234,18 @@
     "preserve": "Keep",
     "redact": "Redact",
     "change_type": "Change entity type",
+    "select_all_occurrences": "Select all {count} occurrences",
     "close": "Close details"
+  },
+  "selection": {
+    "panel_label": "Actions for the selected finds",
+    "count": "1 find selected | {count} finds selected",
+    "redact": "Redact 1 | Redact {count}",
+    "preserve": "Keep 1 | Keep {count}",
+    "change_type": "Change the type of all selected",
+    "reset": "Reset 1 | Reset {count}",
+    "clear": "Clear selection",
+    "preview_more": "and {count} more"
   },
   "areas": {
     "hint": "The original pages are shown. Drag a rectangle over an area (e.g. a signature, logo or stamp) to redact it as well – clicking an area removes it again. Every change is applied immediately.",
@@ -333,6 +345,7 @@
       "invalid_span_rejected": "An invalid span from detector “{detector}” was rejected (offset mismatch).",
       "override_not_matched": "An adjustment matched no detected span and was ignored.",
       "manual_selection_ignored": "A manual selection no longer matches the source text and was ignored.",
+      "pdf_preserve_not_honoured": "One passage you kept also occurs elsewhere in redacted form. The redacted PDF blacks out every occurrence of a redacted text, so it stays covered there even though the text export shows it. Select all occurrences and keep them together if it should be visible in the PDF. | {count} passages you kept also occur elsewhere in redacted form. The redacted PDF blacks out every occurrence of a redacted text, so they stay covered there even though the text export shows them. Select all occurrences and keep them together if they should be visible in the PDF.",
       "residual_identifier": "Redacted content of type {entity_type} appears to remain in the output.",
       "revalidation_hit": "A rule still finds a possible span of type {entity_type} in the output.",
       "labelled_field": "A labelled field appears to be followed by non-redacted content.",
@@ -361,6 +374,7 @@
     "zip_downloaded": "{count} files downloaded as a ZIP archive.",
     "zip_failed": "The ZIP archive could not be created.",
     "selection_too_long": "Please make a shorter selection.",
+    "selection_preserved": "1 find kept – it is back in the output. | {count} finds kept – they are back in the output.",
     "images_already_marked": "All detected images are already redacted.",
     "images_marked": "1 image marked for redaction. | {count} images marked for redaction."
   },

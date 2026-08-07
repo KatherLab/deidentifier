@@ -21,18 +21,35 @@
       @scroll.passive="hidePopover"
     >
       <template v-for="segment in segments" :key="segment.key">
-        <button
+        <!--
+          A SPAN, not a button, on purpose. Browsers force `display: inline-block`
+          on form controls whatever the stylesheet says, and an inline-block box
+          cannot be split across lines: a mark covering a line break (a manual
+          selection dragged over one, or a multi-line address) rendered as one
+          atomic two-line-tall box shoved into the middle of the paragraph, and
+          a long mark near the right edge could not wrap at all. As a real
+          inline box it fragments per line, which is what box-decoration-clone
+          has always been here for. `role`/`tabindex`/`aria-pressed` keep the
+          button semantics, and keyboard activation is wired below.
+        -->
+        <span
           v-if="segment.entityIndex !== null"
-          type="button"
+          role="button"
+          tabindex="0"
           class="inline cursor-pointer rounded-md px-1 py-0.5 box-decoration-clone transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :class="[
             entityHighlightClass(entityAt(segment.entityIndex).status),
-            segment.entityIndex === selectedIndex ? 'ring-2 ring-ring shadow-sm' : '',
+            isSelected(segment.entityIndex) ? 'ring-2 ring-ring shadow-sm' : '',
+            segment.entityIndex === focusIndex ? 'ring-offset-1 ring-offset-surface' : '',
           ]"
           :title="markTitle(segment.entityIndex)"
           :aria-label="markAriaLabel(segment.entityIndex)"
+          :aria-pressed="isSelected(segment.entityIndex)"
           :data-entity-index="segment.entityIndex"
-          @click="emit('select', segment.entityIndex)"
+          :data-selected="isSelected(segment.entityIndex) ? 'true' : undefined"
+          @click="handleMarkClick(segment.entityIndex, $event)"
+          @keydown.enter.prevent="handleMarkClick(segment.entityIndex, $event)"
+          @keydown.space.prevent="handleMarkClick(segment.entityIndex, $event)"
         >
           <!--
             v-text keeps the segment text free of template whitespace — the
@@ -46,7 +63,7 @@
           <!-- Replacement/type badge only on the SELECTED entity (all other
                marks expose the same info via the title tooltip). -->
           <span
-            v-if="segment.showEntityLabel && segment.entityIndex === selectedIndex"
+            v-if="segment.showEntityLabel && isSelected(segment.entityIndex)"
             class="ml-1 rounded px-1 align-super text-[10px] font-semibold"
             :class="getPillClass(entityStatusPillColor(entityAt(segment.entityIndex).status))"
             v-text="badgeText(segment.entityIndex)"
@@ -58,7 +75,7 @@
             class="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-purple-500 align-middle dark:bg-purple-400"
             aria-hidden="true"
           ></span>
-        </button>
+        </span>
         <mark
           v-else-if="segment.warning"
           class="rounded-md px-1 py-0.5 box-decoration-clone"
@@ -70,13 +87,28 @@
         <span v-else :data-start="segment.start" v-text="segment.text"></span>
       </template>
 
+      <!--
+        The actions for what is selected, anchored under the last-touched mark
+        instead of at the foot of the card — the controls belong where the
+        reviewer is reading. Positions are CONTENT coordinates (scrollTop/Left
+        are added in), so the popover scrolls with the text it belongs to.
+        whitespace-normal resets the container's pre-wrap, as for the pill.
+      -->
+      <div
+        v-if="focusIndex !== null"
+        ref="actionsEl"
+        class="absolute z-20 w-max max-w-[min(34rem,calc(100%_-_1rem))] whitespace-normal"
+        :style="actionsStyle"
+      >
+        <slot name="actions" />
+      </div>
+
       <!-- Floating "Schwärzen" pill near the end of a valid text selection.
-           whitespace-normal resets the container's pre-wrap so template
-           whitespace never renders inside the pill. -->
+           Above the actions popover: it belongs to the gesture in progress. -->
       <div
         v-if="pendingSelection"
         ref="popoverEl"
-        class="absolute z-10 whitespace-normal"
+        class="absolute z-30 whitespace-normal"
         :style="{ top: `${pendingSelection.top}px`, left: `${pendingSelection.left}px` }"
       >
         <button
@@ -120,13 +152,23 @@ interface Props {
   sourceText: string
   entities: AnonymizedEntity[]
   warnings: ValidationWarning[]
-  selectedIndex: number | null
+  /** Indices of ALL selected entities (document order). */
+  selectedIndices: number[]
+  /** The last-touched entity — scrolled into view, never color alone. */
+  focusIndex: number | null
 }
 
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
+  /** Plain click: this entity becomes the whole selection. */
   (e: 'select', index: number): void
+  /** Ctrl/Cmd-click: add/remove this entity. */
+  (e: 'toggle', index: number): void
+  /** Shift-click: select the range from the anchor to this entity. */
+  (e: 'range', index: number): void
+  /** Escape inside the panel: drop the selection. */
+  (e: 'clear'): void
 }>()
 
 const { t } = useI18n()
@@ -140,6 +182,34 @@ const segments = computed(() =>
 function entityAt(index: number): AnonymizedEntity {
   // Segments are derived from props.entities, so the index is always valid.
   return props.entities[index]!
+}
+
+const selectedSet = computed(() => new Set(props.selectedIndices))
+
+function isSelected(index: number | null): boolean {
+  return index !== null && selectedSet.value.has(index)
+}
+
+/**
+ * Modifier-aware mark activation. Ctrl/Cmd toggles one entity, Shift takes the
+ * range from the anchor — the gestures every file list uses. Enter/Space on the
+ * focused mark goes through the same path and carries the same modifier flags,
+ * so the whole selection model works without a mouse.
+ */
+function handleMarkClick(index: number, event: MouseEvent | KeyboardEvent): void {
+  if (event.shiftKey) {
+    // A shift-drag over text also ends in a click; clear the incidental
+    // native selection so the "Schwärzen" popover does not fight the range.
+    window.getSelection()?.removeAllRanges()
+    hidePopover()
+    emit('range', index)
+    return
+  }
+  if (event.ctrlKey || event.metaKey) {
+    emit('toggle', index)
+    return
+  }
+  emit('select', index)
 }
 
 function isOverridden(index: number): boolean {
@@ -157,23 +227,29 @@ function markTypeLabel(index: number): string {
     : entityTypeLabel(entityAt(index).entity_type)
 }
 
-/** Native tooltip: "Person · [PERSON_1] · geändert". */
+/** Native tooltip: "Person · [PERSON_1] · geändert · ausgewählt". */
 function markTitle(index: number): string {
   const entity = entityAt(index)
   const parts = [markTypeLabel(index), entity.replacement ?? entityStatusLabel(entity.status)]
   if (isOverridden(index)) parts.push(t('detail.changed_short'))
+  if (isSelected(index)) parts.push(t('highlights.selected_short'))
   return parts.join(' · ')
 }
 
-/** Accessible name of a mark — the status is never conveyed by color alone. */
+/**
+ * Accessible name of a mark — neither status nor selection is ever conveyed by
+ * color alone (`aria-pressed` carries the selection too, for screen readers
+ * that announce it).
+ */
 function markAriaLabel(index: number): string {
   const params = {
     type: markTypeLabel(index),
     status: entityStatusLabel(entityAt(index).status),
   }
-  return isOverridden(index)
+  const label = isOverridden(index)
     ? t('highlights.mark_label_overridden', params)
     : t('highlights.mark_label', params)
+  return isSelected(index) ? `${label}, ${t('highlights.selected_short')}` : label
 }
 
 /** Superscript badge on the selected entity: replacement (or type). */
@@ -194,19 +270,104 @@ const legend = computed(() => {
   return items
 })
 
-// Keep the selected mark visible when the selection comes from outside the
-// text (entity-summary type stepping in ResultView).
+// ---------------------------------------------------------------------------
+// Anchoring the actions popover to the focused mark.
+//
+// The popover is positioned in CONTENT coordinates inside the scroll container
+// (like the manual-redaction pill), so it travels with the text instead of
+// needing a reposition on every scroll event.
+// ---------------------------------------------------------------------------
+
+/** Gap between the mark and the popover, and the inset kept from the edges. */
+const ANCHOR_GAP = 6
+const ANCHOR_INSET = 8
+
+const actionsEl = ref<HTMLElement | null>(null)
+const actionsAnchor = ref<{ top: number; left: number } | null>(null)
+
+const actionsStyle = computed(() => ({
+  top: `${actionsAnchor.value?.top ?? 0}px`,
+  left: `${actionsAnchor.value?.left ?? 0}px`,
+  // Hidden rather than absent until measured: the popover has to be in the DOM
+  // to have a width to clamp against, but must not flash at the wrong place.
+  visibility: actionsAnchor.value === null ? ('hidden' as const) : ('visible' as const),
+}))
+
+/**
+ * Place the popover under the focused mark — or above it when the mark sits
+ * near the bottom of the panel and the popover would hang off the end.
+ */
+function positionActions(): void {
+  const container = textContainer.value
+  const panel = actionsEl.value
+  const index = props.focusIndex
+  if (!container || !panel || index === null) {
+    actionsAnchor.value = null
+    return
+  }
+  // An entity can be split across several segments (an overlapping warning);
+  // the last one is where the label chip sits, so anchor there.
+  const marks = container.querySelectorAll<HTMLElement>(`[data-entity-index="${index}"]`)
+  const mark = marks[marks.length - 1]
+  if (!mark) {
+    actionsAnchor.value = null
+    return
+  }
+
+  const containerRect = container.getBoundingClientRect()
+  const markRect = mark.getBoundingClientRect()
+  const height = panel.offsetHeight
+  const width = panel.offsetWidth
+
+  const below = markRect.bottom - containerRect.top + container.scrollTop + ANCHOR_GAP
+  const above = markRect.top - containerRect.top + container.scrollTop - height - ANCHOR_GAP
+  // Flip up only when there is genuinely room up there — never off the top.
+  const overflowsBelow = markRect.bottom + ANCHOR_GAP + height > containerRect.bottom
+  const top = overflowsBelow && above >= container.scrollTop ? above : below
+
+  const left = Math.max(
+    ANCHOR_INSET,
+    Math.min(
+      markRect.left - containerRect.left + container.scrollLeft,
+      container.clientWidth - width - ANCHOR_INSET,
+    ),
+  )
+  actionsAnchor.value = { top, left }
+}
+
+/**
+ * Bring the focused mark on screen (the selection may come from outside the
+ * text — the entity summary, "alle Vorkommen", a warning), then place the
+ * popover and make sure it is on screen too.
+ */
+async function revealSelection(scrollToMark: boolean): Promise<void> {
+  await nextTick()
+  const index = props.focusIndex
+  if (index === null) {
+    actionsAnchor.value = null
+    return
+  }
+  if (scrollToMark) {
+    textContainer.value
+      ?.querySelector(`[data-entity-index="${index}"]`)
+      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+  positionActions()
+  // A second tick: the popover's own size settles only once it has rendered
+  // with the new content (different buttons, longer preview line).
+  await nextTick()
+  positionActions()
+  if (scrollToMark) actionsEl.value?.scrollIntoView({ block: 'nearest' })
+}
+
 watch(
-  () => props.selectedIndex,
-  (index) => {
-    if (index === null) return
-    void nextTick(() => {
-      textContainer.value
-        ?.querySelector(`[data-entity-index="${index}"]`)
-        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-    })
-  },
+  () => props.focusIndex,
+  () => void revealSelection(true),
 )
+
+// The popover's contents change size when the selection grows or a re-run
+// relabels the marks; both leave the focus where it was, so no scrolling.
+watch([() => props.selectedIndices.length, () => props.entities], () => void revealSelection(false))
 
 // ---------------------------------------------------------------------------
 // Manual selection-to-redact.
@@ -292,6 +453,13 @@ function boundaryCodePointOffset(node: Node, offset: number): number | null {
 function handleSelectionMouseUp(event: MouseEvent): void {
   // Releasing the mouse on the popover itself must not dismiss it.
   if (event.target instanceof Node && popoverEl.value?.contains(event.target)) return
+  // Shift belongs to range selection in this panel: a shift-click extends the
+  // NATIVE text selection as a side effect, which must not be mistaken for a
+  // manual-redaction drag. Plain dragging is unaffected.
+  if (event.shiftKey) {
+    hidePopover()
+    return
+  }
 
   const container = textContainer.value
   const selection = window.getSelection()
@@ -382,8 +550,19 @@ function handleDocumentMouseDown(event: MouseEvent): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') hidePopover()
+  if (event.key !== 'Escape') return
+  if (pendingSelection.value !== null) {
+    hidePopover()
+    return
+  }
+  // Escape drops the selection, but only while the reviewer is actually inside
+  // the source review — it must not reach across the app from another panel.
+  const active = document.activeElement
+  if (active instanceof Node && textContainer.value?.contains(active)) emit('clear')
 }
+
+/** Re-anchor when the panel is resized (window, panel switcher, wrapping). */
+let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
   // Document-level mouseup so selections released OUTSIDE the container (or
@@ -391,11 +570,17 @@ onMounted(() => {
   document.addEventListener('mouseup', handleSelectionMouseUp)
   document.addEventListener('mousedown', handleDocumentMouseDown)
   document.addEventListener('keydown', handleKeydown)
+  if (textContainer.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => positionActions())
+    resizeObserver.observe(textContainer.value)
+  }
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('mouseup', handleSelectionMouseUp)
   document.removeEventListener('mousedown', handleDocumentMouseDown)
   document.removeEventListener('keydown', handleKeydown)
+  resizeObserver?.disconnect()
+  resizeObserver = null
 })
 </script>

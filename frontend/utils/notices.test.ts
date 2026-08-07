@@ -66,3 +66,21 @@ describe('noticeMessage', () => {
     )
   })
 })
+
+describe('a notice carrying a count', () => {
+  // `count` drives plural selection too, so each catalog inflects its own way
+  // instead of falling back to an "(n)" that reads wrong in every language.
+  it('reads as real German in the singular', () => {
+    const message = noticeMessage(notice('pdf_preserve_not_honoured', { count: 1 }))
+
+    expect(message).toContain('Eine beibehaltene Stelle kommt')
+    expect(message).not.toContain('|')
+  })
+
+  it('reads as real German in the plural, with the number', () => {
+    const message = noticeMessage(notice('pdf_preserve_not_honoured', { count: 4 }))
+
+    expect(message).toContain('4 beibehaltene Stellen kommen')
+    expect(message).not.toContain('|')
+  })
+})

@@ -82,10 +82,11 @@ click jumps to the next occurrence of that type.
 
 ## Correcting an entity
 
-Click a mark to open the detail bar:
+Click a mark and its details and actions appear right next to it, so you never
+have to look away from the passage you are judging:
 
 <figure markdown>
-  ![The detail bar for a selected entity](../assets/screenshots/result-entity-selected.png)
+  ![The actions for a selected entity](../assets/screenshots/result-entity-selected.png)
 </figure>
 
 | Action | Effect |
@@ -98,7 +99,58 @@ Click a mark to open the detail bar:
 Every change re-runs the transformation **on the server** from the cached
 detection: the anonymized text and the redacted-PDF preview refresh together,
 and the original document is never modified. Corrections are per occurrence,
-not per string.
+not per string — see below for changing several at once.
+
+## Correcting several finds at once
+
+Fixing the same thing fifteen times is the wrong kind of work. Three gestures
+build a selection in the *Quellprüfung* panel:
+
+| Gesture | Effect |
+|---|---|
+| **Click** | Select this find alone (the details, as above). |
+| **Ctrl-click** (**Cmd-click** on a Mac) | Add a find to the selection, or take it back out. |
+| **Shift-click** | Select everything between the last find you clicked and this one — a whole letterhead or address block in two clicks. |
+
+The marks work as buttons, so `Tab` walks between them and `Enter` — with
+`Ctrl` or `Shift` held — does the same thing without a mouse. `Esc` clears the
+selection.
+
+There is also a shortcut for the most common case: when a name occurs more than
+once, a single find offers **Alle N Vorkommen wählen**.
+
+From two selected finds on, the details give way to the selection actions —
+still anchored to the last mark you touched. They name what you have selected
+and offer the same choices for all of it: **N schwärzen**, **N beibehalten**, a
+type dropdown, and **N zurücksetzen**.
+
+<figure markdown>
+  ![Two finds selected, with the selection bar](../assets/screenshots/result-entities-selected.png)
+</figure>
+
+Each button reports how many finds it would actually change, and the counts
+differ on purpose — **N schwärzen** only touches finds that are currently
+preserved, so a consistent `[PERSON_1]` tag is never flattened into a plain
+`[NAME]` as a side effect.
+
+The whole selection costs **one** re-run, not one per find, and it survives
+that re-run: preserve six names, look at the output, and press **6 schwärzen**
+to take it back without re-selecting anything.
+
+!!! note "Keeping one of several identical passages, in a PDF"
+
+    The redacted PDF finds what to black out by searching for the redacted
+    text, so keeping a single occurrence of a repeated name cannot show through
+    there — only in the text export. A note above the **Geschwärztes PDF**
+    panel appears when that happens; keeping **all** occurrences (the shortcut
+    above) resolves it. See [Exporting](export.md#redacted-pdf).
+
+!!! warning "Keeping several finds is the direction that can leak"
+
+    **N beibehalten** puts every selected passage back into the output. That is
+    the one bulk action that can return an identifier to a document, so the bar
+    spells out the texts it is about to release and a message confirms how many
+    were kept. Read the list before you press it.
 
 !!! note "The LLM re-check does not repeat"
 

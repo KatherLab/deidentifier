@@ -613,3 +613,57 @@ def test_verify_native_catches_needle_surviving_with_injected_whitespace():
     # verification must catch it despite the injected space (fail-closed).
     with pytest.raises(ExportError):
         _verify_native(pdf, [needle])
+
+
+# True redaction searches each page for the redacted STRING, so it cannot honour
+# a per-occurrence decision: keeping one "Müller" while the others are redacted
+# blacks out all of them. The text export, applied by offset, keeps it. These
+# pin the predicate that lets the UI warn about that divergence.
+def test_preserved_duplicate_is_reported_at_risk():
+    entities = [
+        applied("Mueller", 0),
+        applied("Mueller", 40, replacement=None),
+    ]
+    assert pdf_export.preserved_texts_at_risk(entities) == ["Mueller"]
+
+
+def test_preserved_text_nobody_redacts_is_not_at_risk():
+    entities = [
+        applied("Mueller", 0),
+        applied("Schmidt", 40, replacement=None),
+    ]
+    assert pdf_export.preserved_texts_at_risk(entities) == []
+
+
+def test_a_preserved_passage_containing_a_redacted_one_is_at_risk():
+    # search_for is substring-wise: blacking out "Mueller" also hits the
+    # "Mueller" inside a longer passage the reviewer kept.
+    entities = [
+        applied("Mueller", 0),
+        applied("Mueller-Luedenscheidt", 40, replacement=None),
+    ]
+    assert pdf_export.preserved_texts_at_risk(entities) == ["Mueller-Luedenscheidt"]
+
+
+def test_nothing_is_at_risk_when_nothing_is_redacted():
+    assert pdf_export.preserved_texts_at_risk([applied("Mueller", 0, replacement=None)]) == []
+
+
+def test_true_redaction_really_does_black_out_the_preserved_duplicate():
+    """The behaviour the warning exists for — asserted, not assumed."""
+    text = "Befund von Mueller.\nZweitmeinung von Mueller.\n"
+    first = text.index("Mueller")
+    second = text.index("Mueller", first + 1)
+    entities = [
+        applied("Mueller", first),
+        applied("Mueller", second, replacement=None),
+    ]
+    output = redact_native_pdf(make_pdf(text), entities, Settings())
+
+    import pymupdf
+
+    document = pymupdf.open(stream=output, filetype="pdf")
+    extracted = "".join(page.get_text() for page in document)
+    # Both are gone, including the one the reviewer chose to keep.
+    assert "Mueller" not in extracted.replace("\n", "")
+    assert pdf_export.preserved_texts_at_risk(entities) == ["Mueller"]

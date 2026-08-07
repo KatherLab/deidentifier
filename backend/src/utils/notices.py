@@ -31,6 +31,7 @@ INVALID_SPAN_REJECTED = "invalid_span_rejected"
 
 OVERRIDE_NOT_MATCHED = "override_not_matched"
 MANUAL_SELECTION_IGNORED = "manual_selection_ignored"
+PDF_PRESERVE_NOT_HONOURED = "pdf_preserve_not_honoured"
 
 # --- Leakage validation -------------------------------------------------------
 
@@ -64,6 +65,11 @@ _MESSAGES: dict[str, str] = {
     OVERRIDE_NOT_MATCHED: "An override did not match any detected span and was ignored.",
     MANUAL_SELECTION_IGNORED: (
         "A manual selection no longer matches the source text and was ignored."
+    ),
+    PDF_PRESERVE_NOT_HONOURED: (
+        "{count} passage(s) you kept also occur elsewhere in redacted form. The "
+        "redacted PDF blacks out every occurrence of a redacted text, so these "
+        "stay covered there even though the text export keeps them."
     ),
     RESIDUAL_IDENTIFIER: "Redacted {entity_type} content appears to remain in the output.",
     REVALIDATION_HIT: "A rule detector still finds a possible {entity_type} in the output.",

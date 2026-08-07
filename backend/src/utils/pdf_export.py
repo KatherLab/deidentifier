@@ -65,6 +65,36 @@ def redacted_texts(entities: list[AppliedEntity]) -> list[str]:
     return sorted((t for t in unique if len(t) >= _MIN_SEARCH_LENGTH), key=len, reverse=True)
 
 
+def preserved_texts_at_risk(entities: list[AppliedEntity]) -> list[str]:
+    """Preserved passages that a native-PDF export will black out regardless.
+
+    True redaction has no offsets to work with: it locates each redacted string
+    by SEARCHING every page for it (`redacted_texts` above), so every occurrence
+    goes black — including one the reviewer deliberately kept. The text output,
+    applied by offset, keeps that occurrence. Without this the two exports of
+    the same reviewed document disagree and nothing says so.
+
+    The needle list comes from `redacted_texts` itself, so this cannot drift
+    from what the exporter actually searches for. Matching is case-insensitive
+    and substring-wise, mirroring `search_for`; that errs toward warning, which
+    is the right direction for a notice about over-redaction.
+
+    Only meaningful for native PDFs. The scanned-PDF reconstruction rebuilds
+    each line through `anonymize_line`, which is offset-based and keeps a
+    single preserved occurrence correctly.
+    """
+    needles = [needle.casefold() for needle in redacted_texts(entities)]
+    if not needles:
+        return []
+    at_risk = {
+        entity.text.strip()
+        for entity in entities
+        if entity.status == SpanStatus.PRESERVED
+        and any(needle in entity.text.strip().casefold() for needle in needles)
+    }
+    return sorted(at_risk)
+
+
 def _compact(text: str) -> str:
     """Strip ALL whitespace. The detector reads the PDF via one extractor
     (docling-serve or pypdf) while the export searches it via another (pymupdf /

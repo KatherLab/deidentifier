@@ -5,7 +5,15 @@ import { applyLocale } from '@/composables/useLocale'
 import { i18n } from '@/i18n'
 import { anonymizeApi } from '@/services/anonymizeApi'
 import { useToastStore } from '@/stores/toast'
-import type { AnonymizeResponse } from '@/types/anonymizer'
+import type { AnonymizeResponse, AnonymizedEntity } from '@/types/anonymizer'
+
+// The streaming pipeline is not under test here: every spec below drives the
+// store with results it sets itself, so a submit must never race a real (or
+// failing) stream against those assignments.
+vi.mock('@/services/anonymizeStream', () => ({
+  anonymizeFileStream: vi.fn(() => new Promise(() => {})),
+  anonymizeTextStream: vi.fn(() => new Promise(() => {})),
+}))
 
 describe('output language', () => {
   beforeEach(async () => {
@@ -247,6 +255,370 @@ describe('batch-wide result lifetime', () => {
     await session.extendResults()
 
     expect(toast.toasts.at(-1)).toMatchObject({ type: 'error' })
+    session.reset()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Multi-selection in the source review.
+//
+// The selection is stored as override KEYS (`start:end`), never as indices —
+// a re-run reorders the entity array but never moves an offset. Every spec
+// below leans on that: the selection has to survive the re-runs its own
+// actions trigger.
+// ---------------------------------------------------------------------------
+
+const SOURCE = 'Frau Müller, Dr. Schmidt und Frau MÜLLER am 03.04.2024 in Klinik A.'
+
+function entity(
+  start: number,
+  end: number,
+  text: string,
+  extra: Partial<AnonymizedEntity> = {},
+): AnonymizedEntity {
+  return {
+    start,
+    end,
+    text,
+    entity_type: 'PERSON_NAME',
+    confidence: 0.9,
+    detector: 'llm',
+    transformation: 'CONSISTENT_TAG',
+    replacement: '[PERSON_1]',
+    status: 'TAGGED',
+    metadata: {},
+    ...extra,
+  }
+}
+
+function response(entities: AnonymizedEntity[], requestId = 'req-1'): AnonymizeResponse {
+  return {
+    request_id: requestId,
+    source_text: SOURCE,
+    source_type: 'txt',
+    entities,
+    lifetime: { expires_in_seconds: 900, can_extend: true },
+  } as AnonymizeResponse
+}
+
+/** A single-document batch already carrying a result with these entities. */
+function documentWith(
+  session: ReturnType<typeof useSessionStore>,
+  entities: AnonymizedEntity[],
+): SessionDocument {
+  session.submitFiles([new File([SOURCE], 'befund.txt')])
+  const doc = session.documents[0]!
+  doc.result = response(entities)
+  return doc
+}
+
+describe('entity selection', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const THREE = [entity(5, 11, 'Müller'), entity(17, 24, 'Schmidt'), entity(34, 40, 'MÜLLER')]
+
+  it('selects exactly one entity on a plain click', () => {
+    const session = useSessionStore()
+    documentWith(session, THREE)
+
+    session.selectEntity(1)
+
+    expect(session.selectedEntityIndices).toEqual([1])
+    expect(session.selectedEntity?.text).toBe('Schmidt')
+    session.reset()
+  })
+
+  it('adds and removes single entities without disturbing the rest', () => {
+    const session = useSessionStore()
+    documentWith(session, THREE)
+
+    session.selectEntity(0)
+    session.toggleEntitySelection(2)
+    expect(session.selectedEntityIndices).toEqual([0, 2])
+    // Two selected: the single-entity detail panel steps aside for the bar.
+    expect(session.selectedEntity).toBeNull()
+
+    session.toggleEntitySelection(0)
+    expect(session.selectedEntityIndices).toEqual([2])
+    session.reset()
+  })
+
+  it('selects a whole range between the anchor and the click', () => {
+    const session = useSessionStore()
+    documentWith(session, THREE)
+
+    session.selectEntity(0)
+    session.selectEntityRange(2)
+
+    expect(session.selectedEntityIndices).toEqual([0, 1, 2])
+    session.reset()
+  })
+
+  it('ranges backwards just as well, and keeps the clicked end in focus', () => {
+    const session = useSessionStore()
+    documentWith(session, THREE)
+
+    session.selectEntity(2)
+    session.selectEntityRange(0)
+
+    expect(session.selectedEntityIndices).toEqual([0, 1, 2])
+    // The source view scrolls to where the reviewer clicked, not to the anchor.
+    expect(session.selectedEntityIndex).toBe(0)
+    session.reset()
+  })
+
+  it('treats a shift-click without an anchor as a plain click', () => {
+    const session = useSessionStore()
+    documentWith(session, THREE)
+
+    session.selectEntityRange(1)
+
+    expect(session.selectedEntityIndices).toEqual([1])
+    session.reset()
+  })
+
+  it('selects every occurrence of a text, ignoring case and whitespace', () => {
+    const session = useSessionStore()
+    documentWith(session, [
+      entity(5, 11, 'Müller'),
+      entity(17, 24, 'Schmidt'),
+      entity(34, 40, 'MÜLLER'),
+      entity(50, 56, ' müller '),
+    ])
+
+    session.selectEntity(0)
+    session.selectMatchingEntities(session.selectedEntity!)
+
+    expect(session.selectedEntityIndices).toEqual([0, 2, 3])
+    expect(session.countMatchingEntities({ text: 'müller' })).toBe(3)
+    // The entity the reviewer came from stays the focus — no jumping away.
+    expect(session.selectedEntityIndex).toBe(0)
+    session.reset()
+  })
+})
+
+describe('bulk actions on a selection', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    i18n.global.locale.value = 'de'
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /** Mock the cheap cached re-run; returns the spy for call assertions. */
+  function mockRerun(entities: AnonymizedEntity[]) {
+    return vi
+      .spyOn(anonymizeApi, 'rerunWithOverrides')
+      .mockResolvedValue({ data: response(entities, 'req-2') } as never)
+  }
+
+  it('redacts every preserved find in ONE re-run, leaving the others as they are', async () => {
+    const session = useSessionStore()
+    const entities = [
+      // Preserved by policy — this is what "Schwärzen" is for.
+      entity(43, 53, '03.04.2024', {
+        entity_type: 'OTHER_DATE',
+        transformation: 'PRESERVE',
+        replacement: null,
+        status: 'PRESERVED',
+      }),
+      // Already redacted with a consistent tag: forcing TYPE_MASK here would
+      // silently flatten [PERSON_1] into [NAME].
+      entity(5, 11, 'Müller'),
+    ]
+    const doc = documentWith(session, entities)
+    const rerun = mockRerun(entities)
+
+    session.selectEntity(0)
+    session.toggleEntitySelection(1)
+    const changed = await session.applySelectionAction('redact')
+
+    expect(changed).toBe(1)
+    expect(rerun).toHaveBeenCalledTimes(1)
+    expect(rerun.mock.calls[0]![1]).toEqual([
+      { start: 43, end: 53, text: '03.04.2024', transformation: 'TYPE_MASK' },
+    ])
+    expect(doc.overrides.has('5:11')).toBe(false)
+    session.reset()
+  })
+
+  it('preserves several detected finds in one round trip', async () => {
+    const session = useSessionStore()
+    const entities = [entity(5, 11, 'Müller'), entity(17, 24, 'Schmidt')]
+    documentWith(session, entities)
+    const rerun = mockRerun(entities)
+
+    session.selectEntity(0)
+    session.toggleEntitySelection(1)
+    const changed = await session.applySelectionAction('preserve')
+
+    expect(changed).toBe(2)
+    expect(rerun).toHaveBeenCalledTimes(1)
+    expect(rerun.mock.calls[0]![1]).toEqual([
+      { start: 5, end: 11, text: 'Müller', transformation: 'PRESERVE' },
+      { start: 17, end: 24, text: 'Schmidt', transformation: 'PRESERVE' },
+    ])
+    session.reset()
+  })
+
+  it('releases a manual redaction by dropping its override, not by preserving it', async () => {
+    const session = useSessionStore()
+    const manual = entity(57, 65, 'Klinik A', {
+      detector: 'user_manual',
+      transformation: 'REMOVE',
+      replacement: '[GESCHWÄRZT]',
+      status: 'REDACTED',
+      metadata: { user_manual: true },
+    })
+    const entities = [entity(5, 11, 'Müller'), manual]
+    const doc = documentWith(session, entities)
+    doc.overrides.set('57:65', {
+      start: 57,
+      end: 65,
+      text: 'Klinik A',
+      transformation: 'REMOVE',
+    })
+    const rerun = mockRerun([entity(5, 11, 'Müller')])
+
+    session.selectEntity(1)
+    const changed = await session.applySelectionAction('preserve')
+
+    expect(changed).toBe(1)
+    // A manual span has no detection behind it: the override is gone, and no
+    // PRESERVE override took its place.
+    expect(rerun.mock.calls[0]![1]).toEqual([])
+    expect(doc.overrides.size).toBe(0)
+    session.reset()
+  })
+
+  it('resets only the selected overrides and keeps the others', async () => {
+    const session = useSessionStore()
+    const entities = [entity(5, 11, 'Müller'), entity(17, 24, 'Schmidt')]
+    const doc = documentWith(session, entities)
+    doc.overrides.set('5:11', {
+      start: 5,
+      end: 11,
+      text: 'Müller',
+      transformation: 'PRESERVE',
+    })
+    doc.overrides.set('17:24', {
+      start: 17,
+      end: 24,
+      text: 'Schmidt',
+      transformation: 'PRESERVE',
+    })
+    mockRerun(entities)
+
+    session.selectEntity(0)
+    const changed = await session.applySelectionAction('reset')
+
+    expect(changed).toBe(1)
+    expect([...doc.overrides.keys()]).toEqual(['17:24'])
+    session.reset()
+  })
+
+  it('sets one type on the whole selection and drops the transformation overrides', async () => {
+    const session = useSessionStore()
+    const entities = [entity(5, 11, 'Müller'), entity(17, 24, 'Schmidt')]
+    const doc = documentWith(session, entities)
+    doc.overrides.set('5:11', {
+      start: 5,
+      end: 11,
+      text: 'Müller',
+      transformation: 'PRESERVE',
+    })
+    const rerun = mockRerun(entities)
+
+    session.selectEntity(0)
+    session.toggleEntitySelection(1)
+    const changed = await session.applySelectionType('ORGANIZATION')
+
+    expect(changed).toBe(2)
+    expect(rerun.mock.calls[0]![1]).toEqual([
+      { start: 5, end: 11, text: 'Müller', entity_type: 'ORGANIZATION' },
+      { start: 17, end: 24, text: 'Schmidt', entity_type: 'ORGANIZATION' },
+    ])
+    session.reset()
+  })
+
+  it('keeps the selection across the re-run it caused', async () => {
+    const session = useSessionStore()
+    const entities = [entity(5, 11, 'Müller'), entity(17, 24, 'Schmidt')]
+    documentWith(session, entities)
+    // The re-run returns the same finds, preserved — so "no, redact them
+    // again" is one more click on the same selection.
+    mockRerun(
+      entities.map((each) => ({
+        ...each,
+        transformation: 'PRESERVE' as const,
+        replacement: null,
+        status: 'PRESERVED' as const,
+      })),
+    )
+
+    session.selectEntity(0)
+    session.toggleEntitySelection(1)
+    await session.applySelectionAction('preserve')
+
+    expect(session.selectedEntityIndices).toEqual([0, 1])
+    session.reset()
+  })
+
+  it('sheds selected entities the re-run made disappear', async () => {
+    const session = useSessionStore()
+    const manual = entity(57, 65, 'Klinik A', {
+      detector: 'user_manual',
+      metadata: { user_manual: true },
+    })
+    const doc = documentWith(session, [entity(5, 11, 'Müller'), manual])
+    doc.overrides.set('57:65', { start: 57, end: 65, text: 'Klinik A', transformation: 'REMOVE' })
+    mockRerun([entity(5, 11, 'Müller')]) // the manual span is gone
+
+    session.selectEntity(0)
+    session.toggleEntitySelection(1)
+    await session.applySelectionAction('preserve')
+
+    expect(session.selectedEntityIndices).toEqual([0])
+    session.reset()
+  })
+
+  it('rolls the whole batch back when the re-run fails', async () => {
+    const session = useSessionStore()
+    const entities = [entity(5, 11, 'Müller'), entity(17, 24, 'Schmidt')]
+    const doc = documentWith(session, entities)
+    vi.spyOn(anonymizeApi, 'rerunWithOverrides').mockRejectedValue(new Error('boom'))
+
+    session.selectEntity(0)
+    session.toggleEntitySelection(1)
+
+    await expect(session.applySelectionAction('preserve')).rejects.toThrow()
+    // Nothing half-applied: the map is back where it started.
+    expect(doc.overrides.size).toBe(0)
+    expect(doc.rerunning).toBe(false)
+    session.reset()
+  })
+
+  it('does not re-run at all when the action would change nothing', async () => {
+    const session = useSessionStore()
+    const entities = [entity(5, 11, 'Müller'), entity(17, 24, 'Schmidt')]
+    documentWith(session, entities)
+    const rerun = mockRerun(entities)
+
+    session.selectEntity(0)
+    session.toggleEntitySelection(1)
+    // Both are already redacted — "Schwärzen" has nothing left to do.
+    const changed = await session.applySelectionAction('redact')
+
+    expect(changed).toBe(0)
+    expect(rerun).not.toHaveBeenCalled()
     session.reset()
   })
 })

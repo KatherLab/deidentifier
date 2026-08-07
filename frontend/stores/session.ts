@@ -84,7 +84,14 @@ export interface SessionDocument {
   result: AnonymizeResponse | null
   /** Accumulated per-entity overrides, keyed by `${start}:${end}`. */
   overrides: Map<string, Override>
-  selectedEntityIndex: number | null
+  /**
+   * The selected entities as override keys, in CLICK order — the last one is
+   * the focus (detail panel, scroll-into-view). Keys and not indices, because
+   * indices shift on every override re-run while offsets never move.
+   */
+  selectedKeys: string[]
+  /** Origin of shift-click range selection: the last plain or toggling click. */
+  selectionAnchorKey: string | null
   /** True while an override re-run is in flight (result view stays visible). */
   rerunning: boolean
   /** Redacted-PDF preview: object URL + backing blob (reused for downloads). */
@@ -135,6 +142,25 @@ export interface SessionDocument {
 /** Stable identity of a detected entity across re-runs (offsets don't move). */
 export function overrideKey(entity: { start: number; end: number }): string {
   return `${entity.start}:${entity.end}`
+}
+
+/**
+ * What a bulk action does to every selected entity.
+ *
+ * `preserve` is asymmetric on purpose: a DETECTED entity is released with a
+ * PRESERVE override, while a manually redacted span (`user_manual`) has no
+ * detection behind it — releasing it means dropping the override that created
+ * it. `EntityDetailPanel` makes the same distinction for a single entity.
+ */
+export type SelectionAction = 'redact' | 'preserve' | 'reset'
+
+/**
+ * Comparison form for "all occurrences of this text": whitespace-collapsed,
+ * case-folded — the same normalization the backend applies to preserve terms
+ * and consistent tags (`utils/transformation.py::_normalize`).
+ */
+function normalizeEntityText(value: string): string {
+  return value.replace(/\s+/gu, ' ').trim().toLowerCase()
 }
 
 /**
@@ -246,9 +272,6 @@ export const useSessionStore = defineStore('session', () => {
 
   const result = computed<AnonymizeResponse | null>(() => activeDocument.value?.result ?? null)
   const sourceFile = computed<File | null>(() => activeDocument.value?.file ?? null)
-  const selectedEntityIndex = computed<number | null>(
-    () => activeDocument.value?.selectedEntityIndex ?? null,
-  )
   const rerunning = computed(() => activeDocument.value?.rerunning ?? false)
   const overrides = computed<Map<string, Override>>(
     () => activeDocument.value?.overrides ?? new Map(),
@@ -260,11 +283,48 @@ export const useSessionStore = defineStore('session', () => {
   const originalPreviewUrl = computed(() => activeDocument.value?.originalPreviewUrl ?? null)
   const activePanels = computed<ResultPanelId[]>(() => activeDocument.value?.activePanels ?? [])
 
-  const selectedEntity = computed<AnonymizedEntity | null>(() => {
+  /**
+   * Indices of every selected entity in the active result, in DOCUMENT order
+   * (the response is already ordered by offset). Keys that no longer resolve —
+   * a manual span whose override a re-run dropped — simply fall out.
+   */
+  const selectedEntityIndices = computed<number[]>(() => {
     const doc = activeDocument.value
-    if (!doc || doc.result === null || doc.selectedEntityIndex === null) return null
-    return doc.result.entities[doc.selectedEntityIndex] ?? null
+    if (!doc || doc.result === null || doc.selectedKeys.length === 0) return []
+    const keys = new Set(doc.selectedKeys)
+    const indices: number[] = []
+    doc.result.entities.forEach((entity, index) => {
+      if (keys.has(overrideKey(entity))) indices.push(index)
+    })
+    return indices
   })
+
+  /** The selected entities themselves, in document order. */
+  const selectedEntities = computed<AnonymizedEntity[]>(() => {
+    const entities = result.value?.entities
+    if (!entities) return []
+    return selectedEntityIndices.value.map((index) => entities[index]!)
+  })
+
+  /**
+   * The entity the source view scrolls to and badges: the last one the user
+   * touched, whatever else is selected alongside it.
+   */
+  const selectedEntityIndex = computed<number | null>(() => {
+    const doc = activeDocument.value
+    if (!doc || doc.result === null) return null
+    const focus = doc.selectedKeys[doc.selectedKeys.length - 1]
+    if (focus === undefined) return null
+    return indexOfEntityKey(doc.result.entities, focus)
+  })
+
+  /**
+   * The ONE selected entity, or null while zero or several are selected — the
+   * detail panel handles exactly one entity, `EntitySelectionBar` the rest.
+   */
+  const selectedEntity = computed<AnonymizedEntity | null>(() =>
+    selectedEntities.value.length === 1 ? selectedEntities.value[0]! : null,
+  )
 
   /** Entity counts by type (active document), in a stable (first-seen) order. */
   const entityCounts = computed<{ type: EntityType; count: number }[]>(() => {
@@ -425,7 +485,8 @@ export const useSessionStore = defineStore('session', () => {
       error: null,
       result: null,
       overrides: new Map(),
-      selectedEntityIndex: null,
+      selectedKeys: [],
+      selectionAnchorKey: null,
       rerunning: false,
       pdfPreviewUrl: null,
       pdfPreviewBlob: null,
@@ -543,7 +604,8 @@ export const useSessionStore = defineStore('session', () => {
       doc.result = response
       adoptLifetime(doc, response.lifetime)
       doc.overrides = new Map()
-      doc.selectedEntityIndex = null
+      doc.selectedKeys = []
+      doc.selectionAnchorKey = null
       // Default panel selection: source review + result side by side (the
       // result is the redacted PDF for PDF sources, the text otherwise).
       doc.activePanels = isPdfResult(response) ? ['source', 'pdf'] : ['source', 'anonymized']
@@ -932,11 +994,6 @@ export const useSessionStore = defineStore('session', () => {
     const requestId = doc.result.request_id
     const sourceText = doc.result.source_text
     const allOverrides = [...doc.overrides.values()]
-    const selected =
-      doc.selectedEntityIndex === null
-        ? null
-        : (doc.result.entities[doc.selectedEntityIndex] ?? null)
-    const selectedKey = selected === null ? null : overrideKey(selected)
 
     doc.rerunning = true
     try {
@@ -970,9 +1027,15 @@ export const useSessionStore = defineStore('session', () => {
       }
       doc.result = response
       adoptLifetime(doc, response.lifetime)
-      // Re-select the same entity by offsets (indices may shift on re-runs).
-      doc.selectedEntityIndex =
-        selectedKey === null ? null : indexOfEntityKey(response.entities, selectedKey)
+      // The selection survives the re-run: it is stored as offsets, so it only
+      // has to shed the keys the new result no longer has (a manual span whose
+      // override was just dropped). Everything else stays selected, which is
+      // what makes "redact these six → no, preserve them after all" work.
+      const stillThere = (key: string) => indexOfEntityKey(response.entities, key) !== null
+      doc.selectedKeys = doc.selectedKeys.filter(stillThere)
+      if (doc.selectionAnchorKey !== null && !stillThere(doc.selectionAnchorKey)) {
+        doc.selectionAnchorKey = null
+      }
       // The preview must reflect the new overrides (no-op for non-PDF results).
       void refreshPdfPreviewFor(doc)
     } catch (err) {
@@ -1052,9 +1115,196 @@ export const useSessionStore = defineStore('session', () => {
     return rerunOverridesFor(doc, previous)
   }
 
+  // ---------------------------------------------------------------------
+  // Selection (single and multi)
+  //
+  // Everything below stores override KEYS, never indices — a re-run reorders
+  // the entity array but never moves an offset.
+  // ---------------------------------------------------------------------
+
+  /** The override key of the entity at `index` in the ACTIVE document. */
+  function keyAt(doc: SessionDocument, index: number): string | null {
+    const entity = doc.result?.entities[index]
+    return entity === undefined ? null : overrideKey(entity)
+  }
+
+  /** Plain click: select exactly this entity (`null` clears the selection). */
   function selectEntity(index: number | null): void {
     const doc = activeDocument.value
-    if (doc) doc.selectedEntityIndex = index
+    if (!doc) return
+    if (index === null) {
+      doc.selectedKeys = []
+      doc.selectionAnchorKey = null
+      return
+    }
+    const key = keyAt(doc, index)
+    if (key === null) return
+    doc.selectedKeys = [key]
+    doc.selectionAnchorKey = key
+  }
+
+  /** Ctrl/Cmd-click: add this entity to the selection, or take it back out. */
+  function toggleEntitySelection(index: number): void {
+    const doc = activeDocument.value
+    if (!doc) return
+    const key = keyAt(doc, index)
+    if (key === null) return
+    const without = doc.selectedKeys.filter((entry) => entry !== key)
+    // Added entities become the focus; the anchor follows the click either
+    // way, so a following shift-click ranges from where the user last was.
+    doc.selectedKeys = without.length === doc.selectedKeys.length ? [...without, key] : without
+    doc.selectionAnchorKey = key
+  }
+
+  /**
+   * Shift-click: select everything between the anchor and `index` in document
+   * order, inclusive, replacing the selection. Without an anchor (nothing
+   * clicked yet) this is a plain click.
+   */
+  function selectEntityRange(index: number): void {
+    const doc = activeDocument.value
+    if (!doc || doc.result === null) return
+    const entities = doc.result.entities
+    const anchorIndex =
+      doc.selectionAnchorKey === null ? null : indexOfEntityKey(entities, doc.selectionAnchorKey)
+    if (anchorIndex === null) {
+      selectEntity(index)
+      return
+    }
+    // Order by offset rather than trusting the array order, so a range always
+    // means "everything the reviewer sees between these two marks".
+    const byOffset = entities
+      .map((entity, position) => ({ position, start: entity.start }))
+      .sort((a, b) => a.start - b.start || a.position - b.position)
+    const from = byOffset.findIndex((entry) => entry.position === anchorIndex)
+    const to = byOffset.findIndex((entry) => entry.position === index)
+    if (from === -1 || to === -1) return
+
+    const keys: string[] = []
+    for (let step = Math.min(from, to); step <= Math.max(from, to); step++) {
+      const key = keyAt(doc, byOffset[step]!.position)
+      if (key !== null) keys.push(key)
+    }
+    // The clicked end is the focus; the anchor stays put so a second
+    // shift-click re-ranges from the same origin instead of walking away.
+    doc.selectedKeys = from <= to ? keys : keys.reverse()
+  }
+
+  /** Entities whose text matches this one after normalization (incl. itself). */
+  function matchingEntities(entity: { text: string }): AnonymizedEntity[] {
+    const entities = result.value?.entities
+    if (!entities) return []
+    const target = normalizeEntityText(entity.text)
+    return entities.filter((candidate) => normalizeEntityText(candidate.text) === target)
+  }
+
+  /** How often this entity's text occurs in the document (incl. itself). */
+  function countMatchingEntities(entity: { text: string }): number {
+    return matchingEntities(entity).length
+  }
+
+  /**
+   * "Alle 14 Vorkommen": select every entity carrying the same text. The
+   * entity that was already selected stays the focus, so the source view does
+   * not jump away from where the reviewer is reading.
+   */
+  function selectMatchingEntities(entity: AnonymizedEntity): void {
+    const doc = activeDocument.value
+    if (!doc) return
+    const self = overrideKey(entity)
+    const keys = matchingEntities(entity).map(overrideKey)
+    if (keys.length === 0) return
+    doc.selectedKeys = [...keys.filter((key) => key !== self), self]
+    doc.selectionAnchorKey = self
+  }
+
+  /** Drop the selection without touching any override. */
+  function clearSelection(): void {
+    selectEntity(null)
+  }
+
+  // ---------------------------------------------------------------------
+  // Bulk actions on the selection
+  //
+  // The backend takes overrides as a LIST, so N entities cost exactly ONE
+  // re-run — the same round trip a single-entity edit costs today.
+  // ---------------------------------------------------------------------
+
+  /**
+   * Apply `action` to every selected entity of the ACTIVE document and re-run
+   * once. Returns how many entities actually changed, so the caller can report
+   * it; entities the action is a no-op for (already redacted, already
+   * preserved, no override to reset) are skipped and never counted.
+   *
+   * Throws like every other override path — the override map is rolled back by
+   * `rerunOverridesFor` and the caller shows the error.
+   */
+  async function applySelectionAction(action: SelectionAction): Promise<number> {
+    const doc = activeDocument.value
+    if (!doc || doc.result === null) return 0
+    const entities = selectedEntities.value
+    if (entities.length === 0) return 0
+
+    const previous = new Map(doc.overrides)
+    let changed = 0
+    for (const entity of entities) {
+      const key = overrideKey(entity)
+      const isManual = entity.metadata?.user_manual === true
+      // Reset, and releasing a manual span, both mean the same thing: forget
+      // the override. A manual span has no detection to fall back to.
+      if (action === 'reset' || (action === 'preserve' && isManual)) {
+        if (doc.overrides.delete(key)) changed += 1
+        continue
+      }
+      // A manual span is already redacted; anything else already redacted keeps
+      // the transformation it has (forcing TYPE_MASK here would silently turn
+      // a consistent [PERSON_1] tag into a flat [NAME]).
+      if (isManual) continue
+      if (action === 'redact' && entity.status !== 'PRESERVED') continue
+      if (action === 'preserve' && entity.status === 'PRESERVED') continue
+
+      const transformation: TransformationType = action === 'preserve' ? 'PRESERVE' : 'TYPE_MASK'
+      const existing = doc.overrides.get(key)
+      const next: Override = {
+        start: entity.start,
+        end: entity.end,
+        text: entity.text,
+        transformation,
+      }
+      if (existing?.entity_type !== undefined) next.entity_type = existing.entity_type
+      doc.overrides.set(key, next)
+      changed += 1
+    }
+
+    if (changed === 0) return 0
+    await rerunOverridesFor(doc, previous)
+    return changed
+  }
+
+  /**
+   * Set one entity type on every selected entity and re-run once. Like the
+   * single-entity path, this drops any transformation override so the new
+   * type's policy applies; manual spans have no type and are skipped.
+   */
+  async function applySelectionType(entityType: EntityType): Promise<number> {
+    const doc = activeDocument.value
+    if (!doc || doc.result === null) return 0
+    const previous = new Map(doc.overrides)
+    let changed = 0
+    for (const entity of selectedEntities.value) {
+      if (entity.metadata?.user_manual === true) continue
+      if (entity.entity_type === entityType) continue
+      doc.overrides.set(overrideKey(entity), {
+        start: entity.start,
+        end: entity.end,
+        text: entity.text,
+        entity_type: entityType,
+      })
+      changed += 1
+    }
+    if (changed === 0) return 0
+    await rerunOverridesFor(doc, previous)
+    return changed
   }
 
   return {
@@ -1072,7 +1322,9 @@ export const useSessionStore = defineStore('session', () => {
     result,
     sourceFile,
     selectedEntityIndex,
+    selectedEntityIndices,
     selectedEntity,
+    selectedEntities,
     entityCounts,
     overrides,
     rerunning,
@@ -1117,6 +1369,13 @@ export const useSessionStore = defineStore('session', () => {
     submitText,
     submitFiles,
     selectEntity,
+    toggleEntitySelection,
+    selectEntityRange,
+    selectMatchingEntities,
+    countMatchingEntities,
+    clearSelection,
+    applySelectionAction,
+    applySelectionType,
     overrideFor,
     applyEntityOverride,
     addManualRedaction,
