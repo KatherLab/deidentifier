@@ -5,7 +5,7 @@ uv run uvicorn backend.src.main:app --reload --host 0.0.0.0 --port 8000
 
 import asyncio
 import logging
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -57,8 +57,7 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         sweeper.cancel()
-        with suppress(asyncio.CancelledError):
-            await sweeper
+        await asyncio.gather(sweeper, return_exceptions=True)
         # Nothing outlives the process, and nothing waits for a TTL either.
         request_cache.clear()
 

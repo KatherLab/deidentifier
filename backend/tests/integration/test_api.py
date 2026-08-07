@@ -303,13 +303,12 @@ def test_extension_is_bounded_by_the_configured_ceiling(client, monkeypatch):
     12-hour day."""
     import backend.src.utils.cache as cache_module
     from backend.src.core.config import get_settings
-    from backend.src.utils.cache import request_cache
 
     monkeypatch.setenv("RESULT_CACHE_TTL_MINUTES", "15")
     monkeypatch.setenv("RESULT_CACHE_EXTENSION_MINUTES", "60")
     monkeypatch.setenv("RESULT_CACHE_MAX_LIFETIME_MINUTES", "30")
     get_settings.cache_clear()
-    request_cache.configure(get_settings())  # what the app's lifespan does
+    cache_module.request_cache.configure(get_settings())  # what the app's lifespan does
 
     clock = {"now": 1000.0}
     monkeypatch.setattr(cache_module.time, "monotonic", lambda: clock["now"])
@@ -338,7 +337,8 @@ def test_delete_forgets_the_cached_document(client):
     first = client.post("/api/v1/anonymize", json={"text": SAMPLE_TEXT}).json()
     request_id = first["request_id"]
 
-    assert client.delete(f"/api/v1/anonymize/{request_id}").status_code == 204
+    deleted = client.delete(f"/api/v1/anonymize/{request_id}")
+    assert deleted.status_code == 204
     # The document is gone: a re-run now has nothing to work from.
     rerun = client.post("/api/v1/anonymize", json={"request_id": request_id, "overrides": []})
     assert rerun.status_code == 410
@@ -347,7 +347,8 @@ def test_delete_forgets_the_cached_document(client):
 def test_delete_of_an_unknown_id_reveals_nothing(client):
     """Same answer either way — whether an id exists is not something an
     unrelated caller should be able to probe."""
-    assert client.delete("/api/v1/anonymize/no-such-id").status_code == 204
+    deleted = client.delete("/api/v1/anonymize/no-such-id")
+    assert deleted.status_code == 204
 
 
 def test_request_id_is_not_written_to_the_log(client, caplog):
