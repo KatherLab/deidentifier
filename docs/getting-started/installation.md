@@ -69,7 +69,7 @@ container, terminate TLS there, and do not publish port 8080 beyond it.
 ## Local development setup
 
 Prerequisites: Python 3.13 or 3.14 (`requires-python = ">=3.13,<3.15"`),
-[uv](https://docs.astral.sh/uv/), Node.js 22+.
+[uv](https://docs.astral.sh/uv/), Node.js 24+.
 
 ```bash
 uv sync

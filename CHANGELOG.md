@@ -9,6 +9,14 @@ Entries are brief and describe what affects users or setup — features,
 configuration and breaking changes, notable fixes. Internal refactors, tests,
 documentation, and CI work are left out.
 
+## [0.1.3] — 2026-08-07
+
+### Fixed
+
+- The frontend image's `linux/arm64` build crashed in CI because Node ran under
+  QEMU emulation; the build stage now runs on the build host's architecture
+  (and on Node 24, matching what the tests run).
+
 ## [0.1.2] — 2026-08-07
 
 ### Added
@@ -92,6 +100,7 @@ First tagged version.
   configurable deployment banner sits above the header.
 - Documentation site (MkDocs Material) under `docs/`.
 
+[0.1.3]: https://github.com/KatherLab/deidentifier/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/KatherLab/deidentifier/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/KatherLab/deidentifier/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/KatherLab/deidentifier/releases/tag/v0.1.0

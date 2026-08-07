@@ -1,5 +1,8 @@
 ### ── Build stage ───────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+# Runs on the build host's own architecture: the Vite output is static files,
+# so only the nginx runtime stage below needs to be multi-arch. This keeps
+# Node out of QEMU emulation, which crashes it (SIGILL) on arm64 cross-builds.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
 
 WORKDIR /app
 # npm ci against the committed lockfile: reproducible, matches what CI tested.
