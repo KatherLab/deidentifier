@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-The Medical Document Anonymizer (version `0.1.1`) is distributed
+The Medical Document Anonymizer (version `0.1.2`) is distributed
 under the `AGPL-3.0-or-later` license. It bundles the third-party
 open-source components listed below, each governed by its own license.
 Full license texts are available in each project's repository (linked

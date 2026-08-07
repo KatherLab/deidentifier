@@ -9,7 +9,7 @@ Entries are brief and describe what affects users or setup — features,
 configuration and breaking changes, notable fixes. Internal refactors, tests,
 documentation, and CI work are left out.
 
-## [Unreleased]
+## [0.1.2] — 2026-08-07
 
 ### Added
 
@@ -92,6 +92,6 @@ First tagged version.
   configurable deployment banner sits above the header.
 - Documentation site (MkDocs Material) under `docs/`.
 
-[Unreleased]: https://github.com/KatherLab/deidentifier/compare/v0.1.1...HEAD
+[0.1.2]: https://github.com/KatherLab/deidentifier/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/KatherLab/deidentifier/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/KatherLab/deidentifier/releases/tag/v0.1.0
