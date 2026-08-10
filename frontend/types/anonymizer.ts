@@ -266,11 +266,23 @@ export interface Banner {
   color: BannerColor
 }
 
+/** One selectable vision-OCR profile (names and models only, no endpoints). */
+export interface OcrProfileStatus {
+  name: string
+  model: string
+  dialect: string
+  default: boolean
+}
+
 export interface StatusResponse {
   app_env: string
   version: string
   detectors: DetectorStatus[]
   ocr_engine: string
+  /** The vision-OCR dialect in use; null unless ocr_engine is llm_vision. */
+  ocr_dialect: string | null
+  /** Selectable OCR profiles; empty unless several are configured. */
+  ocr_profiles: OcrProfileStatus[]
   external_endpoints: ExternalEndpoint[]
   limits: StatusLimits
   banner: Banner | null

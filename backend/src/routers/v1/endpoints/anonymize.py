@@ -18,6 +18,7 @@ from ....schemas.anonymize import AnonymizeResponse, AnonymizeTextRequest, Cache
 from ....utils.cache import request_cache
 from ....utils.detection import DetectorError
 from ....utils.extraction import ExtractionError, extract_document
+from ....utils.ocr_profiles import OcrProfileError, resolve_vision_ocr_profile
 from ....utils.pipeline import rerun_with_overrides, run_anonymization
 from ....utils.safe_logging import get_safe_logger, log_reference
 
@@ -119,6 +120,7 @@ class _UploadInput:
     preserve_terms: list[str] | None = field(default=None)
     output_language: str | None = None
     force_ocr: bool = False
+    ocr_profile: str | None = None
 
 
 async def _handle_upload(request: Request, settings: Settings) -> AnonymizeResponse:
@@ -136,6 +138,7 @@ async def _parse_upload(request: Request, settings: Settings) -> _UploadInput:
     preserve_terms = _parse_terms_form(form.get("preserve_terms"))
     output_language = _parse_language_form(form.get("output_language"))
     force_ocr = _parse_bool_form(form.get("force_ocr"))
+    ocr_profile = _parse_ocr_profile_form(form.get("ocr_profile"), settings)
     upload = form.get("file")
     if not isinstance(upload, UploadFile):
         raise HTTPException(status_code=400, detail="Multipart field 'file' is required.")
@@ -159,12 +162,14 @@ async def _parse_upload(request: Request, settings: Settings) -> _UploadInput:
         preserve_terms=preserve_terms,
         output_language=output_language,
         force_ocr=force_ocr,
+        ocr_profile=ocr_profile,
     )
 
 
 async def _process_upload(
     upload_input: _UploadInput, settings: Settings, progress=None
 ) -> AnonymizeResponse:
+    settings = _resolve_ocr_profile(settings, upload_input.ocr_profile)
     started = time.perf_counter()
     try:
         extracted = await extract_document(
@@ -372,6 +377,23 @@ def _parse_language_form(raw) -> str | None:
 def _parse_bool_form(raw) -> bool:
     """Parse a multipart boolean flag; accepts 'true'/'1'/'yes'/'on'."""
     return isinstance(raw, str) and raw.strip().lower() in {"true", "1", "yes", "on"}
+
+
+def _parse_ocr_profile_form(raw, settings: Settings) -> str | None:
+    """Parse + validate the multipart 'ocr_profile' field. Validated at parse
+    time so a bad selection fails as a regular HTTP error, before any
+    streaming starts."""
+    name = raw.strip() if isinstance(raw, str) and raw.strip() else None
+    if name is not None:
+        _resolve_ocr_profile(settings, name)
+    return name
+
+
+def _resolve_ocr_profile(settings: Settings, name: str | None) -> Settings:
+    try:
+        return resolve_vision_ocr_profile(settings, name)
+    except OcrProfileError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
 
 
 def _check_text_limits(text: str, settings: Settings) -> None:

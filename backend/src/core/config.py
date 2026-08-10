@@ -99,19 +99,28 @@ class Settings(BaseSettings):
     VISION_OCR_API_BASE: str = ""
     VISION_OCR_API_KEY: str = ""
     VISION_OCR_MODEL: str = ""
-    # Prompt sent with each page image; "<image>document parsing." is the
-    # Unlimited-OCR recipe and works for most vision OCR models.
-    VISION_OCR_PROMPT: str = "<image>document parsing."
+    # Which model family the endpoint serves — selects the request recipe and
+    # the response parser (services/ocr_dialects.py):
+    # unlimited_ocr | chandra | plain. An unknown name fails the request
+    # loudly; a mis-parsed response would silently drop text.
+    VISION_OCR_DIALECT: str = "unlimited_ocr"
+    # Optional: several selectable OCR models at once. Raw JSON list of
+    # profile objects ({"name", "model", "dialect", ...}); unset fields
+    # inherit the flat VISION_OCR_* values, the first entry is the default.
+    # Empty = feature off, the flat settings are the only configuration.
+    # See utils/ocr_profiles.py and docs/operations/ocr-engines.md.
+    VISION_OCR_PROFILES: str = ""
+    # The four recipe values below default to unset = "use the dialect's
+    # default". Setting one overrides the dialect for every model.
+    VISION_OCR_PROMPT: str | None = None
     # Retry prompt for a page that the primary prompt transcribes to (near-)
-    # empty text while the rendered page clearly has ink. Unlimited-OCR's
-    # layout parser occasionally classifies a whole page as a single image
-    # (dense barcodes, handwriting, redaction bars) and emits no text; the flat
-    # "Free OCR." mode transcribes it. Empty disables the fallback.
-    VISION_OCR_FALLBACK_PROMPT: str = "<image>Free OCR."
-    VISION_OCR_MAX_TOKENS: int = Field(default=8192, ge=256)
+    # empty text while the rendered page clearly has ink. Explicitly empty
+    # disables the fallback.
+    VISION_OCR_FALLBACK_PROMPT: str | None = None
+    VISION_OCR_MAX_TOKENS: int | None = Field(default=None, ge=256)
     # Raw JSON merged into the request body (e.g. Unlimited-OCR's
-    # skip_special_tokens / vllm_xargs); empty = none.
-    VISION_OCR_EXTRA_BODY: str = ""
+    # skip_special_tokens / vllm_xargs); "{}" sends none.
+    VISION_OCR_EXTRA_BODY: str | None = None
     VISION_OCR_TIMEOUT_SECONDS: int = Field(default=600, ge=1)
     VISION_OCR_MAX_CONCURRENT_PAGES: int = Field(default=2, ge=1, le=16)
     # Page render scale: 1.0 = 72 dpi; 2.8 ≈ 200 dpi.
@@ -157,6 +166,14 @@ def validate_production_settings(settings: Settings) -> None:
         problems.append("APP_ALLOW_INSECURE_CONTENT_LOGGING must be false in production")
     if "llm" in settings.detector_names and not (settings.OPENAI_API_BASE and settings.LLM_MODEL):
         problems.append("detector 'llm' is enabled but OPENAI_API_BASE/LLM_MODEL are not set")
+    if settings.OCR_ENGINE == "llm_vision" and settings.VISION_OCR_PROFILES.strip():
+        # Late import: utils.ocr_profiles imports this module.
+        from ..utils.ocr_profiles import OcrProfileError, parse_profiles
+
+        try:
+            parse_profiles(settings)
+        except OcrProfileError as exc:
+            problems.append(str(exc))
     if problems:
         raise RuntimeError("Refusing to start: " + "; ".join(problems))
 

@@ -92,6 +92,9 @@
     },
     "ocr": {
       "title": "Texterkennung (OCR)",
+      "profile_label": "OCR-Modell",
+      "profile_default": "Standard ({name})",
+      "profile_hint": "Mehrere Texterkennungs-Modelle sind konfiguriert. Die Auswahl gilt für den nächsten Lauf und wird pro Dokument festgehalten.",
       "force_label": "OCR erzwingen",
       "force_hint": "Liest hochgeladene PDFs immer per Texterkennung neu ein, statt eine vorhandene Textebene zu verwenden. Sinnvoll für Scans mit fehlender oder fehlerhafter Textebene. Betrifft nur PDF-Uploads (nicht Text/DOCX) und macht die Verarbeitung langsamer."
     },

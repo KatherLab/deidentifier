@@ -91,6 +91,13 @@ To get a document in a different language, start a new run.
 
 ## Texterkennung (OCR)
 
+**OCR-Modell** appears only when the administrator has configured several OCR
+models ([profiles](../operations/ocr-engines.md#several-models-at-once-profiles)).
+The default is preselected; picking another applies to the next run and stays
+with each document, so its corrections and PDF export keep using the same
+model. With a single configured model there is nothing to choose and the
+picker is hidden.
+
 **OCR erzwingen** appears only when an OCR engine is configured. It skips the
 embedded-text probe and re-reads every page of an uploaded PDF via OCR. Use it
 for scans whose text layer is missing or garbled. It affects PDF uploads only

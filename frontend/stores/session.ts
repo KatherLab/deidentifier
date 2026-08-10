@@ -118,6 +118,8 @@ export interface SessionDocument {
   rules: CustomRules | null
   /** Force-OCR flag captured at submit — re-sent on export (cache-miss parity). */
   forceOcr: boolean
+  /** OCR profile captured at submit; null = server default. Re-sent on export. */
+  ocrProfile: string | null
   /**
    * Language of the placeholders written into THIS document, captured at
    * submit and re-sent with every re-run/export. Switching the interface
@@ -242,6 +244,14 @@ export const useSessionStore = defineStore('session', () => {
    * cache-miss re-extraction matches.
    */
   const forceOcr = ref(false)
+
+  /**
+   * Which of the server's OCR profiles the next run uses (advanced settings;
+   * only offered when the backend configures several). `null` = the server's
+   * default profile. Captured at submit like forceOcr and re-sent on export
+   * so a cache-miss re-extraction runs the same OCR model.
+   */
+  const ocrProfile = ref<string | null>(null)
 
   /**
    * Language of the placeholders in the anonymized output (advanced settings).
@@ -444,6 +454,7 @@ export const useSessionStore = defineStore('session', () => {
       policyCustomized.value ||
       customRules.value !== null ||
       forceOcr.value ||
+      ocrProfile.value !== null ||
       (outputLanguageOverride.value !== null &&
         outputLanguageOverride.value !== i18n.global.locale.value),
   )
@@ -459,6 +470,7 @@ export const useSessionStore = defineStore('session', () => {
     redactTerms.value = []
     preserveTerms.value = []
     forceOcr.value = false
+    ocrProfile.value = null
     outputLanguageOverride.value = null
   }
 
@@ -471,6 +483,7 @@ export const useSessionStore = defineStore('session', () => {
     batchPolicy: PolicyMap | null,
     batchRules: CustomRules | null,
     batchForceOcr: boolean,
+    batchOcrProfile: string | null,
     batchOutputLanguage: OutputLanguage,
   ): SessionDocument {
     const doc: SessionDocument = {
@@ -503,6 +516,7 @@ export const useSessionStore = defineStore('session', () => {
       policy: batchPolicy,
       rules: batchRules,
       forceOcr: batchForceOcr,
+      ocrProfile: batchOcrProfile,
       outputLanguage: batchOutputLanguage,
       expiresAt: null,
       canExtend: false,
@@ -523,9 +537,17 @@ export const useSessionStore = defineStore('session', () => {
     const batchPolicy = policyOverrides.value
     const batchRules = customRules.value
     const batchForceOcr = forceOcr.value
+    const batchOcrProfile = ocrProfile.value
     const batchOutputLanguage = outputLanguage.value
     documents.value = inputs.map((input) =>
-      createDocument(input, batchPolicy, batchRules, batchForceOcr, batchOutputLanguage),
+      createDocument(
+        input,
+        batchPolicy,
+        batchRules,
+        batchForceOcr,
+        batchOcrProfile,
+        batchOutputLanguage,
+      ),
     )
     activeDocumentId.value = documents.value[0]!.id
     phase.value = 'loading'
@@ -588,6 +610,7 @@ export const useSessionStore = defineStore('session', () => {
             doc.policy,
             doc.rules,
             doc.forceOcr,
+            doc.ocrProfile,
             doc.outputLanguage,
             onProgress,
             abort.signal,
@@ -876,6 +899,7 @@ export const useSessionStore = defineStore('session', () => {
         doc.rules,
         doc.redactAreas,
         doc.forceOcr,
+        doc.ocrProfile,
         doc.outputLanguage,
       )
       if (token !== doc.pdfPreviewToken) return
@@ -1335,6 +1359,7 @@ export const useSessionStore = defineStore('session', () => {
     redactTerms,
     preserveTerms,
     forceOcr,
+    ocrProfile,
     outputLanguage,
     outputLanguageOverride,
     setOutputLanguage,

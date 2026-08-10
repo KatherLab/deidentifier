@@ -157,6 +157,28 @@
     <!-- Texterkennung: force OCR (only when an OCR engine is configured). -->
     <section v-if="ocrEnabled" class="space-y-3 border-t border-default pt-4">
       <h3 class="text-sm font-semibold text-content">{{ t('policy.ocr.title') }}</h3>
+      <!-- OCR model selection, only when the server configures several. -->
+      <div v-if="ocrProfiles.length >= 2" class="space-y-1">
+        <div class="flex flex-wrap items-center gap-3">
+          <label for="ocr-profile" class="text-sm text-content">
+            {{ t('policy.ocr.profile_label') }}
+          </label>
+          <select
+            id="ocr-profile"
+            class="w-64 rounded-card border border-strong bg-surface px-2 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            :value="session.ocrProfile ?? ''"
+            @change="onOcrProfileChange($event)"
+          >
+            <option value="">
+              {{ t('policy.ocr.profile_default', { name: defaultOcrProfileName }) }}
+            </option>
+            <option v-for="profile in ocrProfiles" :key="profile.name" :value="profile.name">
+              {{ profile.name }} ({{ profile.model }})
+            </option>
+          </select>
+        </div>
+        <p class="text-xs text-content-subtle">{{ t('policy.ocr.profile_hint') }}</p>
+      </div>
       <label class="flex items-start gap-3">
         <input
           type="checkbox"
@@ -215,6 +237,12 @@ onMounted(() => {
 /** Force-OCR only makes sense when the backend has an OCR engine configured. */
 const ocrEnabled = computed(() => (session.status?.ocr_engine ?? 'none') !== 'none')
 
+/** Selectable OCR profiles; the picker appears only when there is a choice. */
+const ocrProfiles = computed(() => session.status?.ocr_profiles ?? [])
+const defaultOcrProfileName = computed(
+  () => ocrProfiles.value.find((profile) => profile.default)?.name ?? '',
+)
+
 /** "" = follow the interface language; otherwise pin that output language. */
 function onOutputLanguageChange(event: Event): void {
   const value = (event.target as HTMLSelectElement).value
@@ -223,6 +251,12 @@ function onOutputLanguageChange(event: Event): void {
 
 function onForceOcrChange(event: Event): void {
   session.forceOcr = (event.target as HTMLInputElement).checked
+}
+
+/** "" = the server's default profile; otherwise pin one for the next run. */
+function onOcrProfileChange(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value
+  session.ocrProfile = value === '' ? null : value
 }
 
 function isCustomized(type: EntityType): boolean {

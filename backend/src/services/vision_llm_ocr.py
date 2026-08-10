@@ -1,29 +1,33 @@
 """Vision-LLM OCR via any OpenAI-compatible endpoint (adapted from llmaixweb).
 
-Designed for and tested with baidu/Unlimited-OCR served by vLLM, but works
-with any vision model that transcribes page images: PDF pages are rendered to
-PNG with pypdfium2, sent per page (concurrently, order preserved) as data
-URLs, and the transcriptions are joined.
+PDF pages are rendered to PNG with pypdfium2, sent per page (concurrently,
+order preserved) as data URLs, and the transcriptions are joined. What the
+model is asked and how its response is read is a per-model *dialect*
+(`services/ocr_dialects.py`, selected by VISION_OCR_DIALECT): Unlimited-OCR's
+layout lines, chandra's structured HTML, or plain text. The pipeline around
+the dialect — rendering, concurrency, blank-page detection, fail-closed
+semantics — is shared and identical for every model.
 
 Fail-closed: if any single page fails, the whole document fails — a document
 missing a page must never be reported as anonymized. A page that the primary
 prompt transcribes to no text while it clearly has ink is retried once with the
-fallback prompt (the layout parser sometimes classifies a whole page as one
-image and emits nothing); if it is still empty, the document fails rather than
-silently dropping the page.
+fallback prompt; if it is still empty, the document fails rather than silently
+dropping the page.
 """
 
 import asyncio
 import base64
 import io
 import json
-import re
 
 import httpx
 import openai
 
 from ..core.config import Settings
 from ..utils.concurrency import global_semaphore
+from .ocr_dialects import TranscribedLine, build_dialect
+
+__all__ = ["TranscribedLine", "VisionOCRError", "VisionOCRService"]
 
 
 class VisionOCRError(Exception):
@@ -32,32 +36,12 @@ class VisionOCRError(Exception):
         self.status_code = status_code
 
 
-# Model markup such as <|ref|>…<|/ref|> emitted with skip_special_tokens=false.
-_SPECIAL_TOKENS = re.compile(r"<\|[^|>]{0,40}\|>")
-# Unlimited-OCR line prefixes: element type + bounding box in 0–1000
-# page-normalized coordinates (top-left origin), e.g.
-# "text [112, 76, 681, 95]Patientin: …". The boxes drive the
-# layout-preserving redacted-PDF reconstruction; the prefix itself is
-# stripped from the text output.
-_LAYOUT_LINE = re.compile(
-    r"^([a-z_]{1,20}) \[(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\](.*)$", re.IGNORECASE
-)
-
-
 # A rendered page whose dark-pixel fraction is below this is treated as blank:
 # an empty transcription is then expected, not a dropped page.
 _MIN_INK_FRACTION = 0.002
 
 
-class TranscribedLine:
-    """One output line: text plus optional normalized bounding box."""
-
-    def __init__(self, text: str, box: tuple[int, int, int, int] | None = None):
-        self.text = text
-        self.box = box
-
-
-def _has_text(lines: list["TranscribedLine"]) -> bool:
+def _has_text(lines: list[TranscribedLine]) -> bool:
     """True if any parsed line carries actual text (an image-only page parses
     to a single boxed line with empty text — that counts as no text)."""
     return any(line.text.strip() for line in lines)
@@ -73,19 +57,6 @@ def _page_has_ink(image) -> bool:
     return dark / total > _MIN_INK_FRACTION
 
 
-def parse_transcription(raw: str) -> list[TranscribedLine]:
-    cleaned = _SPECIAL_TOKENS.sub("", raw).strip()
-    lines: list[TranscribedLine] = []
-    for line in cleaned.splitlines():
-        match = _LAYOUT_LINE.match(line)
-        if match:
-            box = tuple(int(match.group(i)) for i in range(2, 6))
-            lines.append(TranscribedLine(text=match.group(6), box=box))  # type: ignore[arg-type]
-        elif line.strip():
-            lines.append(TranscribedLine(text=line))
-    return lines
-
-
 class VisionOCRService:
     def __init__(self, settings: Settings):
         if not (settings.VISION_OCR_API_BASE and settings.VISION_OCR_MODEL):
@@ -95,15 +66,32 @@ class VisionOCRService:
             )
         self._settings = settings
         try:
-            self._extra_body: dict = (
-                json.loads(settings.VISION_OCR_EXTRA_BODY)
-                if settings.VISION_OCR_EXTRA_BODY.strip()
-                else {}
-            )
-        except json.JSONDecodeError as exc:
-            raise VisionOCRError(
-                "VISION_OCR_EXTRA_BODY is not valid JSON.", status_code=500
-            ) from exc
+            self._dialect = build_dialect(settings.VISION_OCR_DIALECT)
+        except ValueError as exc:
+            raise VisionOCRError(str(exc), status_code=503) from exc
+
+        # Explicit settings win; unset (None) falls back to the dialect's
+        # recipe. An *empty* fallback prompt stays empty: it means "no retry".
+        self._prompt = (
+            settings.VISION_OCR_PROMPT
+            if settings.VISION_OCR_PROMPT is not None
+            else self._dialect.default_prompt
+        )
+        self._fallback_prompt = (
+            settings.VISION_OCR_FALLBACK_PROMPT
+            if settings.VISION_OCR_FALLBACK_PROMPT is not None
+            else self._dialect.default_fallback_prompt
+        )
+        self._max_tokens = settings.VISION_OCR_MAX_TOKENS or self._dialect.default_max_tokens
+        if settings.VISION_OCR_EXTRA_BODY is None or not settings.VISION_OCR_EXTRA_BODY.strip():
+            self._extra_body: dict = dict(self._dialect.default_extra_body)
+        else:
+            try:
+                self._extra_body = json.loads(settings.VISION_OCR_EXTRA_BODY)
+            except json.JSONDecodeError as exc:
+                raise VisionOCRError(
+                    "VISION_OCR_EXTRA_BODY is not valid JSON.", status_code=500
+                ) from exc
 
     async def process_pdf(self, data: bytes, progress=None) -> list[list[TranscribedLine]]:
         """Return the parsed transcription (lines with boxes) per page, in order."""
@@ -140,13 +128,13 @@ class VisionOCRService:
         """Transcribe one page. If the primary prompt yields no text while the
         page clearly has ink, retry once with the fallback prompt; if it is
         still empty, fail closed rather than silently drop the page."""
-        lines = parse_transcription(await self._transcribe_page(page_number, png))
+        lines = self._dialect.parse(await self._transcribe_page(page_number, png))
         if _has_text(lines) or not has_ink:
             return lines
 
-        fallback_prompt = self._settings.VISION_OCR_FALLBACK_PROMPT.strip()
+        fallback_prompt = self._fallback_prompt.strip()
         if fallback_prompt:
-            lines = parse_transcription(
+            lines = self._dialect.parse(
                 await self._transcribe_page(page_number, png, prompt=fallback_prompt)
             )
             if _has_text(lines):
@@ -191,20 +179,20 @@ class VisionOCRService:
         settings = self._settings
         timeout = settings.VISION_OCR_TIMEOUT_SECONDS
         data_url = "data:image/png;base64," + base64.b64encode(png).decode()
+        parts = [
+            {"type": "text", "text": prompt or self._prompt},
+            {"type": "image_url", "image_url": {"url": data_url}},
+        ]
+        if self._dialect.image_first:
+            parts.reverse()
         kwargs: dict = {
             "model": settings.VISION_OCR_MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt or settings.VISION_OCR_PROMPT},
-                        {"type": "image_url", "image_url": {"url": data_url}},
-                    ],
-                }
-            ],
-            "max_tokens": settings.VISION_OCR_MAX_TOKENS,
+            "messages": [{"role": "user", "content": parts}],
+            "max_tokens": self._max_tokens,
             "temperature": 0.0,
         }
+        if self._dialect.top_p is not None:
+            kwargs["top_p"] = self._dialect.top_p
         if self._extra_body:
             kwargs["extra_body"] = self._extra_body
 

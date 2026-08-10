@@ -92,6 +92,9 @@
     },
     "ocr": {
       "title": "Reconocimiento de texto (OCR)",
+      "profile_label": "Modelo OCR",
+      "profile_default": "Predeterminado ({name})",
+      "profile_hint": "Hay varios modelos de reconocimiento de texto configurados. La selección se aplica a la próxima ejecución y se conserva por documento.",
       "force_label": "Forzar OCR",
       "force_hint": "Vuelve a leer siempre los PDF subidos mediante reconocimiento de texto en lugar de usar una capa de texto existente. Útil para escaneos con una capa de texto ausente o defectuosa. Solo afecta a los PDF (no a texto/DOCX) y ralentiza el procesamiento."
     },

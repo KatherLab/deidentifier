@@ -142,8 +142,8 @@ async def test_empty_inked_page_retried_with_fallback_prompt(monkeypatch):
     pages = await service.process_pdf(b"pdf")
 
     assert "Karla Wagenbrecht" in "\n".join(line.text for line in pages[0])
-    # Primary attempt, then exactly one retry with the fallback prompt.
-    assert prompts == [None, service._settings.VISION_OCR_FALLBACK_PROMPT]
+    # Primary attempt, then exactly one retry with the dialect's fallback prompt.
+    assert prompts == [None, "<image>Free OCR."]
 
 
 async def test_inked_page_blank_under_all_prompts_fails_closed(monkeypatch):

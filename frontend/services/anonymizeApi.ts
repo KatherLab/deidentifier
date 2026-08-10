@@ -129,6 +129,7 @@ export const anonymizeApi = {
     policy?: PolicyMap | null,
     rules?: CustomRules | null,
     forceOcr?: boolean,
+    ocrProfile?: string | null,
     outputLanguage?: OutputLanguage | null,
   ): Promise<AxiosResponse<AnonymizeResponse>> {
     const formData = new FormData()
@@ -137,6 +138,7 @@ export const anonymizeApi = {
     appendCustomRules(formData, rules)
     if (outputLanguage) formData.append('output_language', outputLanguage)
     if (forceOcr) formData.append('force_ocr', 'true')
+    if (ocrProfile) formData.append('ocr_profile', ocrProfile)
     return api.post<AnonymizeResponse>('/anonymize', formData)
   },
 
@@ -154,6 +156,7 @@ export const anonymizeApi = {
     rules?: CustomRules | null,
     areas?: RedactArea[] | null,
     forceOcr?: boolean,
+    ocrProfile?: string | null,
     outputLanguage?: OutputLanguage | null,
   ): Promise<AxiosResponse<Blob>> {
     const formData = new FormData()
@@ -164,8 +167,10 @@ export const anonymizeApi = {
     appendCustomRules(formData, rules)
     if (areas && areas.length > 0) formData.append('redact_areas', JSON.stringify(areas))
     if (outputLanguage) formData.append('output_language', outputLanguage)
-    // Re-sent so a cache-miss re-extraction matches the original forced-OCR run.
+    // Re-sent so a cache-miss re-extraction matches the original run's
+    // forced-OCR flag and OCR profile.
     if (forceOcr) formData.append('force_ocr', 'true')
+    if (ocrProfile) formData.append('ocr_profile', ocrProfile)
     return api.post<Blob>('/export/pdf', formData, { responseType: 'blob' })
   },
 

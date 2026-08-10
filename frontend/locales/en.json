@@ -92,6 +92,9 @@
     },
     "ocr": {
       "title": "Text recognition (OCR)",
+      "profile_label": "OCR model",
+      "profile_default": "Default ({name})",
+      "profile_hint": "Several text-recognition models are configured. The choice applies to the next run and is kept per document.",
       "force_label": "Force OCR",
       "force_hint": "Always re-reads uploaded PDFs via text recognition instead of using an existing text layer. Useful for scans with a missing or broken text layer. Affects PDF uploads only (not text/DOCX) and makes processing slower."
     },

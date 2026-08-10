@@ -165,11 +165,25 @@ class Banner(BaseModel):
     color: Literal["amber", "red", "blue", "green", "gray"]
 
 
+class OcrProfileStatus(BaseModel):
+    """One selectable vision-OCR profile (VISION_OCR_PROFILES). Names and
+    models only — never endpoints or keys."""
+
+    name: str
+    model: str
+    dialect: str
+    default: bool
+
+
 class StatusResponse(BaseModel):
     app_env: str
     version: str
     detectors: list[DetectorStatus]
     ocr_engine: str
+    #: The vision-OCR dialect in use; only set when ocr_engine is llm_vision.
+    ocr_dialect: str | None = None
+    #: Selectable OCR profiles; empty unless several are configured.
+    ocr_profiles: list[OcrProfileStatus] = []
     external_endpoints: list[ExternalEndpoint]
     limits: Limits
     banner: Banner | None = None

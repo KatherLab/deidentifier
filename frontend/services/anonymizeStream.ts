@@ -184,6 +184,7 @@ export function anonymizeFileStream(
   policy: PolicyMap | null,
   rules: CustomRules | null,
   forceOcr: boolean,
+  ocrProfile: string | null,
   outputLanguage: OutputLanguage | null,
   onProgress: OnStreamProgress,
   signal?: AbortSignal,
@@ -194,6 +195,7 @@ export function anonymizeFileStream(
   appendCustomRules(formData, rules)
   if (outputLanguage) formData.append('output_language', outputLanguage)
   if (forceOcr) formData.append('force_ocr', 'true')
+  if (ocrProfile) formData.append('ocr_profile', ocrProfile)
   // No explicit headers — the browser sets the multipart boundary itself.
   return streamAnonymize(formData, undefined, onProgress, signal)
 }

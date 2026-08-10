@@ -92,6 +92,9 @@
     },
     "ocr": {
       "title": "Reconnaissance de texte (OCR)",
+      "profile_label": "Modèle OCR",
+      "profile_default": "Par défaut ({name})",
+      "profile_hint": "Plusieurs modèles de reconnaissance de texte sont configurés. Le choix s'applique à la prochaine analyse et est conservé par document.",
       "force_label": "Forcer l’OCR",
       "force_hint": "Relit toujours les PDF téléversés par reconnaissance de texte au lieu d’utiliser une couche de texte existante. Utile pour les numérisations dont la couche de texte est absente ou erronée. Ne concerne que les PDF (pas le texte/DOCX) et ralentit le traitement."
     },

@@ -27,6 +27,7 @@ from ....schemas.entities import EntityType, TransformationType
 from ....utils.cache import request_cache
 from ....utils.detection import DetectorError
 from ....utils.extraction import ExtractionError, LayoutLine, extract_document
+from ....utils.ocr_profiles import OcrProfileError, resolve_vision_ocr_profile
 from ....utils.pdf_export import (
     ExportError,
     rebuild_scanned_pdf,
@@ -127,6 +128,16 @@ async def export_pdf(
     raw_language = form.get("output_language")
     output_language = raw_language.strip() if isinstance(raw_language, str) else None
     force_ocr = _parse_bool(form.get("force_ocr"))
+    raw_profile = form.get("ocr_profile")
+    ocr_profile = (
+        raw_profile.strip() if isinstance(raw_profile, str) and raw_profile.strip() else None
+    )
+    try:
+        # Re-sent by the client (like force_ocr) so a cache-miss re-extraction
+        # runs the same OCR configuration the reviewed document came from.
+        settings = resolve_vision_ocr_profile(settings, ocr_profile)
+    except OcrProfileError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
 
     file_hash = hashlib.sha256(data).hexdigest()
     request_id = form.get("request_id")
