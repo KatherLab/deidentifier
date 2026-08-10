@@ -35,9 +35,9 @@ uv run --only-group docs mkdocs serve
    `status_code`.
 3. **Endpoint** — a module under `routers/v1/endpoints/`, registered in
    `routers/v1/api.py`.
-4. **Config** — a field on `Settings` plus a documented block in
-   `.env.example` (and a row in
-   [Configuration](../operations/configuration.md) if users need it).
+4. **Config** — a field on `Settings`, a one-line entry in `.env.example`,
+   and a row in [Configuration](../operations/configuration.md) — the docs
+   page is the reference, the worksheet stays terse.
 5. **Frontend** — mirror the type in `frontend/types/anonymizer.ts`, add the
    call to a `services/*Api.ts` module, put state on the active document in
    `stores/session.ts`, build the UI from `components/common/`.

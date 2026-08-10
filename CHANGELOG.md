@@ -9,6 +9,31 @@ Entries are brief and describe what affects users or setup — features,
 configuration and breaking changes, notable fixes. Internal refactors, tests,
 documentation, and CI work are left out.
 
+## [Unreleased]
+
+### Added
+
+- `VISION_OCR_DIALECT` selects the vision-OCR model family (`unlimited_ocr`,
+  `chandra`, `plain`); the recipe variables (`VISION_OCR_PROMPT`,
+  `VISION_OCR_FALLBACK_PROMPT`, `VISION_OCR_MAX_TOKENS`,
+  `VISION_OCR_EXTRA_BODY`) now default to the dialect's recipe, including
+  Unlimited-OCR's `extra_body` — see [OCR engines](docs/operations/ocr-engines.md).
+
+- `VISION_OCR_PROFILES` configures several selectable OCR models at once; the
+  first is the default and reviewers pick another per document in the advanced
+  settings — see [OCR engines](docs/operations/ocr-engines.md).
+
+- `compose.chandra.yml` runs a datalab chandra GPU OCR sidecar and wires it up,
+  as `compose.unlimited-ocr.yml` does for Unlimited-OCR — see
+  [OCR engines](docs/operations/ocr-engines.md).
+
+### Changed
+
+- `.env.example` is now a short setup worksheet that ships with the LLM
+  detector enabled: fill in `OPENAI_API_BASE`/`LLM_MODEL` before first start
+  (or set `DETECTORS=rules` for a look without an LLM) — see
+  [Configuration](docs/operations/configuration.md).
+
 ## [0.1.3] — 2026-08-07
 
 ### Fixed

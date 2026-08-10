@@ -65,14 +65,14 @@ by step in the
 ## Quick start
 
 ```bash
-cp .env.example .env
+cp .env.example .env             # then fill in the LLM block at the top
 docker compose up -d --build     # → http://localhost:8080
 ```
 
-That starts with rule-based detection and **no external services** — enough to
-see the workflow, not enough for real use, since rules alone miss names in
-running prose. Uncomment the LLM block in `.env` to add the primary detector;
-every variable is documented in that file.
+The only required configuration is the detection LLM: any OpenAI-compatible
+endpoint (Ollama, vLLM, LM Studio, a gateway) plus a model name, filled into
+the block at the top of `.env`. Everything else is optional and documented in
+the [docs](https://katherlab.github.io/deidentifier/).
 
 The stack runs in production mode by default (docs disabled, unsafe
 configurations refuse to start). The backend has no published port, a read-only

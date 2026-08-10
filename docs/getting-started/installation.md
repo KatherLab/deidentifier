@@ -13,17 +13,22 @@ unless you run the OCR sidecar.
 git clone https://github.com/KatherLab/deidentifier.git
 cd deidentifier
 cp .env.example .env
+$EDITOR .env                     # fill in the LLM block at the top
 docker compose up -d --build
 ```
 
 The app is at **<http://localhost:8080>**.
 
-`.env.example` is deliberately runnable unedited: it enables the rule detector
-only, so the stack starts with no external services at all. That finds
-structured identifiers — dates, phone numbers, IBANs, labelled IDs — but **not
-names in running prose**, so it is a demo, not a usable configuration. Adding
-the LLM detector is the next step: uncomment the four-line block in `.env` and
-see [LLM endpoints](../operations/llm-endpoints.md).
+The one thing to configure is at the top of `.env`: the detection LLM. Point
+`OPENAI_API_BASE` at any OpenAI-compatible endpoint (Ollama, vLLM, LM Studio,
+a gateway) and set `LLM_MODEL` to a model it serves — see
+[LLM endpoints](../operations/llm-endpoints.md) for model recommendations.
+While those values are empty the backend refuses to start, and its log says
+exactly that (`Refusing to start: detector 'llm' is enabled but
+OPENAI_API_BASE/LLM_MODEL are not set`) — a deployment that silently misses
+names would be worse. To look around without an LLM endpoint, set
+`DETECTORS=rules`: the app then runs with no external services but finds only
+structured identifiers, not names.
 
 !!! warning "`localhost` in `.env` means the backend container"
 
@@ -51,12 +56,13 @@ message starts with `Refusing to start:`.
 # Development: source mounts + hot reload, backend exposed on :8000
 docker compose -f compose.yml -f compose.dev.yml up --build
 
-# Add a GPU OCR sidecar (baidu/Unlimited-OCR via vLLM) and wire it up
-docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d
+# Add a GPU OCR sidecar (vLLM) and wire it up — pick one:
+docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d   # baidu/Unlimited-OCR
+docker compose -f compose.yml -f compose.chandra.yml up -d         # datalab chandra
 ```
 
-The `unlimited-ocr` overlay requires an NVIDIA GPU and the NVIDIA Container
-Toolkit. It sets `OCR_ENGINE=llm_vision` and points the backend at the sidecar
+The OCR overlays require an NVIDIA GPU and the NVIDIA Container Toolkit. Each
+sets `OCR_ENGINE=llm_vision` and points the backend at its sidecar
 automatically — see [OCR engines](../operations/ocr-engines.md).
 
 ### Behind a reverse proxy
@@ -74,8 +80,11 @@ Prerequisites: Python 3.13 or 3.14 (`requires-python = ">=3.13,<3.15"`),
 ```bash
 uv sync
 npm install
-cp .env.example .env
+cp .env.example .env             # fill in the LLM block, as above
 ```
+
+(Development mode starts with the LLM block empty, but every request then
+fails with a clear 503 instead of a result.)
 
 Two terminals:
 

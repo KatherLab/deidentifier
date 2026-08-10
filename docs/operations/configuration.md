@@ -1,9 +1,11 @@
 # Configuration
 
-All configuration is environment variables. The authoritative reference is
-[`.env.example`](https://github.com/KatherLab/deidentifier/blob/main/.env.example),
-which documents every variable the application reads; this page groups them and
-explains the consequences.
+All configuration is environment variables. **This page is the reference** for
+every variable the application reads;
+[`.env.example`](https://github.com/KatherLab/deidentifier/blob/main/.env.example)
+is the worksheet you copy to `.env` — a fill-in block for the two required
+values, then one line per optional variable, with the explanations here rather
+than there.
 
 **Where they are read from**, in order: the `ENV_PATH` file if that variable is
 set, otherwise `.env` in the repo root (the recommended location), otherwise
@@ -85,7 +87,7 @@ BANNER_COLOR=amber
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DETECTORS` | `rules` | Comma-separated: `rules`, `llm`, `mock`. `.env.example` ships `rules` so a fresh copy starts with no external services. **Recommended for real use: `rules,llm`.** |
+| `DETECTORS` | `rules` | Comma-separated: `rules`, `llm`, `mock`. `.env.example` ships `rules,llm` with empty endpoint values — a fresh copy deliberately refuses to start until `OPENAI_API_BASE`/`LLM_MODEL` are filled in. `rules` alone finds structured identifiers but no names; use it only for a first look without an LLM endpoint. |
 
 A detector that is listed but cannot run makes the request fail with 503 rather
 than returning a partial result, as does a name the build does not know.

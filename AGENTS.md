@@ -67,7 +67,7 @@ deidentifier/
 ├── CHANGELOG.md               # Keep a Changelog format
 ├── CITATION.cff               # academic citation metadata
 ├── THIRD_PARTY_NOTICES.md     # bundled OSS components + licenses
-├── .env.example               # documents every variable (the config reference)
+├── .env.example               # setup worksheet: fill-in LLM block + one line per variable
 ├── backend/
 │   ├── .env.e2e               # fixture-only config for the Playwright harness
 │   ├── tests/                 # pytest: unit/, integration/, files/ (fixtures)
@@ -94,6 +94,7 @@ deidentifier/
 ├── compose.yml                # backend + frontend
 ├── compose.dev.yml            # source mount + hot reload
 ├── compose.unlimited-ocr.yml  # GPU sidecar serving baidu/Unlimited-OCR via vLLM
+├── compose.chandra.yml        # GPU sidecar serving datalab chandra via vLLM
 ├── Dockerfile.backend, Dockerfile.frontend
 ├── pyproject.toml, uv.lock, pytest.ini
 ├── package.json, vitest.config.ts, playwright*.config.ts
@@ -339,13 +340,18 @@ field names, so `logger.info("x", chars=len(text))` is right and
 
 ### Configuration
 
-`Settings` in `core/config.py`; `.env.example` is the reference and documents
-every variable. `validate_production_settings()` refuses to start when
-`APP_ENV=production` and: the mock detector is enabled, insecure content
-logging is on, or `llm` is enabled without `OPENAI_API_BASE`/`LLM_MODEL`.
+`Settings` in `core/config.py`. The **reference** for every variable is
+`docs/operations/configuration.md`; `.env.example` is the setup *worksheet* —
+a fill-in LLM block on top, then strictly one commented line per variable with
+at most a short trailing note. Explanations and rationale belong in the docs,
+never in `.env.example`. `validate_production_settings()` refuses to start
+when `APP_ENV=production` and: the mock detector is enabled, insecure content
+logging is on, or `llm` is enabled without `OPENAI_API_BASE`/`LLM_MODEL` —
+which a fresh copy of `.env.example` deliberately triggers until the LLM block
+is filled in.
 
-Adding a setting = field on `Settings` + a documented block in `.env.example`
-+ (if user-visible) a row in `docs/operations/configuration.md`.
+Adding a setting = field on `Settings` + a one-line entry in `.env.example`
++ a row in `docs/operations/configuration.md`.
 
 ---
 
@@ -750,7 +756,8 @@ npm run test:e2e            # when you touched the API or the UI flow
    external call goes in `services/` with its own `*Error`.
 3. **Endpoint** → a module under `routers/v1/endpoints/`, registered in
    `routers/v1/api.py`.
-4. **Config** → field on `Settings` + documented block in `.env.example`.
+4. **Config** → field on `Settings` + one-line entry in `.env.example` + row
+   in `docs/operations/configuration.md`.
 5. **Frontend** → mirror the type in `frontend/types/anonymizer.ts`, add the
    call to a `services/*Api.ts` module, put state on the active document in
    `stores/session.ts`, build the UI from `components/common/` primitives.
