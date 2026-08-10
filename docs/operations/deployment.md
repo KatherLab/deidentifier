@@ -70,8 +70,9 @@ environment taking precedence. See [Configuration](configuration.md).
 # Development: source mounts + reload, backend published on :8000
 docker compose -f compose.yml -f compose.dev.yml up --build
 
-# GPU OCR sidecar (baidu/Unlimited-OCR via vLLM), wired up automatically
-docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d
+# GPU OCR sidecar (vLLM), wired up automatically — pick one:
+docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d   # baidu/Unlimited-OCR
+docker compose -f compose.yml -f compose.chandra.yml up -d         # datalab chandra
 ```
 
 ## Health and monitoring

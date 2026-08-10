@@ -1,6 +1,6 @@
-# GPU sidecar serving baidu/Unlimited-OCR via vLLM, wired as the llm_vision
-# OCR engine for scanned PDFs.
-# Usage: docker compose -f compose.yml -f compose.unlimited-ocr.yml up -d
+# GPU sidecar serving datalab-to/chandra-ocr-2 via vLLM, wired as the
+# llm_vision OCR engine for scanned PDFs.
+# Usage: docker compose -f compose.yml -f compose.chandra.yml up -d
 #
 # Prerequisites: NVIDIA GPU + NVIDIA Container Toolkit.
 #
@@ -9,24 +9,22 @@
 #
 # The backend settings below are set as `environment:`, which takes precedence
 # over `env_file`: while this overlay is active it overrides any OCR_ENGINE /
-# VISION_OCR_* you set in .env.
+# VISION_OCR_* you set in .env (including VISION_OCR_PROFILES, which would
+# otherwise take precedence over the wiring here).
 
 services:
-  unlimited-ocr:
-    # Upstream vLLM ships Unlimited-OCR (and the NGramPerReqLogitsProcessor
-    # referenced below) since v0.25.0, so the stock image works — pin a tag
-    # instead of `latest` if you need a reproducible deployment.
+  chandra-ocr:
+    # Pin a tag instead of `latest` if you need a reproducible deployment.
     image: vllm/vllm-openai:latest
     ipc: host
     shm_size: "8gb"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      # Only needed while the model repo requires Hugging Face authentication.
+      HF_TOKEN: ${HF_TOKEN:-}
     command: >
-      --model baidu/Unlimited-OCR
-      --trust-remote-code
-      --logits_processors vllm.model_executor.models.unlimited_ocr:NGramPerReqLogitsProcessor
-      --no-enable-prefix-caching
-      --mm-processor-cache-gb 0
+      --model datalab-to/chandra-ocr-2
       --host 0.0.0.0
       --port 8000
     healthcheck:
@@ -47,12 +45,12 @@ services:
   backend:
     environment:
       - OCR_ENGINE=llm_vision
-      - VISION_OCR_API_BASE=http://unlimited-ocr:8000/v1
-      - VISION_OCR_MODEL=baidu/Unlimited-OCR
-      - VISION_OCR_DIALECT=unlimited_ocr
+      - VISION_OCR_API_BASE=http://chandra-ocr:8000/v1
+      - VISION_OCR_MODEL=datalab-to/chandra-ocr-2
+      - VISION_OCR_DIALECT=chandra
       # Profiles from .env would override the flat wiring above; this overlay
       # is single-model on purpose.
       - VISION_OCR_PROFILES=
     depends_on:
-      unlimited-ocr:
+      chandra-ocr:
         condition: service_healthy
