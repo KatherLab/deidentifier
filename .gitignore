@@ -38,3 +38,4 @@ backend/.env.*
 
 # Claude Code session settings
 .claude/
+.mcp.json
