@@ -28,13 +28,13 @@ is excluded because it is not distributed.
 | httpcore           | 1.0.9     | BSD-3-Clause                                                     | https://www.encode.io/httpcore/                                      |
 | idna               | 3.18      | BSD-3-Clause                                                     | https://github.com/kjd/idna                                          |
 | lxml               | 6.1.1     | BSD-3-Clause                                                     | https://lxml.de/                                                     |
-| pypdf              | 6.14.2    | BSD-3-Clause                                                     | https://github.com/py-pdf/pypdf                                      |
+| pypdf              | 6.15.0    | BSD-3-Clause                                                     | https://github.com/py-pdf/pypdf                                      |
 | python-dotenv      | 1.2.2     | BSD-3-Clause                                                     | https://github.com/theskumar/python-dotenv                           |
 | starlette          | 1.4.0     | BSD-3-Clause                                                     | https://github.com/Kludex/starlette                                  |
 | uvicorn            | 0.52.1    | BSD-3-Clause                                                     | https://uvicorn.dev/                                                 |
 | websockets         | 17.0.1    | BSD-3-Clause                                                     | https://github.com/python-websockets/websockets                      |
 | pypdfium2          | 5.12.1    | BSD-3-Clause, Apache-2.0, dependency licenses                    | https://github.com/pypdfium2-team/pypdfium2                          |
-| pymupdf            | 1.28.0    | Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License | https://github.com/pymupdf/pymupdf                                   |
+| pymupdf            | 1.28.2    | Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License | https://github.com/pymupdf/pymupdf                                   |
 | annotated-doc      | 0.0.5     | MIT                                                              | https://github.com/fastapi/annotated-doc                             |
 | annotated-types    | 0.8.0     | MIT                                                              | https://github.com/annotated-types/annotated-types                   |
 | anyio              | 4.14.2    | MIT                                                              | https://anyio.readthedocs.io/en/stable/versionhistory.html           |
@@ -43,7 +43,7 @@ is excluded because it is not distributed.
 | httptools          | 0.8.0     | MIT                                                              | https://github.com/MagicStack/httptools                              |
 | jiter              | 0.16.0    | MIT                                                              | https://github.com/pydantic/jiter/                                   |
 | pydantic           | 2.13.4    | MIT                                                              | https://github.com/pydantic/pydantic                                 |
-| pydantic-settings  | 2.14.2    | MIT                                                              | https://github.com/pydantic/pydantic-settings                        |
+| pydantic-settings  | 2.15.0    | MIT                                                              | https://github.com/pydantic/pydantic-settings                        |
 | pydantic_core      | 2.46.4    | MIT                                                              | https://github.com/pydantic                                          |
 | typing-inspection  | 0.4.2     | MIT                                                              | https://github.com/pydantic/typing-inspection                        |
 | PyYAML             | 6.0.3     | MIT License                                                      | https://pyyaml.org/                                                  |
@@ -70,13 +70,13 @@ is excluded because it is not distributed.
 - [@jridgewell/resolve-uri@3.1.2](https://github.com/jridgewell/resolve-uri) - MIT
 - [@jridgewell/sourcemap-codec@1.5.5](https://github.com/jridgewell/sourcemaps) - MIT
 - [@jridgewell/trace-mapping@0.3.31](https://github.com/jridgewell/sourcemaps) - MIT
-- [@lucide/vue@1.28.0](https://github.com/lucide-icons/lucide) - ISC
+- [@lucide/vue@1.31.0](https://github.com/lucide-icons/lucide) - ISC
 - [@oxc-project/types@0.143.0](https://github.com/oxc-project/oxc) - MIT
 - [@rolldown/pluginutils@1.0.1](https://github.com/rolldown/plugins) - MIT
 - [@tailwindcss/node@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [@tailwindcss/oxide@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [@tailwindcss/vite@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
-- [@types/node@26.1.2](https://github.com/DefinitelyTyped/DefinitelyTyped) - MIT
+- [@types/node@26.2.0](https://github.com/DefinitelyTyped/DefinitelyTyped) - MIT
 - [@vue/compiler-core@3.5.41](https://github.com/vuejs/core) - MIT
 - [@vue/compiler-dom@3.5.41](https://github.com/vuejs/core) - MIT
 - [@vue/compiler-sfc@3.5.41](https://github.com/vuejs/core) - MIT
@@ -145,6 +145,6 @@ is excluded because it is not distributed.
 - [tinyglobby@0.2.17](https://github.com/SuperchupuDev/tinyglobby) - MIT
 - [typescript@6.0.3](https://github.com/microsoft/TypeScript) - Apache-2.0
 - [undici-types@8.3.0](https://github.com/nodejs/undici) - MIT
-- [vite@8.2.0](https://github.com/vitejs/vite) - MIT
+- [vite@8.2.1](https://github.com/vitejs/vite) - MIT
 - [vue-i18n@11.4.8](https://github.com/intlify/vue-i18n) - MIT
 - [vue@3.5.41](https://github.com/vuejs/core) - MIT
