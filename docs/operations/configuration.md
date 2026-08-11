@@ -100,7 +100,7 @@ than returning a partial result, as does a name the build does not know.
 | `OPENAI_API_BASE` | *(empty)* | Any OpenAI-compatible endpoint: Ollama, vLLM, LM Studio, a gateway. Include the `/v1` suffix most servers expect. |
 | `OPENAI_API_KEY` | *(empty)* | Empty is fine for most local servers. |
 | `LLM_MODEL` | *(empty)* | Required when `llm` is enabled. |
-| `LLM_REQUEST_TIMEOUT_SECONDS` | `120` | Per request. |
+| `LLM_REQUEST_TIMEOUT_SECONDS` | `600` | Per request. |
 | `LLM_CHUNK_CHARS` | `16000` | Chunk size for long documents. Keep it well inside the model's context. |
 | `LLM_CHUNK_OVERLAP` | `500` | Overlap so entities are not cut at a boundary. |
 | `LLM_DETECTION_PASSES` | `2` | Independent passes whose results are unioned. Recall-first; doubles cost. `1` is faster, `3` catches a little more. |

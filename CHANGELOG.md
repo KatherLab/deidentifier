@@ -29,6 +29,9 @@ documentation, and CI work are left out.
 
 ### Changed
 
+- `LLM_REQUEST_TIMEOUT_SECONDS` now defaults to `600` instead of `120` — see
+  [Configuration](docs/operations/configuration.md).
+
 - `.env.example` is now a short setup worksheet that ships with the LLM
   detector enabled: fill in `OPENAI_API_BASE`/`LLM_MODEL` before first start
   (or set `DETECTORS=rules` for a look without an LLM) — see
