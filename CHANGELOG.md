@@ -11,30 +11,30 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-11
+
 ### Added
 
 - `VISION_OCR_DIALECT` selects the vision-OCR model family (`unlimited_ocr`,
-  `chandra`, `plain`); the recipe variables (`VISION_OCR_PROMPT`,
-  `VISION_OCR_FALLBACK_PROMPT`, `VISION_OCR_MAX_TOKENS`,
-  `VISION_OCR_EXTRA_BODY`) now default to the dialect's recipe, including
-  Unlimited-OCR's `extra_body` — see [OCR engines](docs/operations/ocr-engines.md).
+  `chandra`, `plain`) and supplies the prompt, token and body defaults — see
+  [OCR engines](docs/operations/ocr-engines.md).
 
-- `VISION_OCR_PROFILES` configures several selectable OCR models at once; the
-  first is the default and reviewers pick another per document in the advanced
-  settings — see [OCR engines](docs/operations/ocr-engines.md).
+- `VISION_OCR_PROFILES` offers several OCR models at once, one pickable per
+  document in the advanced settings — see
+  [OCR engines](docs/operations/ocr-engines.md).
 
-- `compose.chandra.yml` runs a datalab chandra GPU OCR sidecar and wires it up,
-  as `compose.unlimited-ocr.yml` does for Unlimited-OCR — see
+- `compose.chandra.yml` runs a datalab chandra GPU OCR sidecar, as
+  `compose.unlimited-ocr.yml` does for Unlimited-OCR — see
   [OCR engines](docs/operations/ocr-engines.md).
 
 ### Changed
 
-- `LLM_REQUEST_TIMEOUT_SECONDS` now defaults to `600` instead of `120` — see
-  [Configuration](docs/operations/configuration.md).
-
 - `.env.example` is now a short setup worksheet that ships with the LLM
   detector enabled: fill in `OPENAI_API_BASE`/`LLM_MODEL` before first start
   (or set `DETECTORS=rules` for a look without an LLM) — see
+  [Configuration](docs/operations/configuration.md).
+
+- `LLM_REQUEST_TIMEOUT_SECONDS` now defaults to `600` instead of `120` — see
   [Configuration](docs/operations/configuration.md).
 
 ## [0.1.3] — 2026-08-07
@@ -128,6 +128,7 @@ First tagged version.
   configurable deployment banner sits above the header.
 - Documentation site (MkDocs Material) under `docs/`.
 
+[0.2.0]: https://github.com/KatherLab/deidentifier/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/KatherLab/deidentifier/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/KatherLab/deidentifier/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/KatherLab/deidentifier/compare/v0.1.0...v0.1.1

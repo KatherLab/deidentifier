@@ -20,8 +20,8 @@ has been published to `ghcr.io`, a deployment host can skip the build
 toolchain entirely:
 
 ```bash
-DEIDENTIFIER_IMAGE_TAG=v0.1.3 docker compose pull
-DEIDENTIFIER_IMAGE_TAG=v0.1.3 docker compose up -d
+DEIDENTIFIER_IMAGE_TAG=v0.2.0 docker compose pull
+DEIDENTIFIER_IMAGE_TAG=v0.2.0 docker compose up -d
 ```
 
 You still need `compose.yml` and your `.env` on that host.
