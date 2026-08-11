@@ -692,6 +692,9 @@ into an image. Works with Docker or Podman.
 
 - Backend: `snake_case` files/functions, `PascalCase` models/schemas. Frontend:
   `PascalCase.vue`, `camelCase` identifiers.
+- **Commit messages are a subject line only** — no body, no rationale
+  paragraph. What users and operators need to know goes in `CHANGELOG.md` or
+  the affected page under `docs/`; the diff covers the rest.
 - Domain logic lives in `utils/`; `services/` is for **external integrations
   only** (llmaixweb convention).
 - **Dependencies are pinned exactly** — `==` in `pyproject.toml` (all three
