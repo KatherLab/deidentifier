@@ -1,6 +1,7 @@
 {
   "app": {
-    "title": "Anonimizador de documentos médicos"
+    "title": "Anonimizador de documentos médicos",
+    "version": "Versión {version}"
   },
   "common": {
     "close": "Cerrar",

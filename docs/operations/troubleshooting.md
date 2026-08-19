@@ -129,7 +129,8 @@ works; use *Als PDF* from the export menu.
 
 ## Reporting a problem
 
-Include: the app version (`GET /api/v1/status`), the source type
+Include: the app version (shown at the bottom of every screen, also in
+`GET /api/v1/status`), the source type
 (`paste`/`txt`/`docx`/`pdf`/`pdf-ocr`), the exact message, the warning
 categories from [expert mode](../user-guide/advanced-settings.md#expert-mode),
 and the relevant backend log lines.
