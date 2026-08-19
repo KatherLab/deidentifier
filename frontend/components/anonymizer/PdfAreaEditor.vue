@@ -7,39 +7,69 @@
       class="shrink-0 space-y-1.5 border-b border-default bg-surface-muted px-4 py-2 text-xs text-content-muted"
     >
       <div class="flex items-start justify-between gap-3">
-        <p>{{ t('areas.hint') }}</p>
+        <p>{{ hint }}</p>
         <BaseButton size="sm" class="shrink-0" @click="emit('done')">
           <Check class="h-3.5 w-3.5" aria-hidden="true" />
           {{ t('common.done') }}
         </BaseButton>
       </div>
-      <div
-        v-if="imageBoxCount > 0 || session.pdfPagesTruncated"
-        class="flex flex-wrap items-center gap-2"
-      >
-        <BaseButton v-if="imageBoxCount > 0" size="sm" variant="secondary" @click="markAllImages">
+      <div class="flex flex-wrap items-center gap-2">
+        <BaseButton
+          v-if="!isReconstruction && imageBoxCount > 0"
+          size="sm"
+          variant="secondary"
+          @click="markAllImages"
+        >
           <ImageOff class="h-3.5 w-3.5" aria-hidden="true" />
           {{ t('areas.mark_all_images', { count: imageBoxCount }) }}
         </BaseButton>
-        <span v-if="session.pdfPagesTruncated" class="text-amber-700 dark:text-amber-300">
-          {{ t('areas.truncated', { count: session.pdfPages?.length ?? 0 }) }}
+        <!-- Native PDFs only: draw on the redacted preview instead of the
+             original pages. Same page geometry, blackouts in the pixels. A
+             scanned document has no such choice — see `isReconstruction`. -->
+        <BaseButton
+          v-if="!isReconstruction"
+          size="sm"
+          :variant="showRedacted ? 'primary' : 'secondary'"
+          :disabled="redactedBlockedReason !== null"
+          :aria-pressed="showRedacted"
+          @click="session.setAreasShowRedacted(!showRedacted)"
+        >
+          <component :is="showRedacted ? EyeOff : Eye" class="h-3.5 w-3.5" aria-hidden="true" />
+          {{ showRedacted ? t('areas.hide_redacted') : t('areas.show_redacted') }}
+        </BaseButton>
+        <span
+          v-if="showsRedactedPages && renderingRedacted"
+          class="inline-flex items-center gap-1.5"
+          aria-live="polite"
+        >
+          <LoadingSpinner size="small" color="gray" inline label="" />
+          {{ t('areas.redacted_loading') }}
+        </span>
+        <span v-else-if="toolbarWarning !== null" class="text-amber-700 dark:text-amber-300">
+          {{ toolbarWarning }}
+        </span>
+        <span v-if="truncated" class="text-amber-700 dark:text-amber-300">
+          {{ t('areas.truncated', { count: pages.length }) }}
         </span>
       </div>
     </div>
 
     <div
-      v-if="session.pdfPagesLoading"
+      v-if="surfaceLoading"
       class="flex flex-1 items-center justify-center gap-2 p-4 text-sm text-content-subtle"
       aria-live="polite"
     >
       <LoadingSpinner size="small" color="gray" inline label="" />
       {{ t('areas.rendering') }}
     </div>
-    <div v-else-if="session.pdfPagesError" class="space-y-3 p-4">
+    <!-- A scanned document has no fallback surface: its areas are applied to
+         the reconstruction, so drawing them on the scan would place them
+         somewhere else. Fail loudly instead. -->
+    <div v-else-if="surfaceError !== null" class="space-y-3 p-4">
       <p class="rounded-card px-3 py-2 text-sm" :class="getBannerClass('red')">
-        {{ session.pdfPagesError }}
+        {{ surfaceError }}
       </p>
-      <BaseButton size="sm" variant="secondary" @click="session.loadPdfPages()">
+      <BaseButton size="sm" variant="secondary" @click="reloadSurface">
         {{ t('common.retry') }}
       </BaseButton>
     </div>
@@ -48,7 +78,7 @@
          (top-left origin), rendered as percentages of the page wrapper. -->
     <div v-else class="min-h-0 flex-1 space-y-4 overflow-y-auto bg-surface-sunken p-4">
       <div
-        v-for="page in session.pdfPages ?? []"
+        v-for="page in pages"
         :key="page.page"
         class="relative mx-auto max-w-3xl cursor-crosshair touch-none select-none bg-white shadow-sm"
         @pointerdown="onPointerDown($event, page.page)"
@@ -56,12 +86,7 @@
         @pointerup="onPointerUp($event, page.page)"
         @pointercancel="drawing = null"
       >
-        <img
-          :src="page.image"
-          :alt="t('areas.page_alt', { page: page.page })"
-          class="block w-full"
-          draggable="false"
-        />
+        <img :src="pageImage(page)" :alt="pageAlt(page)" class="block w-full" draggable="false" />
 
         <!-- Existing areas: click to remove. -->
         <button
@@ -69,6 +94,7 @@
           :key="area.index"
           type="button"
           class="group absolute bg-black/85 transition-colors hover:bg-black/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :class="showsRedactedPages ? 'ring-1 ring-white/70 ring-inset' : ''"
           :style="rectStyle(area)"
           :aria-label="t('areas.remove_label', { page: page.page })"
           :title="t('areas.remove_title')"
@@ -93,14 +119,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check, ImageOff, X } from '@lucide/vue'
+import { Check, Eye, EyeOff, ImageOff, X } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { useSessionStore } from '@/stores/session'
 import { useToast } from '@/composables/useToast'
 import { getBannerClass } from '@/utils/statusStyles'
+import type { PdfPageRender } from '@/types/anonymizer'
 
 const emit = defineEmits<{
   (e: 'done'): void
@@ -113,13 +140,137 @@ const toast = useToast()
 /** Minimum drag size (normalized units) — below counts as an accidental click. */
 const MIN_AREA_SIZE = 8
 
+/**
+ * Every drawn area regenerates the redacted preview, and each new preview
+ * needs a new page render. Coalesce a burst of edits into one.
+ */
+const REDACTED_RENDER_DEBOUNCE_MS = 400
+
+// ---------------------------------------------------------------------------
+// The drawing surface.
+//
+// Native PDF: the original pages, optionally swapped for the redacted
+// preview's pages so the automatic text redactions are visible while drawing.
+// Both are the same geometry — the export blacks the areas out on the page
+// itself.
+//
+// Scanned PDF: the redacted RECONSTRUCTION, always. Its export is re-typeset
+// onto A4 and the original pixels are discarded, so the reconstruction is the
+// page the areas are actually applied to; the scan (a different geometry) is
+// the wrong thing to place them on. The scan itself stays one click away in
+// the "Original" panel.
+// ---------------------------------------------------------------------------
+
+const isReconstruction = computed(() => session.result?.source_type === 'pdf-ocr')
+
 onMounted(() => {
-  void session.loadPdfPages()
+  // The reconstruction path never renders the scan — one big render saved.
+  if (!isReconstruction.value) void session.loadPdfPages()
 })
 
 const imageBoxCount = computed(() =>
   (session.pdfPages ?? []).reduce((sum, page) => sum + page.image_boxes.length, 0),
 )
+
+const showRedacted = computed(() => session.areasShowRedacted)
+
+/** True when what is on screen carries the automatic redactions. */
+const showsRedactedPages = computed(() => isReconstruction.value || showRedacted.value)
+
+const pages = computed<PdfPageRender[]>(() =>
+  isReconstruction.value ? (session.pdfRedactedPages ?? []) : (session.pdfPages ?? []),
+)
+
+const truncated = computed(() =>
+  isReconstruction.value ? session.pdfRedactedPagesTruncated : session.pdfPagesTruncated,
+)
+
+/** Why the native toggle cannot be offered yet, or null when it can. */
+const redactedBlockedReason = computed<string | null>(() =>
+  session.pdfPreviewBlob === null ? t('areas.redacted_unavailable') : null,
+)
+
+/** The redacted preview is being (re-)generated or rendered. */
+const renderingRedacted = computed(
+  () => session.pdfPreviewLoading || session.pdfRedactedPagesLoading,
+)
+
+/** Toggle unavailable, or on but still showing the originals. */
+const toolbarWarning = computed<string | null>(() => {
+  if (isReconstruction.value) return null
+  if (redactedBlockedReason.value !== null) return redactedBlockedReason.value
+  if (showRedacted.value && session.pdfRedactedPages === null) {
+    return session.pdfRedactedPagesError
+  }
+  return null
+})
+
+const redactedImages = computed<Map<number, string>>(
+  () => new Map((session.pdfRedactedPages ?? []).map((page) => [page.page, page.image])),
+)
+
+/** True when THIS page is currently showing its redacted render. */
+function showsRedacted(page: PdfPageRender): boolean {
+  return showRedacted.value && redactedImages.value.has(page.page)
+}
+
+function pageImage(page: PdfPageRender): string {
+  // On the reconstruction path `pages` already IS the redacted render.
+  if (isReconstruction.value) return page.image
+  return showsRedacted(page) ? redactedImages.value.get(page.page)! : page.image
+}
+
+function pageAlt(page: PdfPageRender): string {
+  if (isReconstruction.value) return t('areas.page_alt_reconstructed', { page: page.page })
+  if (showsRedacted(page)) return t('areas.page_alt_redacted', { page: page.page })
+  return t('areas.page_alt', { page: page.page })
+}
+
+const hint = computed(() => {
+  if (isReconstruction.value) return t('areas.hint_reconstruction')
+  return showRedacted.value ? t('areas.hint_redacted') : t('areas.hint')
+})
+
+// State of the surface itself. The reconstruction has no fallback: without
+// its pages there is nothing safe to draw on, so its errors fill the panel
+// instead of sitting in the toolbar.
+const surfaceError = computed<string | null>(() => {
+  if (!isReconstruction.value) return session.pdfPagesError
+  if (pages.value.length > 0) return null
+  return session.pdfRedactedPagesError ?? session.pdfPreviewError
+})
+
+const surfaceLoading = computed(() => {
+  if (!isReconstruction.value) return session.pdfPagesLoading
+  // No pages and nothing wrong: the preview or its render is still on its way.
+  return pages.value.length === 0 && surfaceError.value === null
+})
+
+function reloadSurface(): void {
+  if (isReconstruction.value) void session.refreshPdfPreview()
+  else void session.loadPdfPages()
+}
+
+// Render the redacted pages when they are the surface (scanned) or the view
+// is switched on (native), and again whenever a new preview supersedes them.
+// The previous render stays on screen until the new one lands, so the pages
+// never flash back to un-redacted.
+let renderTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  () => [showsRedactedPages.value, session.pdfPreviewBlob] as const,
+  ([needed]) => {
+    if (renderTimer !== null) clearTimeout(renderTimer)
+    if (!needed) return
+    renderTimer = setTimeout(() => {
+      void session.loadRedactedPdfPages()
+    }, REDACTED_RENDER_DEBOUNCE_MS)
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  if (renderTimer !== null) clearTimeout(renderTimer)
+})
 
 /** The active document's areas on ONE page, keeping their store index. */
 function areasOn(page: number) {

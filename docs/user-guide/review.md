@@ -183,13 +183,27 @@ that should be covered:
   ![The area redaction editor](../assets/screenshots/result-pdf-area-editor.png)
 </figure>
 
-The editor shows the **original** pages, not the redacted preview — the text
-redaction is applied to the export on top of the areas you draw here.
+The editor draws on the pages of the **redacted preview**, so everything the
+detectors already caught is blacked out while you add what they missed.
+**Originalseiten anzeigen** switches the background to the unredacted pages —
+useful when a black bar sits on top of what you are trying to cover —
+and **Schwärzungen anzeigen** switches back.
 
-- Click an existing rectangle to remove it.
+- Click an existing rectangle to remove it. Against the redacted background,
+  your own areas are the ones outlined in white.
+- The background follows every change: each drawn area regenerates the redacted
+  preview, and the pages catch up a moment later.
+- **Scanned documents draw on the reconstruction.** Their export is not the
+  scan: the original pixels are discarded and the anonymized text is re-typeset
+  at the OCR positions, so the editor shows that reconstruction — the page the
+  areas are really applied to — and there is nothing to switch. The scan itself
+  stays available in the **Original** panel.
 - **Fertig** (or the **Vorschau** view) takes you back to the redacted preview;
   every change applies immediately, so nothing is lost either way.
 - **Alle Bilder schwärzen** covers every embedded image the backend found, in
   one click.
 - Areas apply to the redacted-PDF preview and export only; text exports are
   unaffected.
+- An area is a **true redaction**, not a black rectangle drawn on top: the text
+  and image pixels under it are removed from the exported PDF, and an export
+  that cannot prove that is refused.

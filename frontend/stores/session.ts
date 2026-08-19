@@ -110,6 +110,32 @@ export interface SessionDocument {
   pdfPagesTruncated: boolean
   pdfPagesLoading: boolean
   pdfPagesError: string | null
+  /**
+   * The pages of the REDACTED preview PDF. Rendered from `pdfPreviewBlob`,
+   * which the store already holds, so this costs one page render and no
+   * detection. The area editor's optional background for a native PDF — and
+   * its ONLY drawing surface for a scanned one, whose export is a
+   * reconstruction on a different page geometry than the scan.
+   */
+  pdfRedactedPages: PdfPageRender[] | null
+  pdfRedactedPagesTruncated: boolean
+  /**
+   * The preview blob `pdfRedactedPages` was rendered from (identity, not a
+   * copy). Every override or drawn area produces a NEW blob, which is what
+   * makes these pages stale — the old ones stay on screen until the new
+   * render arrives, so the view never flickers back to un-redacted pages.
+   */
+  pdfRedactedPagesSource: Blob | null
+  pdfRedactedPagesLoading: boolean
+  pdfRedactedPagesError: string | null
+  /** Bumped per render so a superseded in-flight response is ignored. */
+  pdfRedactedPagesToken: number
+  /**
+   * Whether the area editor draws on the redacted pages. Defaults to true:
+   * the point of the editor is to add what the detectors missed, which means
+   * seeing what they already caught. Turning it off shows the originals.
+   */
+  areasShowRedacted: boolean
   /** Active result panels in ACTIVATION order (restored on document switch). */
   activePanels: ResultPanelId[]
   /** Policy deviations captured at submit — used for ALL re-runs/exports. */
@@ -512,6 +538,13 @@ export const useSessionStore = defineStore('session', () => {
       pdfPagesTruncated: false,
       pdfPagesLoading: false,
       pdfPagesError: null,
+      pdfRedactedPages: null,
+      pdfRedactedPagesTruncated: false,
+      pdfRedactedPagesSource: null,
+      pdfRedactedPagesLoading: false,
+      pdfRedactedPagesError: null,
+      pdfRedactedPagesToken: 0,
+      areasShowRedacted: true,
       activePanels: ['source'],
       policy: batchPolicy,
       rules: batchRules,
@@ -705,6 +738,12 @@ export const useSessionStore = defineStore('session', () => {
     doc.pdfPages = null
     doc.pdfPagesLoading = false
     doc.pdfPagesError = null
+    doc.pdfRedactedPagesToken += 1 // ignore any in-flight page render
+    doc.pdfRedactedPages = null
+    doc.pdfRedactedPagesTruncated = false
+    doc.pdfRedactedPagesSource = null
+    doc.pdfRedactedPagesLoading = false
+    doc.pdfRedactedPagesError = null
   }
 
   /** Remove one document from the batch (revoking its object URLs). */
@@ -944,6 +983,77 @@ export const useSessionStore = defineStore('session', () => {
       doc.pdfPagesError = extractApiErrorMessage(err)
     } finally {
       doc.pdfPagesLoading = false
+    }
+  }
+
+  const pdfRedactedPages = computed<PdfPageRender[] | null>(
+    () => activeDocument.value?.pdfRedactedPages ?? null,
+  )
+  const pdfRedactedPagesTruncated = computed(
+    () => activeDocument.value?.pdfRedactedPagesTruncated ?? false,
+  )
+  const pdfRedactedPagesLoading = computed(
+    () => activeDocument.value?.pdfRedactedPagesLoading ?? false,
+  )
+  const pdfRedactedPagesError = computed(() => activeDocument.value?.pdfRedactedPagesError ?? null)
+  const areasShowRedacted = computed(() => activeDocument.value?.areasShowRedacted ?? false)
+
+  /** Draw on the redacted pages (or back on the originals). */
+  function setAreasShowRedacted(value: boolean): void {
+    const doc = activeDocument.value
+    if (doc) doc.areasShowRedacted = value
+  }
+
+  /**
+   * Render the ACTIVE document's REDACTED preview into page images for the
+   * area editor's "show automatic redactions" view.
+   *
+   * The redacted PDF already exists as `pdfPreviewBlob`, so this re-posts
+   * those bytes to the page-render route instead of locating entities again:
+   * the blackouts are in the pixels, and what the editor shows is by
+   * construction what the export contains. A new preview (any override, any
+   * drawn area) supersedes the render; the previous pages stay visible until
+   * the new ones arrive.
+   *
+   * `image_boxes` are deliberately NOT taken from this render: a
+   * rasterized export is one full-page image per page, so "redact all images"
+   * would offer to black out whole pages. Those keep coming from `pdfPages`.
+   */
+  async function loadRedactedPdfPages(): Promise<void> {
+    const doc = activeDocument.value
+    if (!doc) return
+    const blob = doc.pdfPreviewBlob
+    // No redacted preview to render: none generated yet, or the export failed
+    // closed. The editor stays on the original pages and says so.
+    if (blob === null) return
+    // Already rendered (or being rendered) for exactly these bytes.
+    if (doc.pdfRedactedPagesSource === blob) return
+
+    doc.pdfRedactedPagesSource = blob
+    doc.pdfRedactedPagesError = null
+    // The render route is an upload: a rasterized export of a long document
+    // can exceed the server's limit, and a 413 is not worth showing here.
+    const maxBytes = (status.value?.limits.max_upload_mb ?? 20) * 1024 * 1024
+    if (blob.size > maxBytes) {
+      doc.pdfRedactedPages = null
+      doc.pdfRedactedPagesError = t('areas.redacted_too_large')
+      return
+    }
+
+    const token = ++doc.pdfRedactedPagesToken
+    doc.pdfRedactedPagesLoading = true
+    try {
+      const file = new File([blob], 'redacted.pdf', { type: 'application/pdf' })
+      const { data } = await anonymizeApi.renderPdfPages(file)
+      if (token !== doc.pdfRedactedPagesToken) return
+      doc.pdfRedactedPages = data.pages
+      doc.pdfRedactedPagesTruncated = data.truncated
+    } catch (err) {
+      if (token !== doc.pdfRedactedPagesToken) return
+      doc.pdfRedactedPages = null
+      doc.pdfRedactedPagesError = extractApiErrorMessage(err)
+    } finally {
+      if (token === doc.pdfRedactedPagesToken) doc.pdfRedactedPagesLoading = false
     }
   }
 
@@ -1383,6 +1493,13 @@ export const useSessionStore = defineStore('session', () => {
     pdfPagesLoading,
     pdfPagesError,
     loadPdfPages,
+    pdfRedactedPages,
+    pdfRedactedPagesTruncated,
+    pdfRedactedPagesLoading,
+    pdfRedactedPagesError,
+    loadRedactedPdfPages,
+    areasShowRedacted,
+    setAreasShowRedacted,
     addRedactArea,
     removeRedactArea,
     addImageAreas,

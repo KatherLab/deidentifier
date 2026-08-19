@@ -191,12 +191,12 @@ test('captures the documentation screenshots', async ({ page }) => {
     await shoot(page, 'result-pdf')
   })
 
-  // The editor draws on the *original* pages, so an empty one looks like an
-  // un-anonymized document. Capture it doing its job instead: the one-click
-  // image suggestion applied, plus one hand-drawn area over the letterhead.
+  // Capture the editor doing its job: the automatic redactions it opens on,
+  // the one-click image suggestion applied, plus one hand-drawn area over the
+  // letterhead.
   await capture('result-pdf-area-editor', async () => {
     await page.getByRole('button', { name: /Bereiche schwärzen/ }).click()
-    const firstPage = page.getByRole('img', { name: 'Seite 1' })
+    const firstPage = page.getByRole('img', { name: 'Seite 1 (geschwärzt)' })
     await expect(firstPage).toBeVisible({ timeout: 60_000 })
 
     await page.getByRole('button', { name: /Alle Bilder schwärzen/ }).click()
@@ -211,7 +211,8 @@ test('captures the documentation screenshots', async ({ page }) => {
       await page.mouse.up()
     }
 
-    // Long enough for the "images blacked out" toast to auto-dismiss.
+    // Long enough for the "images blacked out" toast to auto-dismiss, and for
+    // the background to catch up with the areas just drawn.
     await page.waitForTimeout(4500)
     await shoot(page, 'result-pdf-area-editor')
     // The header is a two-view segmented control, so leaving means picking the

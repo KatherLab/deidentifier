@@ -11,6 +11,19 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+### Changed
+
+- **Bereiche schwärzen** now draws on the redacted pages, so the automatic text
+  redactions are visible while marking areas; scanned documents draw on the
+  reconstruction, which is the page their areas are applied to — see
+  [Reviewing a result](docs/user-guide/review.md).
+
+### Fixed
+
+- An area drawn on a scanned document's export removed only the pixels: the
+  reconstructed text under the black box stayed selectable. Areas are now true
+  redactions on both PDF paths, verified before the export is handed out.
+
 ## [0.2.0] — 2026-08-11
 
 ### Added
