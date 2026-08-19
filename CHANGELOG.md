@@ -11,6 +11,11 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+### Added
+
+- The running app version is shown at the bottom of every screen, so a bug
+  report no longer needs `GET /api/v1/status`.
+
 ### Changed
 
 - **Bereiche schwärzen** now draws on the redacted pages, so the automatic text

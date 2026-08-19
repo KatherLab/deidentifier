@@ -1,6 +1,7 @@
 {
   "app": {
-    "title": "Medical Document Anonymizer"
+    "title": "Medical Document Anonymizer",
+    "version": "Version {version}"
   },
   "common": {
     "close": "Close",

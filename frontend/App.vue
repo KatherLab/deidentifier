@@ -136,6 +136,16 @@
       <InputPanel v-else />
     </main>
 
+    <!-- The version an operator is actually running — the first thing any bug
+         report needs, and otherwise only readable from /api/v1/status. -->
+    <footer
+      v-if="session.status"
+      class="mx-auto px-4 pb-6 text-center text-xs text-content-subtle"
+      :class="containerClass"
+    >
+      {{ t('app.version', { version: session.status.version }) }}
+    </footer>
+
     <ToastContainer />
   </div>
 </template>

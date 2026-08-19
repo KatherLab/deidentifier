@@ -89,7 +89,8 @@ proposes the bumps weekly.
 
 ## Reporting bugs
 
-Include the version (`GET /api/v1/status`), the source type, the exact message,
+Include the version (the footer of the web UI, or `GET /api/v1/status`), the
+source type, the exact message,
 the warning categories from expert mode, and the relevant log lines — which
 contain no document content by design. Check any excerpt you paste anyway.
 
