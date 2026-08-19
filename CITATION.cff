@@ -45,8 +45,8 @@ keywords:
   - "privacy-preserving artificial intelligence"
 
 license: "AGPL-3.0-or-later"
-version: "0.2.0"
-date-released: "2026-08-11"
+version: "0.2.1"
+date-released: "2026-08-19"
 
 references:
   - type: article

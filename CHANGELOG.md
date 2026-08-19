@@ -11,23 +11,22 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-08-19
+
 ### Added
 
-- The running app version is shown at the bottom of every screen, so a bug
-  report no longer needs `GET /api/v1/status`.
+- The running app version is shown at the bottom of every screen.
 
 ### Changed
 
-- **Bereiche schwärzen** now draws on the redacted pages, so the automatic text
-  redactions are visible while marking areas; scanned documents draw on the
-  reconstruction, which is the page their areas are applied to — see
+- **Bereiche schwärzen** draws on the redacted pages, so the automatic
+  redactions are visible while marking areas — see
   [Reviewing a result](docs/user-guide/review.md).
 
 ### Fixed
 
-- An area drawn on a scanned document's export removed only the pixels: the
-  reconstructed text under the black box stayed selectable. Areas are now true
-  redactions on both PDF paths, verified before the export is handed out.
+- Areas drawn on a scanned document's export only covered the text instead of
+  removing it, leaving it selectable in the exported PDF.
 
 ## [0.2.0] — 2026-08-11
 
@@ -146,6 +145,7 @@ First tagged version.
   configurable deployment banner sits above the header.
 - Documentation site (MkDocs Material) under `docs/`.
 
+[0.2.1]: https://github.com/KatherLab/deidentifier/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/KatherLab/deidentifier/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/KatherLab/deidentifier/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/KatherLab/deidentifier/compare/v0.1.1...v0.1.2
