@@ -17,7 +17,7 @@
  * the existing mapping in `utils/errors.ts` (extractApiErrorMessage) keeps
  * working unchanged.
  */
-import { api } from '@/services/api'
+import { api, notifyUnauthorized } from '@/services/api'
 import { appendCustomRules, hasPolicyEntries } from '@/services/anonymizeApi'
 import type {
   AnonymizeResponse,
@@ -78,6 +78,9 @@ async function streamAnonymize(
       headers,
       body,
       signal,
+      // fetch does not inherit the axios instance's `withCredentials`, so the
+      // sign-in gate's session cookie has to be asked for explicitly.
+      credentials: 'include',
     })
   } catch (err) {
     // Deliberate aborts (reset while streaming) keep their AbortError shape so
@@ -89,6 +92,8 @@ async function streamAnonymize(
   }
 
   if (!response.ok) {
+    // No axios interceptor on this path, so the gate is told by hand.
+    if (response.status === 401) notifyUnauthorized()
     // Request rejected before streaming — a normal HTTP error with a JSON
     // {"detail": ...} body (or none).
     let data: unknown

@@ -39,6 +39,30 @@
       "to_dark": "Switch to dark theme"
     }
   },
+  "auth": {
+    "gate": {
+      "title": "Sign-in required",
+      "description": "This installation is protected by your organisation's sign-in. Sign in to anonymize documents.",
+      "sign_in": "Sign in",
+      "checking": "Checking sign-in",
+      "note": "You will be sent to your organisation's sign-in page. No document is processed before that."
+    },
+    "user": {
+      "label": "Signed in as {name}",
+      "menu_label": "Account",
+      "signed_in": "Signed in",
+      "sign_out": "Sign out"
+    },
+    "errors": {
+      "denied": "The sign-in was cancelled.",
+      "state": "The sign-in expired or could not be matched. Please sign in again.",
+      "provider": "The sign-in service cannot be reached. Try again later or contact IT.",
+      "token": "The sign-in could not be completed. Please try again.",
+      "identity": "The sign-in service's response could not be verified. Please contact IT.",
+      "expired": "Your session has expired. Please sign in again.",
+      "unknown": "The sign-in failed. Please try again."
+    }
+  },
   "input": {
     "dropzone_label": "Select files or drag them here",
     "dropzone_prompt": "Drag files here or click to select",
@@ -379,7 +403,8 @@
     "llm_unreachable": "The AI detection service is unreachable. The document was NOT anonymized.",
     "backend_unreachable": "Server unreachable. Please check whether the backend is running.",
     "pdf_export_failed": "PDF export failed. Please try again.",
-    "pdf_export_detail": "PDF export failed: {detail}"
+    "pdf_export_detail": "PDF export failed: {detail}",
+    "unauthorized": "Your session has expired. Please sign in again."
   },
   "toast": {
     "copy_success": "Anonymized text copied to the clipboard.",

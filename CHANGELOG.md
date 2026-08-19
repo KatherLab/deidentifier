@@ -11,6 +11,14 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+### Added
+
+- Optional sign-in at the organisation's OpenID Connect provider, for
+  deployments without an authenticating proxy in front: `OIDC_ENABLED` plus
+  the client credentials and `APP_PUBLIC_URL` gate every API route on a
+  signed session cookie. No accounts, no roles — see
+  [Single sign-on](docs/operations/sso.md).
+
 ## [0.2.1] — 2026-08-19
 
 ### Added

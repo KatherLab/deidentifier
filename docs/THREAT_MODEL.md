@@ -101,11 +101,18 @@ containment.
 *Vector:* the app is exposed without the auth proxy.
 
 *Controls:* the backend publishes no port; only the frontend port is published;
-the deployment checklist leads with the proxy requirement.
+the deployment checklist leads with the proxy requirement. Where no proxy
+exists, `OIDC_ENABLED=true` gates every `/api/` route on a signed session
+cookie issued after an authorization-code sign-in (PKCE, verified id_token) at
+the institution's provider — enforced in middleware, so a route added later is
+covered by default. A half-configured gate refuses to start rather than
+running open.
 
-*Residual:* if the proxy is missing, anyone reachable can process documents and
-consume the model endpoint. There is still no stored data to exfiltrate — every
-request only returns what the caller submitted.
+*Residual:* if neither the proxy nor the gate is in place, anyone reachable can
+process documents and consume the model endpoint. There is still no stored data
+to exfiltrate — every request only returns what the caller submitted. With the
+gate on, the static frontend bundle remains readable without a session; it
+contains no patient data.
 
 ### T7 — Unverifiable redacted export
 

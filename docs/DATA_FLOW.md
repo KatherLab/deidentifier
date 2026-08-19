@@ -36,6 +36,13 @@ no telemetry endpoint, no CDN, and no analytics.
 | `DELETE /api/v1/anonymize/{id}` | A request id | Nothing (204 either way) | No — it only forgets the cached detection |
 | `GET /api/v1/status` | — | Detector states, OCR engine, endpoint **hosts** + locality, limits | No |
 | `GET /health/live`, `/health/ready` | — | Status only | Readiness may probe configured endpoints |
+| `GET /api/v1/auth/session` | — | Whether a sign-in gate exists, and the signed-in name/email | No |
+| `GET /api/v1/auth/login`, `/auth/callback` | An authorization code from the provider | A redirect + the session cookie | To the identity provider — client id, redirect URI, scopes, PKCE challenge and nonce. **Never document content.** |
+| `POST /api/v1/auth/logout` | — | Whether to visit the provider's sign-out | No |
+
+The three `/auth` routes exist only when
+[the OIDC gate](operations/sso.md) is configured; with it on, every other row
+in this table requires a valid session cookie.
 
 `/api/v1/status` returns hosts, never full URLs, keys, or filesystem paths. It
 is what the UI uses to warn that content will leave the machine, so it has to
@@ -47,7 +54,8 @@ stay safe to expose.
 |---|---|---|
 | Document text, results, corrections | Pinia store — **memory only** | Cleared on reload. Never `localStorage`/`sessionStorage`. |
 | Object URLs for previews (original PDF, redacted PDF, rendered pages) | Memory, revoked on reset | Needed to display a PDF. |
-| `darkMode`, `expertMode`, `keepFilenames` | `localStorage` | UI preferences only. |
+| `darkMode`, `expertMode`, `keepFilenames`, `locale` | `localStorage` | UI preferences only. |
+| The sign-in session (OIDC gate only) | `HttpOnly` cookie, scoped to `/api` | Signed, absolute expiry, no document content. JavaScript cannot read it. |
 
 That split is a hard rule in the codebase: nothing derived from a document is
 ever persisted client-side.
@@ -73,6 +81,7 @@ refused in production mode.
 |---|---|
 | Browser memory | Until reload or **Neues Dokument** |
 | Browser `localStorage` | UI preferences only, indefinitely |
+| Sign-in cookie (OIDC gate only) | `OIDC_SESSION_MINUTES` (8 h by default) from sign-in, absolute; gone on sign-out |
 | Backend memory (request) | The request |
 | Backend cache | 15 minutes from creation, extendable by the reviewer in 1 h steps up to 12 h (all configurable), or until the UI drops it, eviction (100 entries), or restart |
 | Backend disk | **Nothing.** Read-only filesystem, `tmpfs` for `/tmp`, no volumes |

@@ -70,6 +70,32 @@ class Settings(BaseSettings):
     BANNER_TEXT: str = ""
     BANNER_COLOR: str = "amber"  # amber | red | blue | green | gray
 
+    # ── Access control (optional) ──────────────────────────────────────────
+    # Off by default: the app is designed to run behind the hospital's own
+    # auth proxy. Switching it on makes the app itself require a sign-in at
+    # the organisation's OpenID Connect provider. It is a *gate*, not an
+    # authorisation model — everyone who can sign in gets the same, whole app.
+    OIDC_ENABLED: bool = False
+    # Provider base URL; the app reads {issuer}/.well-known/openid-configuration.
+    OIDC_ISSUER: str = ""
+    OIDC_CLIENT_ID: str = ""
+    OIDC_CLIENT_SECRET: str = ""
+    OIDC_SCOPES: str = "openid profile email"
+    # Signing key for the session cookie (and the short-lived login state).
+    # Rotating it signs everyone out; sharing it is equivalent to sharing
+    # every session. Generate with: openssl rand -hex 32
+    OIDC_SESSION_SECRET: str = ""
+    OIDC_SESSION_MINUTES: int = Field(default=480, ge=5)
+    # Also end the session at the provider on sign-out (RP-initiated logout),
+    # when the provider advertises an end_session_endpoint. Off by default:
+    # it signs the user out of every application, not only this one.
+    OIDC_END_SESSION: bool = False
+    OIDC_HTTP_TIMEOUT_SECONDS: int = Field(default=10, ge=1)
+    # The public origin browsers reach the app at, e.g. https://deid.klinik.de.
+    # The redirect URI registered with the provider is derived from it, so it
+    # must match what the browser actually uses — not the container's address.
+    APP_PUBLIC_URL: str = ""
+
     # Detectors: comma-separated (mock | rules | llm)
     DETECTORS: str = "rules"
 
@@ -153,6 +179,75 @@ class Settings(BaseSettings):
     def banner_active(self) -> bool:
         """Enabled *and* non-empty — an empty banner would be a blank bar."""
         return self.BANNER_ENABLED and bool(self.banner_text)
+
+    @property
+    def public_url(self) -> str:
+        return self.APP_PUBLIC_URL.strip().rstrip("/")
+
+    @property
+    def oidc_issuer(self) -> str:
+        return self.OIDC_ISSUER.strip().rstrip("/")
+
+    @property
+    def oidc_scopes(self) -> str:
+        """The requested scopes, always including `openid` — without it the
+        provider runs a plain OAuth flow and returns no id_token."""
+        scopes = self.OIDC_SCOPES.split()
+        if "openid" not in scopes:
+            scopes.insert(0, "openid")
+        return " ".join(scopes)
+
+    @property
+    def oidc_redirect_uri(self) -> str:
+        """The callback URL that must be registered with the provider."""
+        return f"{self.public_url}/api/v1/auth/callback"
+
+    @property
+    def cookies_secure(self) -> bool:
+        """`Secure` on the session cookie whenever the app is served over TLS.
+        An http:// deployment cannot set it without breaking sign-in."""
+        return self.public_url.lower().startswith("https://")
+
+
+#: A shorter key than this makes the session cookie's signature guessable.
+MIN_SESSION_SECRET_CHARS = 32
+
+
+def validate_auth_settings(settings: Settings) -> None:
+    """Refuse to start with a half-configured OIDC gate.
+
+    Checked in every environment, not only production: an access gate that
+    silently does not gate is worse than one that never came up. The counterpart
+    — the app running with no gate at all — is the documented default, so an
+    operator cannot reach this state by accident.
+    """
+    if not settings.OIDC_ENABLED:
+        return
+    problems: list[str] = []
+    required = {
+        "OIDC_ISSUER": settings.oidc_issuer,
+        "OIDC_CLIENT_ID": settings.OIDC_CLIENT_ID.strip(),
+        "OIDC_CLIENT_SECRET": settings.OIDC_CLIENT_SECRET.strip(),
+        "APP_PUBLIC_URL": settings.public_url,
+        "OIDC_SESSION_SECRET": settings.OIDC_SESSION_SECRET.strip(),
+    }
+    missing = [name for name, value in required.items() if not value]
+    if missing:
+        problems.append(f"OIDC_ENABLED is true but {', '.join(missing)} are not set")
+    if settings.public_url and not settings.public_url.lower().startswith(("http://", "https://")):
+        problems.append("APP_PUBLIC_URL must be an absolute http(s) URL")
+    if settings.oidc_issuer and not settings.oidc_issuer.lower().startswith(
+        ("http://", "https://")
+    ):
+        problems.append("OIDC_ISSUER must be an absolute http(s) URL")
+    secret = settings.OIDC_SESSION_SECRET.strip()
+    if secret and len(secret) < MIN_SESSION_SECRET_CHARS:
+        problems.append(
+            f"OIDC_SESSION_SECRET must be at least {MIN_SESSION_SECRET_CHARS} characters "
+            "(openssl rand -hex 32)"
+        )
+    if problems:
+        raise RuntimeError("Refusing to start: " + "; ".join(problems))
 
 
 def validate_production_settings(settings: Settings) -> None:

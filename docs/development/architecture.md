@@ -13,9 +13,11 @@ Browser ── nginx (SPA + /api proxy) ── FastAPI ── LLM / OCR endpoint
                                           └───── in-memory cache
 ```
 
-Deliberately absent: database, migrations, task queue, object storage,
-authentication, WebSockets. The app is a stateless transformer of a document
-into an anonymized document.
+Deliberately absent: database, migrations, task queue, object storage, user
+accounts, WebSockets. The app is a stateless transformer of a document into an
+anonymized document. The optional [OIDC sign-in](../operations/sso.md) is the
+one thing that resembles auth, and it keeps the property: the session is a
+signed cookie, so there is still nothing stored server-side.
 
 Conventions come from the sibling project
 [llmaixweb](https://github.com/KatherLab/llmaixweb) — layout, config pattern,

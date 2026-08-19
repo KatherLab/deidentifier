@@ -11,6 +11,8 @@ import { isAxiosError } from 'axios'
 import { t } from '@/i18n'
 
 const STATUS_MESSAGE_KEYS: Record<number, string> = {
+  // Only reachable with the sign-in gate on: the session ran out mid-work.
+  401: 'errors.unauthorized',
   410: 'errors.expired',
   413: 'errors.too_large',
   415: 'errors.unsupported_type',

@@ -39,6 +39,30 @@
       "to_dark": "Passer au thème sombre"
     }
   },
+  "auth": {
+    "gate": {
+      "title": "Connexion requise",
+      "description": "Cet accès est protégé par l'authentification de votre établissement. Connectez-vous pour anonymiser des documents.",
+      "sign_in": "Se connecter",
+      "checking": "Vérification de la connexion",
+      "note": "Vous serez redirigé vers la page de connexion de votre établissement. Aucun document n'est traité avant cela."
+    },
+    "user": {
+      "label": "Connecté en tant que {name}",
+      "menu_label": "Compte",
+      "signed_in": "Connecté",
+      "sign_out": "Se déconnecter"
+    },
+    "errors": {
+      "denied": "La connexion a été annulée.",
+      "state": "La connexion a expiré ou n'a pas pu être associée. Veuillez vous reconnecter.",
+      "provider": "Le service d'authentification est injoignable. Réessayez plus tard ou contactez le service informatique.",
+      "token": "La connexion n'a pas pu être finalisée. Veuillez réessayer.",
+      "identity": "La réponse du service d'authentification n'a pas pu être vérifiée. Contactez le service informatique.",
+      "expired": "Votre session a expiré. Veuillez vous reconnecter.",
+      "unknown": "La connexion a échoué. Veuillez réessayer."
+    }
+  },
   "input": {
     "dropzone_label": "Sélectionner des fichiers ou les glisser ici",
     "dropzone_prompt": "Glissez des fichiers ici ou cliquez pour les sélectionner",
@@ -379,7 +403,8 @@
     "llm_unreachable": "Le service de détection par IA est injoignable. Le document n’a PAS été anonymisé.",
     "backend_unreachable": "Serveur injoignable. Veuillez vérifier que le backend fonctionne.",
     "pdf_export_failed": "L’export PDF a échoué. Veuillez réessayer.",
-    "pdf_export_detail": "L’export PDF a échoué : {detail}"
+    "pdf_export_detail": "L’export PDF a échoué : {detail}",
+    "unauthorized": "Votre session a expiré. Veuillez vous reconnecter."
   },
   "toast": {
     "copy_success": "Texte anonymisé copié dans le presse-papiers.",

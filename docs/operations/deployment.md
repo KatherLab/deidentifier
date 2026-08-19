@@ -43,13 +43,19 @@ A backend that exits immediately after `docker compose up` almost always logs
 
 ## Authentication
 
-There is none, by design: the app is meant to run behind the institution's
+None by default, by design: the app is meant to run behind the institution's
 existing authenticating reverse proxy. Terminate TLS there, enforce
 authentication and authorization there, and do not expose port 8080 beyond it.
 
 Everything a user can reach is a stateless endpoint that processes the document
 they submitted — there are no accounts, no stored documents, and nothing to
 enumerate. That is only true as long as the proxy is actually in front of it.
+
+Where that proxy does not exist, the app can require a sign-in at your
+organisation's OpenID Connect provider itself — one setting plus the client
+credentials, no accounts and no roles. See
+[Single sign-on](sso.md). It replaces the *authentication* the proxy would
+provide, not the TLS termination.
 
 ## Configuration
 
