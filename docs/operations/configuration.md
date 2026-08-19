@@ -64,6 +64,37 @@ Tightening also applies to what is already in memory. The bounds are read once
 at startup, so a restart with stricter values immediately drops whatever no
 longer fits.
 
+## Sign-in (OIDC)
+
+Off by default: the app assumes it sits behind your own authenticating proxy.
+Turning it on makes the app itself require a sign-in at your identity provider
+before any route that touches a document answers. It is a gate, not an
+authorisation model — everyone who can sign in gets the same, whole
+application. Full setup, including what to register at the provider:
+[Single sign-on](sso.md).
+
+| Variable | Default | Notes |
+|---|---|---|
+| `OIDC_ENABLED` | `false` | Turns the gate on. With it on, the five values below are required — the backend refuses to start without them, in every environment. |
+| `OIDC_ISSUER` | *(empty)* | The provider's base URL. The app reads `{issuer}/.well-known/openid-configuration`; the value must match the `iss` the provider puts in its tokens. |
+| `OIDC_CLIENT_ID` | *(empty)* | From the client you register at the provider. |
+| `OIDC_CLIENT_SECRET` | *(empty)* | Confidential client: the secret never reaches the browser. |
+| `OIDC_SESSION_SECRET` | *(empty)* | Signs the session cookie. At least 32 characters — `openssl rand -hex 32`. Rotating it signs everyone out; treat it like a private key. |
+| `APP_PUBLIC_URL` | *(empty)* | The origin browsers actually use, e.g. `https://deid.klinik.de`. The redirect URI is derived from it, and an `https://` value is what lets the session cookie be `Secure`. |
+| `OIDC_SCOPES` | `openid profile email` | Space-separated. `openid` is always requested even if you leave it out. |
+| `OIDC_SESSION_MINUTES` | `480` (8 h) | How long a sign-in lasts. **Absolute** — it does not renew on activity, so the session ends on schedule whether or not the tab stayed open. |
+| `OIDC_END_SESSION` | `false` | Also end the session at the provider on sign-out, when it advertises an `end_session_endpoint`. Off because it signs the user out of every application, not just this one. |
+| `OIDC_HTTP_TIMEOUT_SECONDS` | `10` | Timeout for the calls to the provider (discovery, token exchange, keys). |
+
+```bash
+OIDC_ENABLED=true
+OIDC_ISSUER=https://keycloak.klinik.de/realms/intranet
+OIDC_CLIENT_ID=deidentifier
+OIDC_CLIENT_SECRET=…
+OIDC_SESSION_SECRET=…            # openssl rand -hex 32
+APP_PUBLIC_URL=https://deid.klinik.de
+```
+
 ## Deployment banner
 
 A bar above the header for a deployment-wide notice — "Research Use Only!",

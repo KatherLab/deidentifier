@@ -22,12 +22,14 @@ is excluded because it is not distributed.
 | sniffio            | 1.3.1     | Apache Software License; MIT License                             | https://github.com/python-trio/sniffio                               |
 | uvloop             | 0.22.1    | Apache Software License; MIT License                             | UNKNOWN                                                              |
 | python-multipart   | 0.0.32    | Apache-2.0                                                       | https://github.com/Kludex/python-multipart                           |
+| cryptography       | 50.0.0    | Apache-2.0 OR BSD-3-Clause                                       | https://github.com/pyca/cryptography                                 |
 | httpx              | 0.28.1    | BSD License                                                      | https://github.com/encode/httpx                                      |
 | reportlab          | 5.0.0     | BSD License                                                      | https://www.reportlab.com/                                           |
 | click              | 8.4.2     | BSD-3-Clause                                                     | https://github.com/pallets/click/                                    |
 | httpcore           | 1.0.9     | BSD-3-Clause                                                     | https://www.encode.io/httpcore/                                      |
 | idna               | 3.18      | BSD-3-Clause                                                     | https://github.com/kjd/idna                                          |
 | lxml               | 6.1.1     | BSD-3-Clause                                                     | https://lxml.de/                                                     |
+| pycparser          | 3.0       | BSD-3-Clause                                                     | https://github.com/eliben/pycparser                                  |
 | pypdf              | 6.15.0    | BSD-3-Clause                                                     | https://github.com/py-pdf/pypdf                                      |
 | python-dotenv      | 1.2.2     | BSD-3-Clause                                                     | https://github.com/theskumar/python-dotenv                           |
 | starlette          | 1.4.0     | BSD-3-Clause                                                     | https://github.com/Kludex/starlette                                  |
@@ -35,6 +37,7 @@ is excluded because it is not distributed.
 | websockets         | 17.0.1    | BSD-3-Clause                                                     | https://github.com/python-websockets/websockets                      |
 | pypdfium2          | 5.12.1    | BSD-3-Clause, Apache-2.0, dependency licenses                    | https://github.com/pypdfium2-team/pypdfium2                          |
 | pymupdf            | 1.28.2    | Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License | https://github.com/pymupdf/pymupdf                                   |
+| PyJWT              | 2.13.0    | MIT                                                              | https://github.com/jpadilla/pyjwt                                    |
 | annotated-doc      | 0.0.5     | MIT                                                              | https://github.com/fastapi/annotated-doc                             |
 | annotated-types    | 0.8.0     | MIT                                                              | https://github.com/annotated-types/annotated-types                   |
 | anyio              | 4.14.2    | MIT                                                              | https://anyio.readthedocs.io/en/stable/versionhistory.html           |
@@ -50,6 +53,7 @@ is excluded because it is not distributed.
 | h11                | 0.16.0    | MIT License                                                      | https://github.com/python-hyper/h11                                  |
 | python-docx        | 1.2.0     | MIT License                                                      | https://github.com/python-openxml/python-docx                        |
 | watchfiles         | 1.2.0     | MIT License                                                      | https://github.com/samuelcolvin/watchfiles                           |
+| cffi               | 2.1.1     | MIT-0                                                            | https://cffi.readthedocs.io/en/latest/whatsnew.html                  |
 | pillow             | 12.3.0    | MIT-CMU                                                          | https://python-pillow.github.io                                      |
 | tqdm               | 4.70.0    | MPL-2.0 AND MIT                                                  | https://tqdm.github.io                                               |
 | certifi            | 2026.7.22 | Mozilla Public License 2.0 (MPL 2.0)                             | https://github.com/certifi/python-certifi                            |

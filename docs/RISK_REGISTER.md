@@ -23,7 +23,7 @@ listed controls.
 
 | # | Risk | Controls | Residual | Owner |
 |---|---|---|---|---|
-| S1 | The app is exposed without the auth proxy | Backend publishes no port; checklist; docs state the requirement repeatedly | **Low**, if reviewed at deployment | Operator |
+| S1 | The app is exposed without the auth proxy | Backend publishes no port; checklist; docs state the requirement repeatedly; optional built-in OIDC gate (`OIDC_ENABLED`) for deployments with no proxy, which refuses to start half-configured | **Low**, if reviewed at deployment | Operator |
 | S2 | Prompt injection from document content | Fenced document markers, untrusted-data system prompt, strings-only model output, deterministic grounding, independent validation | **Low** for integrity; contributes to P1 | Developers |
 | S3 | Parser vulnerability in a document library | Extension allow-list, size caps, read-only non-root container, no persistence, Dependabot + CI scanning | **Low** | Developers |
 | S4 | A redacted PDF that is not actually redacted | Text removal + box coverage, post-export verification, fail-closed refusal, reconstruction for scans | **Low** | Developers |

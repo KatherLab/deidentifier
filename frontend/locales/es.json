@@ -39,6 +39,30 @@
       "to_dark": "Cambiar al tema oscuro"
     }
   },
+  "auth": {
+    "gate": {
+      "title": "Se requiere iniciar sesión",
+      "description": "Este acceso está protegido por el inicio de sesión de su institución. Inicie sesión para anonimizar documentos.",
+      "sign_in": "Iniciar sesión",
+      "checking": "Comprobando el inicio de sesión",
+      "note": "Se le redirigirá a la página de inicio de sesión de su institución. Ningún documento se procesa antes de eso."
+    },
+    "user": {
+      "label": "Sesión iniciada como {name}",
+      "menu_label": "Cuenta",
+      "signed_in": "Sesión iniciada",
+      "sign_out": "Cerrar sesión"
+    },
+    "errors": {
+      "denied": "El inicio de sesión se canceló.",
+      "state": "El inicio de sesión caducó o no se pudo asociar. Vuelva a iniciar sesión.",
+      "provider": "No se puede contactar con el servicio de inicio de sesión. Inténtelo más tarde o avise a informática.",
+      "token": "No se pudo completar el inicio de sesión. Inténtelo de nuevo.",
+      "identity": "No se pudo verificar la respuesta del servicio de inicio de sesión. Avise a informática.",
+      "expired": "Su sesión ha caducado. Vuelva a iniciar sesión.",
+      "unknown": "El inicio de sesión falló. Inténtelo de nuevo."
+    }
+  },
   "input": {
     "dropzone_label": "Seleccionar archivos o arrastrarlos aquí",
     "dropzone_prompt": "Arrastre archivos aquí o haga clic para seleccionarlos",
@@ -379,7 +403,8 @@
     "llm_unreachable": "El servicio de detección por IA no está accesible. El documento NO se ha anonimizado.",
     "backend_unreachable": "Servidor no accesible. Compruebe si el backend está en marcha.",
     "pdf_export_failed": "La exportación a PDF ha fallado. Inténtelo de nuevo.",
-    "pdf_export_detail": "La exportación a PDF ha fallado: {detail}"
+    "pdf_export_detail": "La exportación a PDF ha fallado: {detail}",
+    "unauthorized": "Su sesión ha caducado. Vuelva a iniciar sesión."
   },
   "toast": {
     "copy_success": "Texto anonimizado copiado al portapapeles.",

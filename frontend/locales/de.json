@@ -39,6 +39,30 @@
       "to_dark": "Zum dunklen Design wechseln"
     }
   },
+  "auth": {
+    "gate": {
+      "title": "Anmeldung erforderlich",
+      "description": "Dieser Zugang ist durch die Anmeldung Ihrer Einrichtung geschützt. Melden Sie sich an, um Dokumente zu anonymisieren.",
+      "sign_in": "Anmelden",
+      "checking": "Anmeldung wird geprüft",
+      "note": "Sie werden zur Anmeldeseite Ihrer Einrichtung weitergeleitet. Dokumente werden erst danach verarbeitet."
+    },
+    "user": {
+      "label": "Angemeldet als {name}",
+      "menu_label": "Konto",
+      "signed_in": "Angemeldet",
+      "sign_out": "Abmelden"
+    },
+    "errors": {
+      "denied": "Die Anmeldung wurde abgebrochen.",
+      "state": "Die Anmeldung ist abgelaufen oder konnte nicht zugeordnet werden. Bitte melden Sie sich erneut an.",
+      "provider": "Der Anmeldedienst ist nicht erreichbar. Bitte später erneut versuchen oder die IT informieren.",
+      "token": "Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
+      "identity": "Die Antwort des Anmeldedienstes konnte nicht überprüft werden. Bitte informieren Sie die IT.",
+      "expired": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+      "unknown": "Die Anmeldung ist fehlgeschlagen. Bitte versuchen Sie es erneut."
+    }
+  },
   "input": {
     "dropzone_label": "Dateien auswählen oder hierher ziehen",
     "dropzone_prompt": "Dateien hierher ziehen oder klicken, um auszuwählen",
@@ -379,7 +403,8 @@
     "llm_unreachable": "Der KI-Erkennungsdienst ist nicht erreichbar. Das Dokument wurde NICHT anonymisiert.",
     "backend_unreachable": "Server nicht erreichbar. Bitte prüfen Sie, ob das Backend läuft.",
     "pdf_export_failed": "PDF-Export fehlgeschlagen. Bitte versuchen Sie es erneut.",
-    "pdf_export_detail": "PDF-Export fehlgeschlagen: {detail}"
+    "pdf_export_detail": "PDF-Export fehlgeschlagen: {detail}",
+    "unauthorized": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an."
   },
   "toast": {
     "copy_success": "Anonymisierter Text in die Zwischenablage kopiert.",

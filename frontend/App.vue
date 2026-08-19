@@ -115,6 +115,41 @@
             </div>
           </div>
 
+          <!-- Who is signed in, when this deployment has a sign-in gate. -->
+          <div v-if="auth.enabled && auth.authenticated" ref="accountContainer" class="relative">
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-full border border-default px-2.5 py-1 text-xs font-medium text-content-subtle transition-colors hover:bg-surface-muted hover:text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              :aria-label="t('auth.user.label', { name: accountName })"
+              :aria-expanded="accountOpen"
+              @click="toggleAccount()"
+            >
+              <User class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span class="max-w-[10rem] truncate">{{ accountName }}</span>
+            </button>
+            <div
+              v-if="accountOpen"
+              class="absolute right-0 top-full z-20 mt-2 w-64 rounded-card border border-default bg-surface p-4 shadow-lg"
+              role="dialog"
+              :aria-label="t('auth.user.menu_label')"
+            >
+              <p class="truncate text-sm font-medium text-content">{{ accountName }}</p>
+              <p v-if="auth.user?.email" class="truncate text-xs text-content-subtle">
+                {{ auth.user.email }}
+              </p>
+              <BaseButton
+                class="mt-3 w-full"
+                variant="secondary"
+                size="sm"
+                :loading="auth.signingOut"
+                @click="auth.signOut()"
+              >
+                <LogOut class="h-4 w-4" aria-hidden="true" />
+                {{ t('auth.user.sign_out') }}
+              </BaseButton>
+            </div>
+          </div>
+
           <LanguageSwitcher />
 
           <!-- Dark mode -->
@@ -132,7 +167,14 @@
     </header>
 
     <main class="mx-auto px-4 py-8" :class="containerClass">
-      <ResultView v-if="session.phase === 'result'" />
+      <!-- Nothing renders before the sign-in gate has answered: flashing the
+           input panel at someone who is about to be sent to the identity
+           provider looks like the app lost their work. -->
+      <div v-if="!auth.ready" class="flex justify-center py-16">
+        <LoadingSpinner :label="t('auth.gate.checking')" />
+      </div>
+      <SignInGate v-else-if="auth.blocked" />
+      <ResultView v-else-if="session.phase === 'result'" />
       <InputPanel v-else />
     </main>
 
@@ -153,20 +195,29 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertTriangle, Moon, Plus, Settings, Sun, Timer } from '@lucide/vue'
+import { AlertTriangle, LogOut, Moon, Plus, Settings, Sun, Timer, User } from '@lucide/vue'
 import InputPanel from '@/components/anonymizer/InputPanel.vue'
 import ResultView from '@/components/anonymizer/ResultView.vue'
+import SignInGate from '@/components/auth/SignInGate.vue'
+import BaseButton from '@/components/common/BaseButton.vue'
 import DeploymentBanner from '@/components/common/DeploymentBanner.vue'
 import LanguageSwitcher from '@/components/common/LanguageSwitcher.vue'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import ToastContainer from '@/components/common/ToastContainer.vue'
 import { usePopover } from '@/composables/usePopover'
 import { useResultLifetime } from '@/composables/useResultLifetime'
+import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { useSettingsStore } from '@/stores/settings'
 
 const { t } = useI18n()
+const auth = useAuthStore()
 const session = useSessionStore()
 const settings = useSettingsStore()
+
+/** Providers are not required to send a name; the email is the fallback, and
+ *  a generic word the fallback for that. */
+const accountName = computed(() => auth.user?.name || auth.user?.email || t('auth.user.signed_in'))
 
 // ---------------------------------------------------------------------------
 // Result lifetime chip: the batch-wide countdown, extendable at any time
@@ -198,6 +249,9 @@ const { open: hintsOpen, toggle: toggleHints } = usePopover(hintsContainer)
 
 const settingsContainer = ref<HTMLElement | null>(null)
 const { open: settingsOpen, toggle: toggleSettings } = usePopover(settingsContainer)
+
+const accountContainer = ref<HTMLElement | null>(null)
+const { open: accountOpen, toggle: toggleAccount } = usePopover(accountContainer)
 
 /** Full sentences for the popover; the header chip stays compact. */
 const systemHints = computed<string[]>(() => {
@@ -240,8 +294,10 @@ function toggleDarkMode() {
   }
 }
 
-onMounted(() => {
-  void session.fetchStatus()
+onMounted(async () => {
+  // The gate answers first: behind it, every other API call is a 401.
+  await auth.initialize()
+  if (!auth.blocked) void session.fetchStatus()
   // Closing the tab should end the server-side copy too, not leave it to the
   // cache TTL. `pagehide` fires where `beforeunload` is unreliable (mobile,
   // bfcache); the handler lives for the life of the app, so it is never

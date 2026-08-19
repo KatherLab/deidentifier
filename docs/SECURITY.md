@@ -16,7 +16,7 @@ vulnerability, see
 | Decision | Consequence |
 |---|---|
 | **No persistence.** No database, no object storage, no volumes; the backend container runs read-only. | There is no data at rest to protect, breach, or subpoena. A restart drops everything. |
-| **No authentication.** The app is deployed behind the institution's auth proxy. | One fewer credential store and session mechanism to secure — and a hard requirement that the proxy is actually there. |
+| **No authentication by default.** The app is deployed behind the institution's auth proxy; optionally it can require an [OIDC sign-in](operations/sso.md) itself. | One fewer credential store and session mechanism to secure — and a hard requirement that the proxy (or the gate) is actually there. The gate holds no accounts and no passwords: the session is a signed cookie, the provider owns the identity. |
 | **Content-refusing logger.** Fields whose names carry document content are dropped before a log line is written. | Logs can be shipped to normal infrastructure without becoming a PHI store. |
 | **Configured endpoints only.** Model and OCR base URLs are deployment configuration, not user input. | The set of destinations document content may reach is fixed at deploy time and visible in the UI. |
 | **Fail closed.** An unavailable detector fails the request; an unverifiable PDF export is refused. | The system never reports a document as processed when it was not fully checked. |
@@ -68,8 +68,11 @@ no external fonts or scripts. The app needs no internet access at runtime.
 ## Deployment checklist
 
 - [ ] An authenticating reverse proxy is in front of the frontend, and port
-      8080 is not reachable around it.
-- [ ] TLS terminates at that proxy.
+      8080 is not reachable around it — or `OIDC_ENABLED=true` with the
+      provider configured ([Single sign-on](operations/sso.md)).
+- [ ] TLS terminates at that proxy. With the OIDC gate on, `APP_PUBLIC_URL`
+      is an `https://` URL, so the session cookie is `Secure` (the backend
+      warns at startup when it is not).
 - [ ] `APP_ENV=production`.
 - [ ] `APP_ALLOW_INSECURE_CONTENT_LOGGING=false` (production refuses otherwise).
 - [ ] `DETECTORS` contains no `mock` (production refuses otherwise).

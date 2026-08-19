@@ -67,10 +67,14 @@ automatically — see [OCR engines](../operations/ocr-engines.md).
 
 ### Behind a reverse proxy
 
-The app has **no authentication**: it is designed to sit behind the
+The app has **no authentication by default**: it is designed to sit behind the
 institution's existing auth proxy. Put your proxy in front of the `frontend`
 container, terminate TLS there, and do not publish port 8080 beyond it.
 `FRONTEND_PORT` changes the published port.
+
+If you have no such proxy, the app can require a sign-in at your organisation's
+OpenID Connect provider instead — see
+[Single sign-on](../operations/sso.md). You still need TLS in front of it.
 
 ## Local development setup
 

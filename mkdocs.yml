@@ -89,6 +89,7 @@ nav:
       - Requirements & sizing: operations/requirements.md
       - Deployment: operations/deployment.md
       - Configuration: operations/configuration.md
+      - Single sign-on (OIDC): operations/sso.md
       - LLM endpoints: operations/llm-endpoints.md
       - OCR engines: operations/ocr-engines.md
       - Troubleshooting: operations/troubleshooting.md

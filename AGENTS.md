@@ -19,9 +19,11 @@ be read as a guarantee must be corrected, not softened.
 
 **Tech stack:** Vue 3 + Vite + TypeScript + TailwindCSS v4 (frontend), FastAPI
 + Pydantic v2 (backend), `uv` for Python, the `openai` SDK for every
-OpenAI-compatible endpoint. **No database, no Celery/Redis, no S3, no auth, no
-Alembic** — the app runs behind the hospital's own auth proxy and persists
-nothing.
+OpenAI-compatible endpoint. **No database, no Celery/Redis, no S3, no user
+accounts, no Alembic** — the app runs behind the hospital's own auth proxy and
+persists nothing. The one exception is an *optional* OIDC sign-in gate
+(`OIDC_ENABLED`, off by default) for deployments without such a proxy: it
+gates the API on a signed cookie and holds no accounts, roles or permissions.
 
 The sibling project **llmaixweb** (https://github.com/KatherLab/llmaixweb) is
 the convention source: layout, config pattern, service style, frontend
@@ -102,8 +104,9 @@ deidentifier/
 ```
 
 Deliberately **absent** (and not to be reintroduced without a design change):
-`models/`, `db/`, `alembic/`, `celery/`, dynamic settings, auth/SSO, S3,
-WebSockets.
+`models/`, `db/`, `alembic/`, `celery/`, dynamic settings, user accounts /
+roles / permissions, S3, WebSockets. The OIDC gate is authentication only —
+"who may enter", never "who may do what".
 
 ---
 
@@ -282,7 +285,10 @@ Retention rules that are security properties, not tuning knobs:
 
 ### API surface
 
-All under `/api/v1` (`routers/v1/api.py`), no auth:
+All under `/api/v1` (`routers/v1/api.py`). No auth by default; with
+`OIDC_ENABLED` everything except `/api/v1/auth/*` and `/health/*` requires the
+session cookie (`middleware/auth_gate.py` — gating in middleware, so a new
+route is protected by default rather than by remembering a dependency):
 
 | Route | Purpose |
 |---|---|
@@ -294,6 +300,9 @@ All under `/api/v1` (`routers/v1/api.py`), no auth:
 | `POST /api/v1/export/pdf/pages` | Renders pages as PNGs for the area-redaction editor, with embedded-image boxes as one-click suggestions. |
 | `GET /api/v1/status` | Configured detectors + OCR engine, endpoint **hosts** and their locality, limits. Never returns paths, keys, or full URLs. |
 | `GET /health/live`, `GET /health/ready` | Liveness/readiness. |
+| `GET /api/v1/auth/session` | Whether a gate exists and who is signed in. The frontend's first call; with the gate off it answers `enabled=false, authenticated=true` and nothing else in the UI changes. |
+| `GET /api/v1/auth/login` → `GET /api/v1/auth/callback` | Authorization Code + PKCE. The state token is signed and carried in *both* the URL and a cookie; the callback requires them to match. Failures redirect to `{APP_PUBLIC_URL}/?auth_error=<code>` so the reviewer reads a sentence, not JSON. |
+| `POST /api/v1/auth/logout` | Drops the session cookie; returns the provider's `end_session` URL when `OIDC_END_SESSION` is on. |
 
 Limits: `APP_MAX_UPLOAD_MB` (413 before buffering), `APP_MAX_TEXT_CHARS`,
 extensions `.txt/.docx/.pdf`. `Cache-Control: no-store` on content routes
@@ -318,6 +327,9 @@ extensions `.txt/.docx/.pdf`. `Cache-Control: no-store` on content routes
 | `utils/pdf_export.py` | Native-PDF true redaction, rasterized fallback, scanned-PDF reconstruction, page rendering. **Fails closed**: an export that cannot be verified is refused. |
 | `utils/notices.py` | Stable codes + English text for every non-fatal message (the translation contract). |
 | `utils/policy.py` | Default policy + the replacement placeholders of every output language. |
+| `utils/auth.py` | Session + login-state tokens for the OIDC gate (HS256, PKCE helpers). No session store: the signed cookie *is* the session. |
+| `services/oidc_client.py` | OIDC discovery, authorize URL, code exchange, id_token verification against the provider's JWKS. Own `OidcError` with a stable `code` the UI translates. |
+| `middleware/auth_gate.py` | The gate. Fail-closed by path, exempting only `/api/v1/auth/*`. |
 | `utils/safe_logging.py` | `get_safe_logger()` — the only logger application code may use. |
 | `utils/concurrency.py` | Process-wide named semaphores (global LLM/OCR request budgets across concurrent documents). |
 | `services/docling_serve_client.py` | docling-serve HTTP client. |
@@ -374,6 +386,12 @@ hints, expert-mode popover, dark-mode toggle) and switches between
   and is batch-wide on purpose: `resultsExpireAt` counts down to whichever
   document expires first and `extendResults()` extends them all, so the header
   can state one number and one button for the work in front of the reviewer.
+- **`auth.ts`** — the optional sign-in gate: `enabled`/`authenticated`/`user`
+  from `/auth/session`, `blocked` (the one flag `App.vue` reads), and the
+  sign-in/sign-out navigations. With no gate configured it settles on
+  `enabled=false` and nothing else in the UI changes. It also registers the
+  401 handler on `services/api.ts` — that module never imports a store, so
+  there is no cycle.
 - **`settings.ts`** — expert mode + keep-original-filenames. The *only* store
   that touches `localStorage`.
 - **`toast.ts`** — global toast queue.
@@ -384,8 +402,9 @@ hints, expert-mode popover, dark-mode toggle) and switches between
 
 ### Services (`services/`)
 
-`api.ts` holds the shared axios instance; **components never import it**.
-Call `anonymizeApi` / `statusApi`, or the streaming helpers in
+`api.ts` holds the shared axios instance (`withCredentials` for the gate's
+cookie, plus a 401 interceptor); **components never import it**.
+Call `anonymizeApi` / `statusApi` / `authApi`, or the streaming helpers in
 `anonymizeStream.ts` (which speak `fetch` + NDJSON because axios cannot stream
 a response body in the browser). Add a function to the matching module rather
 than reaching for `api` directly.
