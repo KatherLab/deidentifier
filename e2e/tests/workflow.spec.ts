@@ -234,6 +234,30 @@ test.describe('anonymization workflow', () => {
     expect((await download).suggestedFilename()).toContain('.pdf')
   })
 
+  test('shows the automatic redactions in the area editor', async ({ page }) => {
+    await page.goto('/')
+
+    await page.locator('input[type="file"]').setInputFiles(path.join(FIXTURES, '9874562_text.pdf'))
+    await page.getByRole('button', { name: 'Anonymisieren' }).click()
+    await waitForResult(page)
+
+    await page.getByRole('button', { name: /Bereiche schwärzen/ }).click()
+    // The editor opens on the pages of the redacted preview: what the
+    // detectors already caught is blacked out while the reviewer adds to it.
+    await expect(page.getByRole('img', { name: 'Seite 1 (geschwärzt)' })).toBeVisible({
+      timeout: 60_000,
+    })
+
+    // The originals are one click away, for whatever the box has to cover.
+    await page.getByRole('button', { name: 'Originalseiten anzeigen' }).click()
+    await expect(page.getByRole('img', { name: 'Seite 1', exact: true })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Schwärzungen anzeigen' }).click()
+    await expect(page.getByRole('img', { name: 'Seite 1 (geschwärzt)' })).toBeVisible({
+      timeout: 60_000,
+    })
+  })
+
   test('says when a kept passage stays black in the redacted PDF anyway', async ({ page }) => {
     await page.goto('/')
 

@@ -351,6 +351,35 @@ def test_rebuild_scanned_applies_area():
     assert _dark_fraction_in_area(output, area) > 0.8
 
 
+def test_rebuild_scanned_area_removes_the_text_underneath():
+    """A black box over reconstructed text must REMOVE it, not cover it — the
+    reviewer draws these areas over exactly the things no detector caught."""
+    from pypdf import PdfReader
+
+    source = "Unterschrift Dr. Beispiel\nDiagnose unauffaellig"
+    signature, diagnosis = source.split("\n")
+    layout = [
+        LayoutLine(page_number=1, x1=100, y1=100, x2=800, y2=140, start=0, end=len(signature)),
+        LayoutLine(
+            page_number=1,
+            x1=100,
+            y1=200,
+            x2=800,
+            y2=240,
+            start=len(signature) + 1,
+            end=len(source),
+        ),
+    ]
+    # Covers the first line only, with room for the font the rebuild picks.
+    area = RedactArea(page=1, x0=50, y0=80, x1=900, y1=180)
+
+    output = rebuild_scanned_pdf(source, layout, [], page_count=1, areas=[area])
+
+    text = "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(output)).pages)
+    assert "Unterschrift" not in text
+    assert "unauffaellig" in text
+
+
 def test_redact_area_rejects_empty_rect():
     with pytest.raises(ValueError):
         RedactArea(page=1, x0=500, y0=100, x1=500, y1=200)

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useSessionStore, type SessionDocument } from '@/stores/session'
 import { applyLocale } from '@/composables/useLocale'
-import { i18n } from '@/i18n'
+import { i18n, t } from '@/i18n'
 import { anonymizeApi } from '@/services/anonymizeApi'
 import { useToastStore } from '@/stores/toast'
 import type { AnonymizeResponse, AnonymizedEntity } from '@/types/anonymizer'
@@ -619,6 +619,100 @@ describe('bulk actions on a selection', () => {
 
     expect(changed).toBe(0)
     expect(rerun).not.toHaveBeenCalled()
+    session.reset()
+  })
+})
+
+describe('redacted pages for the area editor', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    i18n.global.locale.value = 'de'
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /** A document whose redacted-PDF preview has already been generated. */
+  function documentWithPreview(
+    session: ReturnType<typeof useSessionStore>,
+    blob: Blob,
+  ): SessionDocument {
+    const doc = documentWith(session, [])
+    doc.pdfPreviewBlob = blob
+    return doc
+  }
+
+  function pages(image: string) {
+    return {
+      data: {
+        pages: [{ page: 1, width: 595, height: 842, image, image_boxes: [] }],
+        truncated: false,
+      },
+    } as never
+  }
+
+  it('renders the preview the store already holds, once per preview', async () => {
+    const session = useSessionStore()
+    const blob = new Blob(['%PDF-redacted'], { type: 'application/pdf' })
+    documentWithPreview(session, blob)
+    const render = vi
+      .spyOn(anonymizeApi, 'renderPdfPages')
+      .mockResolvedValue(pages('data:image/png;base64,redacted'))
+
+    await session.loadRedactedPdfPages()
+    await session.loadRedactedPdfPages()
+
+    // No entity search, no second render: the blackouts come from the bytes
+    // the export already produced.
+    expect(render).toHaveBeenCalledTimes(1)
+    expect(render.mock.calls[0]![0]!.type).toBe('application/pdf')
+    expect(session.pdfRedactedPages?.[0]?.image).toBe('data:image/png;base64,redacted')
+    session.reset()
+  })
+
+  it('re-renders when a new preview supersedes the old one', async () => {
+    const session = useSessionStore()
+    const doc = documentWithPreview(session, new Blob(['%PDF-1'], { type: 'application/pdf' }))
+    const render = vi
+      .spyOn(anonymizeApi, 'renderPdfPages')
+      .mockResolvedValue(pages('data:image/png;base64,first'))
+    await session.loadRedactedPdfPages()
+
+    // What a drawn area or an override does: a brand-new preview blob.
+    doc.pdfPreviewBlob = new Blob(['%PDF-2'], { type: 'application/pdf' })
+    render.mockResolvedValue(pages('data:image/png;base64,second'))
+    await session.loadRedactedPdfPages()
+
+    expect(render).toHaveBeenCalledTimes(2)
+    expect(session.pdfRedactedPages?.[0]?.image).toBe('data:image/png;base64,second')
+    session.reset()
+  })
+
+  it('does not upload a preview larger than the server accepts', async () => {
+    const session = useSessionStore()
+    session.status = { limits: { max_upload_mb: 20, max_text_chars: 100_000 } } as never
+    // Size is all the store reads before deciding — no 21 MB blob needed.
+    documentWithPreview(session, { size: 21 * 1024 * 1024, type: 'application/pdf' } as Blob)
+    const render = vi.spyOn(anonymizeApi, 'renderPdfPages')
+
+    await session.loadRedactedPdfPages()
+
+    expect(render).not.toHaveBeenCalled()
+    expect(session.pdfRedactedPages).toBeNull()
+    expect(session.pdfRedactedPagesError).toBe(t('areas.redacted_too_large'))
+    session.reset()
+  })
+
+  it('stays quiet when there is no redacted preview to render', async () => {
+    const session = useSessionStore()
+    documentWith(session, [])
+    const render = vi.spyOn(anonymizeApi, 'renderPdfPages')
+
+    await session.loadRedactedPdfPages()
+
+    expect(render).not.toHaveBeenCalled()
+    expect(session.pdfRedactedPagesError).toBeNull()
     session.reset()
   })
 })

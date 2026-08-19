@@ -95,6 +95,63 @@ def preserved_texts_at_risk(entities: list[AppliedEntity]) -> list[str]:
     return sorted(at_risk)
 
 
+def _apply_areas(data: bytes, areas: list[RedactArea] | None) -> bytes:
+    """Apply the user-drawn areas to a PDF as TRUE redactions: the text and the
+    image pixels under each rectangle are removed, not merely covered.
+
+    Painting a filled rectangle over the page (what a drawing API does) leaves
+    everything underneath selectable and extractable — the box would hide the
+    content from the eye only. Verified below, and never silently skipped."""
+    if not areas:
+        return data
+
+    import pymupdf
+
+    document = pymupdf.open(stream=data, filetype="pdf")
+    try:
+        for page in document:
+            page_width, page_height = page.rect.width, page.rect.height
+            rects = [
+                pymupdf.Rect(x0 * page_width, y0 * page_height, x1 * page_width, y1 * page_height)
+                for x0, y0, x1, y1 in _page_areas(areas, page.number + 1)
+            ]
+            if not rects:
+                continue
+            for rect in rects:
+                page.add_redact_annot(rect, fill=(0, 0, 0))
+            page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_PIXELS)
+        output = document.tobytes(garbage=4, deflate=True)
+    finally:
+        document.close()
+
+    _verify_areas(output, areas)
+    return output
+
+
+def _verify_areas(data: bytes, areas: list[RedactArea] | None) -> None:
+    """Mandatory: no text may survive inside a user-drawn area."""
+    if not areas:
+        return
+
+    import pymupdf
+
+    document = pymupdf.open(stream=data, filetype="pdf")
+    try:
+        for page in document:
+            page_width, page_height = page.rect.width, page.rect.height
+            for x0, y0, x1, y1 in _page_areas(areas, page.number + 1):
+                rect = pymupdf.Rect(
+                    x0 * page_width, y0 * page_height, x1 * page_width, y1 * page_height
+                )
+                if any(word[4].strip() for word in page.get_text("words", clip=rect)):
+                    raise ExportError(
+                        "Verification failed: text is still present under a blacked-out "
+                        "area; the redacted PDF was NOT generated."
+                    )
+    finally:
+        document.close()
+
+
 def _compact(text: str) -> str:
     """Strip ALL whitespace. The detector reads the PDF via one extractor
     (docling-serve or pypdf) while the export searches it via another (pymupdf /
@@ -213,6 +270,7 @@ def _redact_native_true(
         document.close()
 
     _verify_native(output, needles)
+    _verify_areas(output, areas)
     return output
 
 
@@ -595,21 +653,14 @@ def rebuild_scanned_pdf(
             for index, wrapped_line in enumerate(wrapped):
                 baseline = height - top - (index + 1) * font_size * _LINE_SPACING + font_size * 0.2
                 pdf.drawString(x, baseline, wrapped_line)
-        # User-drawn areas: black box at the (approximate) original position —
-        # the rebuild is layout-faithful, so the normalized coordinates map
-        # onto the reconstructed page. reportlab's origin is bottom-left.
-        for x0, y0, x1, y1 in _page_areas(areas, page_number):
-            pdf.rect(
-                x0 * width,
-                height - y1 * height,
-                (x1 - x0) * width,
-                (y1 - y0) * height,
-                stroke=0,
-                fill=1,
-            )
         pdf.showPage()
     pdf.save()
     output = buffer.getvalue()
+
+    # User-drawn areas are applied to the REBUILT page (the geometry the review
+    # UI draws on), as true redactions — a filled rectangle painted over the
+    # text would leave that text selectable underneath.
+    output = _apply_areas(output, areas)
 
     _verify_rebuilt(output, entities)
     return output
