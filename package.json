@@ -1,6 +1,6 @@
 {
   "name": "deidentifier",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "Deidentifier frontend — anonymize German clinical documents locally.",
   "license": "AGPL-3.0-or-later",

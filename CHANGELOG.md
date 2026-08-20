@@ -11,12 +11,13 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-20
+
 ### Added
 
 - Optional sign-in at the organisation's OpenID Connect provider, for
-  deployments without an authenticating proxy in front: `OIDC_ENABLED` plus
-  the client credentials and `APP_PUBLIC_URL` gate every API route on a
-  signed session cookie. No accounts, no roles — see
+  deployments that have no authenticating proxy in front. Set `OIDC_ENABLED`
+  plus the client credentials and `APP_PUBLIC_URL` — see
   [Single sign-on](docs/operations/sso.md).
 
 ## [0.2.1] — 2026-08-19
@@ -40,26 +41,19 @@ documentation, and CI work are left out.
 
 ### Added
 
-- `VISION_OCR_DIALECT` selects the vision-OCR model family (`unlimited_ocr`,
-  `chandra`, `plain`) and supplies the prompt, token and body defaults — see
-  [OCR engines](docs/operations/ocr-engines.md).
-
-- `VISION_OCR_PROFILES` offers several OCR models at once, one pickable per
-  document in the advanced settings — see
-  [OCR engines](docs/operations/ocr-engines.md).
-
-- `compose.chandra.yml` runs a datalab chandra GPU OCR sidecar, as
-  `compose.unlimited-ocr.yml` does for Unlimited-OCR — see
+- Vision OCR gained `VISION_OCR_DIALECT` (model family `unlimited_ocr`,
+  `chandra` or `plain`, each supplying its own prompt, token and body
+  defaults), `VISION_OCR_PROFILES` (several models at once, one pickable per
+  document), and `compose.chandra.yml` for a chandra GPU sidecar next to the
+  existing `compose.unlimited-ocr.yml` — see
   [OCR engines](docs/operations/ocr-engines.md).
 
 ### Changed
 
-- `.env.example` is now a short setup worksheet that ships with the LLM
-  detector enabled: fill in `OPENAI_API_BASE`/`LLM_MODEL` before first start
-  (or set `DETECTORS=rules` for a look without an LLM) — see
-  [Configuration](docs/operations/configuration.md).
-
-- `LLM_REQUEST_TIMEOUT_SECONDS` now defaults to `600` instead of `120` — see
+- `.env.example` is now a short setup worksheet shipping with the LLM detector
+  enabled: fill in `OPENAI_API_BASE`/`LLM_MODEL` before first start, or set
+  `DETECTORS=rules` for a look without an LLM.
+- `LLM_REQUEST_TIMEOUT_SECONDS` defaults to `600` instead of `120`. Both:
   [Configuration](docs/operations/configuration.md).
 
 ## [0.1.3] — 2026-08-07
@@ -153,6 +147,7 @@ First tagged version.
   configurable deployment banner sits above the header.
 - Documentation site (MkDocs Material) under `docs/`.
 
+[0.3.0]: https://github.com/KatherLab/deidentifier/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/KatherLab/deidentifier/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/KatherLab/deidentifier/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/KatherLab/deidentifier/compare/v0.1.2...v0.1.3

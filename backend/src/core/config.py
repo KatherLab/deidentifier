@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # Application
     APP_ENV: str = "development"
-    APP_VERSION: str = "0.2.1"
+    APP_VERSION: str = "0.3.0"
     APP_MAX_UPLOAD_MB: int = Field(default=20, ge=1)
     APP_MAX_TEXT_CHARS: int = Field(default=500_000, ge=1)
     APP_ALLOW_INSECURE_CONTENT_LOGGING: bool = False
