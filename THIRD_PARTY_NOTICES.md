@@ -18,7 +18,7 @@ is excluded because it is not distributed.
 | Name               | Version   | License                                                          | URL                                                                  |
 |--------------------|-----------|------------------------------------------------------------------|----------------------------------------------------------------------|
 | distro             | 1.9.0     | Apache Software License                                          | https://github.com/python-distro/distro                              |
-| openai             | 2.53.0    | Apache Software License                                          | https://github.com/openai/openai-python                              |
+| openai             | 2.54.0    | Apache Software License                                          | https://github.com/openai/openai-python                              |
 | sniffio            | 1.3.1     | Apache Software License; MIT License                             | https://github.com/python-trio/sniffio                               |
 | uvloop             | 0.22.1    | Apache Software License; MIT License                             | UNKNOWN                                                              |
 | python-multipart   | 0.0.32    | Apache-2.0                                                       | https://github.com/Kludex/python-multipart                           |
@@ -30,12 +30,12 @@ is excluded because it is not distributed.
 | idna               | 3.18      | BSD-3-Clause                                                     | https://github.com/kjd/idna                                          |
 | lxml               | 6.1.1     | BSD-3-Clause                                                     | https://lxml.de/                                                     |
 | pycparser          | 3.0       | BSD-3-Clause                                                     | https://github.com/eliben/pycparser                                  |
-| pypdf              | 6.15.0    | BSD-3-Clause                                                     | https://github.com/py-pdf/pypdf                                      |
+| pypdf              | 6.16.1    | BSD-3-Clause                                                     | https://github.com/py-pdf/pypdf                                      |
 | python-dotenv      | 1.2.2     | BSD-3-Clause                                                     | https://github.com/theskumar/python-dotenv                           |
 | starlette          | 1.4.0     | BSD-3-Clause                                                     | https://github.com/Kludex/starlette                                  |
-| uvicorn            | 0.52.1    | BSD-3-Clause                                                     | https://uvicorn.dev/                                                 |
+| uvicorn            | 0.52.4    | BSD-3-Clause                                                     | https://uvicorn.dev/                                                 |
 | websockets         | 17.0.1    | BSD-3-Clause                                                     | https://github.com/python-websockets/websockets                      |
-| pypdfium2          | 5.12.1    | BSD-3-Clause, Apache-2.0, dependency licenses                    | https://github.com/pypdfium2-team/pypdfium2                          |
+| pypdfium2          | 5.13.0    | BSD-3-Clause, Apache-2.0, dependency licenses                    | https://github.com/pypdfium2-team/pypdfium2                          |
 | pymupdf            | 1.28.2    | Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License | https://github.com/pymupdf/pymupdf                                   |
 | PyJWT              | 2.13.0    | MIT                                                              | https://github.com/jpadilla/pyjwt                                    |
 | annotated-doc      | 0.0.5     | MIT                                                              | https://github.com/fastapi/annotated-doc                             |
@@ -74,8 +74,8 @@ is excluded because it is not distributed.
 - [@jridgewell/resolve-uri@3.1.2](https://github.com/jridgewell/resolve-uri) - MIT
 - [@jridgewell/sourcemap-codec@1.5.5](https://github.com/jridgewell/sourcemaps) - MIT
 - [@jridgewell/trace-mapping@0.3.31](https://github.com/jridgewell/sourcemaps) - MIT
-- [@lucide/vue@1.31.0](https://github.com/lucide-icons/lucide) - ISC
-- [@oxc-project/types@0.143.0](https://github.com/oxc-project/oxc) - MIT
+- [@lucide/vue@1.33.0](https://github.com/lucide-icons/lucide) - ISC
+- [@oxc-project/types@0.146.0](https://github.com/oxc-project/oxc) - MIT
 - [@rolldown/pluginutils@1.0.1](https://github.com/rolldown/plugins) - MIT
 - [@tailwindcss/node@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [@tailwindcss/oxide@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
@@ -134,21 +134,21 @@ is excluded because it is not distributed.
 - [mime-db@1.52.0](https://github.com/jshttp/mime-db) - MIT
 - [mime-types@2.1.35](https://github.com/jshttp/mime-types) - MIT
 - [ms@2.1.3](https://github.com/vercel/ms) - MIT
-- [nanoid@3.3.17](https://github.com/ai/nanoid) - MIT
+- [nanoid@3.3.18](https://github.com/ai/nanoid) - MIT
 - [nostics@1.2.0](https://github.com/vercel-labs/nostics) - MIT
 - [perfect-debounce@2.1.0](https://github.com/unjs/perfect-debounce) - MIT
 - [picocolors@1.1.1](https://github.com/alexeyraspopov/picocolors) - ISC
 - [picomatch@4.0.5](https://github.com/micromatch/picomatch) - MIT
-- [pinia@4.0.2](https://github.com/vuejs/pinia) - MIT
-- [postcss@8.5.25](https://github.com/postcss/postcss) - MIT
+- [pinia@4.0.3](https://github.com/vuejs/pinia) - MIT
+- [postcss@8.5.26](https://github.com/postcss/postcss) - MIT
 - [proxy-from-env@2.1.0](https://github.com/Rob--W/proxy-from-env) - MIT
-- [rolldown@1.2.3](https://github.com/rolldown/rolldown) - MIT
+- [rolldown@1.2.5](https://github.com/rolldown/rolldown) - MIT
 - [source-map-js@1.2.1](https://github.com/7rulnik/source-map-js) - BSD-3-Clause
 - [tailwindcss@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [tapable@2.3.3](https://github.com/webpack/tapable) - MIT
 - [tinyglobby@0.2.17](https://github.com/SuperchupuDev/tinyglobby) - MIT
 - [typescript@6.0.3](https://github.com/microsoft/TypeScript) - Apache-2.0
 - [undici-types@8.3.0](https://github.com/nodejs/undici) - MIT
-- [vite@8.2.1](https://github.com/vitejs/vite) - MIT
+- [vite@8.2.2](https://github.com/vitejs/vite) - MIT
 - [vue-i18n@11.4.8](https://github.com/intlify/vue-i18n) - MIT
 - [vue@3.5.41](https://github.com/vuejs/core) - MIT
