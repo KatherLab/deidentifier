@@ -1,6 +1,6 @@
 [project]
 name = "deidentifier"
-version = "0.2.1"
+version = "0.3.0"
 description = "Locally deployable anonymizer for German clinical documents"
 requires-python = ">=3.13,<3.15"
 # Every dependency is pinned exactly, like the frontend's package.json: this is
