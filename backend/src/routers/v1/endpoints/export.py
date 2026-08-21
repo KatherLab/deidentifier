@@ -128,6 +128,10 @@ async def export_pdf(
     raw_language = form.get("output_language")
     output_language = raw_language.strip() if isinstance(raw_language, str) else None
     force_ocr = _parse_bool(form.get("force_ocr"))
+    # Scanned documents only: black bars over the placeholders of the rebuilt
+    # page, so a reconstruction looks like the native export instead of reading
+    # its replacements out in words.
+    redaction_bars = _parse_bool(form.get("redaction_bars"))
     raw_profile = form.get("ocr_profile")
     ocr_profile = (
         raw_profile.strip() if isinstance(raw_profile, str) and raw_profile.strip() else None
@@ -160,7 +164,12 @@ async def export_pdf(
             pdf_bytes = redact_native_pdf(data, result.entities, settings, areas=redact_areas)
         elif source_type == "pdf-ocr":
             pdf_bytes = rebuild_scanned_pdf(
-                result.source_text, layout, result.entities, page_count, areas=redact_areas
+                result.source_text,
+                layout,
+                result.entities,
+                page_count,
+                areas=redact_areas,
+                bars=redaction_bars,
             )
         else:
             raise HTTPException(

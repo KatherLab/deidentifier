@@ -158,6 +158,7 @@ export const anonymizeApi = {
     forceOcr?: boolean,
     ocrProfile?: string | null,
     outputLanguage?: OutputLanguage | null,
+    redactionBars?: boolean,
   ): Promise<AxiosResponse<Blob>> {
     const formData = new FormData()
     formData.append('file', file)
@@ -171,6 +172,9 @@ export const anonymizeApi = {
     // forced-OCR flag and OCR profile.
     if (forceOcr) formData.append('force_ocr', 'true')
     if (ocrProfile) formData.append('ocr_profile', ocrProfile)
+    // Scanned sources only: black bars over the placeholders of the rebuilt
+    // page. Ignored for native PDFs, which black their redactions out anyway.
+    if (redactionBars) formData.append('redaction_bars', 'true')
     return api.post<Blob>('/export/pdf', formData, { responseType: 'blob' })
   },
 

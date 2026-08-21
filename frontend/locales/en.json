@@ -203,6 +203,8 @@
       "zip": "All documents (.zip)",
       "keep_filenames": "Keep filenames",
       "keep_filenames_hint": "Caution: filenames can contain personal data.",
+      "redaction_bars": "Black bars instead of placeholders",
+      "redaction_bars_hint": "Scanned documents only: the reconstruction shows black bars – as a native PDF does.",
       "filename": "anonymized",
       "document_fallback": "document"
     },
@@ -253,6 +255,18 @@
     "redact": "Redact",
     "redact_label": "Redact the selection manually"
   },
+  "search": {
+    "open": "Search",
+    "open_title": "Search this panel (Ctrl/Cmd + F)",
+    "label": "Search this panel",
+    "placeholder": "Search …",
+    "count": "{current}/{total}",
+    "count_label": "Match {current} of {total}",
+    "no_matches": "No match",
+    "next": "Next match",
+    "previous": "Previous match",
+    "close": "Close search"
+  },
   "detail": {
     "panel_label": "Details of the selected entity",
     "changed": "Changed",
@@ -263,6 +277,8 @@
     "redact": "Redact",
     "change_type": "Change entity type",
     "select_all_occurrences": "Select all {count} occurrences",
+    "search_in_result": "Search in result",
+    "search_in_result_title": "Search this text in the result",
     "close": "Close details"
   },
   "selection": {

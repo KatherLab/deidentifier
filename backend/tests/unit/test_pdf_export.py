@@ -462,6 +462,86 @@ def test_rebuild_places_anonymized_text_and_verifies():
     assert "rekonstruiertes" in extracted  # the reconstruction notice
 
 
+def _black_bar_count(output: bytes) -> int:
+    """Filled black rectangles on page 1 of a rebuilt PDF."""
+    import pymupdf
+
+    document = pymupdf.open(stream=output, filetype="pdf")
+    try:
+        return sum(
+            1
+            for drawing in document[0].get_drawings()
+            if drawing.get("fill") == (0.0, 0.0, 0.0)
+            and any(item[0] == "re" for item in drawing.get("items", []))
+        )
+    finally:
+        document.close()
+
+
+def _dark_fraction(output: bytes, needle: str) -> float:
+    """Share of dark pixels where `needle` sits on page 1 of a rebuilt PDF."""
+    import pymupdf
+
+    document = pymupdf.open(stream=output, filetype="pdf")
+    try:
+        page = document[0]
+        image = page.get_pixmap(clip=page.search_for(needle)[0], colorspace=pymupdf.csGRAY, dpi=150)
+        pixels = list(image.samples)
+    finally:
+        document.close()
+    return sum(1 for value in pixels if value < 60) / len(pixels)
+
+
+def test_rebuild_draws_bars_over_placeholders_but_keeps_them_readable():
+    from pypdf import PdfReader
+
+    lines = ["Patientin: Erika Musterfrau, geb. 03.11.1957", "Aufnahme durch Erika Musterfrau."]
+    source = "\n".join(lines)
+    layout = make_layout(source, lines)
+    entities = entities_for(source, [("Erika Musterfrau", "[PERSON_1]")])
+    # Both occurrences are replaced (offsets differ, the tag does not).
+    entities.append(applied("Erika Musterfrau", source.rindex("Erika Musterfrau")))
+
+    plain = rebuild_scanned_pdf(source, layout, entities, page_count=1)
+    barred = rebuild_scanned_pdf(source, layout, entities, page_count=1, bars=True)
+
+    # One bar per placeholder occurrence, and none without the option.
+    assert _black_bar_count(plain) == 0
+    assert _black_bar_count(barred) == 2
+
+    # The bar is painted OVER the token: the text layer is unchanged, so the
+    # consistent tag still says WHICH person was redacted — and the export
+    # verification still sees an output free of the original name.
+    extracted = "\n".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(barred)).pages)
+    assert "Erika Musterfrau" not in extracted
+    assert extracted.count("[PERSON_1]") == 2
+
+    # …and the bar really covers it: where the token renders as thin glyph
+    # strokes on white without the option, it renders as a solid block with it.
+    # The remainder is the line box's leading above the glyphs, not exposed text.
+    assert _dark_fraction(plain, "[PERSON_1]") < 0.35
+    assert _dark_fraction(barred, "[PERSON_1]") > 0.8
+
+
+def test_rebuild_bars_leave_generalized_replacements_readable():
+    lines = ["Aufnahme am 03.11.1957 in der Klinik."]
+    source = "\n".join(lines)
+    layout = make_layout(source, lines)
+    generalized = applied(
+        "03.11.1957",
+        source.index("03.11.1957"),
+        etype=EntityType.OTHER_DATE,
+        replacement="1957",
+    )
+    generalized.status = SpanStatus.GENERALIZED
+    generalized.transformation = TransformationType.GENERALIZE
+
+    output = rebuild_scanned_pdf(source, layout, [generalized], page_count=1, bars=True)
+
+    # The native export keeps a generalized date visible; so does this one.
+    assert _black_bar_count(output) == 0
+
+
 def test_rebuild_wraps_paragraph_boxes_and_maps_bullets():
     from pypdf import PdfReader
 

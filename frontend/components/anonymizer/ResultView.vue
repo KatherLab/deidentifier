@@ -118,6 +118,26 @@
                   </span>
                 </span>
               </label>
+              <!-- Scanned sources only: the reconstruction is re-typeset, so it
+                   can print the placeholders or black them out. A native PDF
+                   blacks out regardless — there is nothing to choose. -->
+              <label
+                v-if="isReconstruction"
+                class="flex cursor-pointer items-start gap-2 rounded-card px-3 py-2 transition-colors hover:bg-surface-muted"
+              >
+                <input
+                  type="checkbox"
+                  class="mt-0.5 h-3.5 w-3.5 shrink-0 accent-primary"
+                  :checked="settings.redactionBars"
+                  @change="setRedactionBars(($event.target as HTMLInputElement).checked)"
+                />
+                <span class="text-sm text-content">
+                  {{ t('result.export.redaction_bars') }}
+                  <span class="block text-xs text-content-subtle">
+                    {{ t('result.export.redaction_bars_hint') }}
+                  </span>
+                </span>
+              </label>
             </div>
           </div>
           <BaseButton size="sm" variant="secondary" @click="session.reset()">
@@ -206,9 +226,15 @@
       <div class="grid items-start gap-4" :class="gridClass">
         <!-- Original document: PDF sources render the untouched upload, text
              sources the extracted source text. -->
-        <section v-if="isVisible('original')" :class="panelCardClass">
+        <section
+          v-if="isVisible('original')"
+          :class="panelCardClass"
+          @focusin="session.focusPanel('original')"
+          @pointerdown="session.focusPanel('original')"
+        >
           <header :class="panelHeaderClass">
             <h3 class="text-sm font-semibold text-content">{{ t('result.panels.original') }}</h3>
+            <PanelSearch panel="original" class="ml-auto" />
           </header>
           <template v-if="isPdfSource">
             <iframe
@@ -221,19 +247,25 @@
               {{ t('result.original.unavailable') }}
             </p>
           </template>
-          <!-- v-text: the panel is whitespace-pre-wrap, so template indentation
-               must not leak in. -->
-          <div
+          <SearchableText
             v-else
             class="min-h-0 flex-1 overflow-y-auto p-6 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words text-content"
-            v-text="result.source_text"
-          ></div>
+            :text="result.source_text"
+            :matches="matchesFor('original')"
+            :active-match-index="activeMatchFor('original')"
+          />
         </section>
 
         <!-- Quellprüfung: interactive source review (primary view). -->
-        <section v-if="isVisible('source')" :class="panelCardClass">
+        <section
+          v-if="isVisible('source')"
+          :class="panelCardClass"
+          @focusin="session.focusPanel('source')"
+          @pointerdown="session.focusPanel('source')"
+        >
           <header :class="panelHeaderClass">
             <h3 class="text-sm font-semibold text-content">{{ t('result.panels.source') }}</h3>
+            <PanelSearch panel="source" class="ml-auto" />
           </header>
           <EntityHighlights
             class="min-h-0 flex-1"
@@ -242,6 +274,8 @@
             :warnings="result.validation.warnings"
             :selected-indices="session.selectedEntityIndices"
             :focus-index="session.selectedEntityIndex"
+            :matches="matchesFor('source')"
+            :active-match-index="activeMatchFor('source')"
             @select="session.selectEntity($event)"
             @toggle="session.toggleEntitySelection($event)"
             @range="session.selectEntityRange($event)"
@@ -254,6 +288,7 @@
                 v-if="session.selectedEntity"
                 :entity="session.selectedEntity"
                 @close="session.clearSelection()"
+                @search="searchInResult"
               />
               <EntitySelectionBar v-else-if="session.selectedEntityIndices.length > 1" />
             </template>
@@ -270,49 +305,57 @@
              override re-run, so it always mirrors the text result). The area
              editor draws additional blackout regions (signatures, logos) on
              the ORIGINAL pages; they apply to the export and this preview. -->
-        <section v-if="isVisible('pdf')" :class="panelCardClass">
+        <section
+          v-if="isVisible('pdf')"
+          :class="panelCardClass"
+          @focusin="session.focusPanel('pdf')"
+          @pointerdown="session.focusPanel('pdf')"
+        >
           <header class="shrink-0 border-b border-default bg-surface-muted px-4 py-2.5">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <h3 class="text-sm font-semibold text-content">{{ t('result.panels.pdf') }}</h3>
-              <!-- Two VIEWS of this one panel, not an on/off switch: opening
+              <div class="flex flex-wrap items-center gap-2">
+                <!-- Two VIEWS of this one panel, not an on/off switch: opening
                    the editor replaces the preview, so the header shows both
                    sides and which one is showing. -->
-              <div
-                v-if="session.sourceFile !== null"
-                role="group"
-                :aria-label="t('result.pdf.view_label')"
-                class="inline-flex items-center gap-0.5 rounded-card bg-surface-sunken p-0.5"
-              >
-                <button
-                  type="button"
-                  :aria-pressed="!areaEditing"
-                  :class="pdfViewTabClass(!areaEditing)"
-                  @click="areaEditing = false"
+                <div
+                  v-if="session.sourceFile !== null"
+                  role="group"
+                  :aria-label="t('result.pdf.view_label')"
+                  class="inline-flex items-center gap-0.5 rounded-card bg-surface-sunken p-0.5"
                 >
-                  {{ t('result.pdf.view_preview') }}
-                </button>
-                <button
-                  type="button"
-                  :aria-pressed="areaEditing"
-                  :class="pdfViewTabClass(areaEditing)"
-                  @click="areaEditing = true"
-                >
-                  <SquareDashedMousePointer class="h-3.5 w-3.5" aria-hidden="true" />
-                  {{ t('result.pdf.view_areas') }}
-                  <span
-                    v-if="session.redactAreas.length > 0"
-                    class="rounded-full bg-primary px-1.5 text-[11px] leading-4 font-semibold text-white"
-                    :aria-label="
-                      t(
-                        'result.pdf.areas_badge_label',
-                        { count: session.redactAreas.length },
-                        session.redactAreas.length,
-                      )
-                    "
+                  <button
+                    type="button"
+                    :aria-pressed="!areaEditing"
+                    :class="pdfViewTabClass(!areaEditing)"
+                    @click="areaEditing = false"
                   >
-                    {{ session.redactAreas.length }}
-                  </span>
-                </button>
+                    {{ t('result.pdf.view_preview') }}
+                  </button>
+                  <button
+                    type="button"
+                    :aria-pressed="areaEditing"
+                    :class="pdfViewTabClass(areaEditing)"
+                    @click="areaEditing = true"
+                  >
+                    <SquareDashedMousePointer class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ t('result.pdf.view_areas') }}
+                    <span
+                      v-if="session.redactAreas.length > 0"
+                      class="rounded-full bg-primary px-1.5 text-[11px] leading-4 font-semibold text-white"
+                      :aria-label="
+                        t(
+                          'result.pdf.areas_badge_label',
+                          { count: session.redactAreas.length },
+                          session.redactAreas.length,
+                        )
+                      "
+                    >
+                      {{ session.redactAreas.length }}
+                    </span>
+                  </button>
+                </div>
+                <PanelSearch panel="pdf" />
               </div>
             </div>
             <p v-if="result.source_type === 'pdf-ocr'" class="text-xs text-content-subtle">
@@ -395,16 +438,24 @@
         </section>
 
         <!-- Anonymized output as plain selectable text. -->
-        <section v-if="isVisible('anonymized')" :class="panelCardClass">
+        <section
+          v-if="isVisible('anonymized')"
+          :class="panelCardClass"
+          @focusin="session.focusPanel('anonymized')"
+          @pointerdown="session.focusPanel('anonymized')"
+        >
           <header :class="panelHeaderClass">
             <h3 class="text-sm font-semibold text-content">
               {{ t('result.panels.anonymized') }}
             </h3>
+            <PanelSearch panel="anonymized" class="ml-auto" />
           </header>
-          <div
+          <SearchableText
             class="min-h-0 flex-1 overflow-y-auto p-6 font-sans text-[15px] leading-relaxed whitespace-pre-wrap break-words text-content"
-            v-text="result.anonymized_text"
-          ></div>
+            :text="result.anonymized_text"
+            :matches="matchesFor('anonymized')"
+            :active-match-index="activeMatchFor('anonymized')"
+          />
         </section>
       </div>
 
@@ -486,7 +537,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { strToU8, zipSync } from 'fflate'
 import {
@@ -509,7 +560,9 @@ import DocumentBar from '@/components/anonymizer/DocumentBar.vue'
 import EntityHighlights from '@/components/anonymizer/EntityHighlights.vue'
 import EntityDetailPanel from '@/components/anonymizer/EntityDetailPanel.vue'
 import EntitySelectionBar from '@/components/anonymizer/EntitySelectionBar.vue'
+import PanelSearch, { PANEL_SEARCH_INPUT_ID } from '@/components/anonymizer/PanelSearch.vue'
 import PdfAreaEditor from '@/components/anonymizer/PdfAreaEditor.vue'
+import SearchableText from '@/components/anonymizer/SearchableText.vue'
 import ProcessingCard from '@/components/anonymizer/ProcessingCard.vue'
 import WarningsList from '@/components/anonymizer/WarningsList.vue'
 import { useSessionStore } from '@/stores/session'
@@ -521,6 +574,7 @@ import { useToast } from '@/composables/useToast'
 import { useFileDownload } from '@/composables/useFileDownload'
 import { anonymizeApi } from '@/services/anonymizeApi'
 import { extractPdfExportErrorMessage } from '@/utils/errors'
+import type { MatchRange } from '@/utils/textSegments'
 import { getBannerClass } from '@/utils/statusStyles'
 import { entityTypeLabel, sourceTypeLabel } from '@/utils/entityLabels'
 import { noticeMessage } from '@/utils/notices'
@@ -539,14 +593,28 @@ const result = computed(() => session.result)
 /** Shared card chrome so all panel columns align at the same height. */
 const panelCardClass =
   'flex h-[72vh] min-w-0 flex-col overflow-hidden rounded-card border border-default bg-surface'
+// min-h: the header is as tall with the search bar open as without it, so
+// opening the search never nudges the document underneath.
 const panelHeaderClass =
-  'flex shrink-0 items-baseline gap-2 border-b border-default bg-surface-muted px-4 py-2.5'
+  'flex min-h-[3.25rem] shrink-0 flex-wrap items-center gap-2 border-b border-default bg-surface-muted px-4 py-2'
 const menuItemClass =
   'flex w-full items-center gap-2 rounded-card px-3 py-2 text-left text-sm text-content transition-colors hover:bg-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 const isPdfSource = computed(
   () => result.value?.source_type === 'pdf' || result.value?.source_type === 'pdf-ocr',
 )
+
+/** A scanned source: its redacted PDF is re-typeset, not the original pages. */
+const isReconstruction = computed(() => result.value?.source_type === 'pdf-ocr')
+
+/**
+ * Toggling the bars re-exports every scanned document of the batch, so the
+ * previews — and the ZIP built from them — stay one consistent set.
+ */
+function setRedactionBars(value: boolean): void {
+  settings.setRedactionBars(value)
+  void session.refreshReconstructedPreviews()
+}
 
 /** Which view of the redacted-PDF panel is showing (off on doc switch). */
 const areaEditing = ref(false)
@@ -723,6 +791,85 @@ const gridClass = computed(() => {
   }
 })
 
+// ---------------------------------------------------------------------------
+// Panel search: find a term in the view the reviewer is working in.
+//
+// The state lives on the document (store); this component owns the DOM side —
+// which panel was last touched, and the keyboard shortcut.
+// ---------------------------------------------------------------------------
+
+/** Hits belong to the ONE searched panel; every other panel renders plain. */
+function matchesFor(panel: ResultPanelId): MatchRange[] {
+  return session.searchPanel === panel ? session.searchMatches : []
+}
+
+function activeMatchFor(panel: ResultPanelId): number | null {
+  return session.searchPanel === panel && session.searchMatches.length > 0
+    ? session.searchMatchIndex
+    : null
+}
+
+/**
+ * Where the shortcut lands before the reviewer has touched a searchable panel:
+ * the result text, because that is what a final check ("is that name really
+ * gone?") is about. Falls back to whatever else is on screen, and to nothing
+ * when only PDF views are — there the browser's own find bar is the tool.
+ */
+function defaultSearchPanel(): ResultPanelId | null {
+  const searchable = visiblePanels.value.filter((panel) => session.isSearchablePanel(panel))
+  return searchable.find((panel) => panel === 'anonymized') ?? searchable[0] ?? null
+}
+
+function openPanelSearch(panel?: ResultPanelId): boolean {
+  // The panel in front of the reviewer when it can be searched; otherwise the
+  // nearest one that can (a PDF view falls through to the text beside it).
+  const preferred = panel ?? session.focusedPanel
+  const usable = preferred != null && isVisible(preferred) && session.isSearchablePanel(preferred)
+  const target = usable ? preferred : defaultSearchPanel()
+  if (target === null) return false
+  session.openSearch(target)
+  // Already open on that panel: the watcher in PanelSearch does not fire, so
+  // put the cursor back in the field here.
+  void nextTick(() => {
+    const input = document.getElementById(PANEL_SEARCH_INPUT_ID)
+    if (input instanceof HTMLInputElement) {
+      input.focus()
+      input.select()
+    }
+  })
+  return true
+}
+
+/**
+ * "Im Ergebnis suchen" on a selected entity — the one-click final check.
+ *
+ * Always the anonymized TEXT, never the redacted-PDF panel: a hit has to be
+ * visible to answer anything, and only the text view can mark one. For a PDF
+ * source in default mode that means the result panel switches from the
+ * preview to the text — the same result, in the form that can show the answer.
+ */
+function searchInResult(term: string): void {
+  session.searchInPanel('anonymized', term)
+  if (!settings.expertMode && session.activePanels.includes('pdf')) session.togglePanel('pdf')
+}
+
+/**
+ * Ctrl/Cmd+F searches the panel in front of the reviewer instead of the whole
+ * page — but only when that panel is one the app can mark a hit in. In a PDF
+ * view (and inside its iframe, where this handler never fires anyway) the
+ * browser's own find bar is the one that can do anything, so the shortcut is
+ * left alone.
+ */
+function handleSearchShortcut(event: KeyboardEvent): void {
+  if (event.key !== 'f' && event.key !== 'F') return
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
+  if (doc.value?.status !== 'done' || result.value === null) return
+  if (openPanelSearch()) event.preventDefault()
+}
+
+onMounted(() => document.addEventListener('keydown', handleSearchShortcut))
+onBeforeUnmount(() => document.removeEventListener('keydown', handleSearchShortcut))
+
 /**
  * The backend's notice that this PDF blacks out passages the reviewer chose
  * to keep. Matched by CODE, never re-derived here: the condition depends on
@@ -870,11 +1017,14 @@ async function downloadRedactedPdf() {
           entry.policy,
           entry.rules,
           entry.redactAreas,
-          // Both matter only on a backend cache miss, where the document is
+          // These matter only on a backend cache miss, where the document is
           // re-extracted and re-transformed: without them the fallback would
-          // skip the forced OCR and write German placeholders.
+          // skip the forced OCR, use another OCR profile, and write German
+          // placeholders.
           entry.forceOcr,
+          entry.ocrProfile,
           entry.outputLanguage,
+          settings.redactionBars,
         ),
       exportFilename('pdf'),
     )

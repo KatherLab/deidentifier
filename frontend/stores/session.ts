@@ -28,7 +28,9 @@ import {
 } from '@/utils/errors'
 import { DEFAULT_POLICY, policyDeviations } from '@/utils/policy'
 import { formatRemaining, remainingSeconds } from '@/utils/lifetime'
+import { findMatches, type MatchRange } from '@/utils/textSegments'
 import { useToast } from '@/composables/useToast'
+import { useSettingsStore } from '@/stores/settings'
 import type {
   AnonymizeResponse,
   AnonymizedEntity,
@@ -138,6 +140,18 @@ export interface SessionDocument {
   areasShowRedacted: boolean
   /** Active result panels in ACTIVATION order (restored on document switch). */
   activePanels: ResultPanelId[]
+  /**
+   * The panel the reviewer last worked in. Ctrl/Cmd+F searches THIS one — the
+   * final check ("is that name really gone?") is always about one specific
+   * view, and asking which would be one question too many.
+   */
+  focusedPanel: ResultPanelId | null
+  /** The panel whose search bar is open, or null while none is. */
+  searchPanel: ResultPanelId | null
+  /** The search term. Memory only — never persisted, like every other input. */
+  searchQuery: string
+  /** Which hit the reviewer is on (clamped to the hit count when read). */
+  searchMatchIndex: number
   /** Policy deviations captured at submit — used for ALL re-runs/exports. */
   policy: PolicyMap | null
   /** Custom rules captured at submit — used for ALL re-runs/exports. */
@@ -546,6 +560,10 @@ export const useSessionStore = defineStore('session', () => {
       pdfRedactedPagesToken: 0,
       areasShowRedacted: true,
       activePanels: ['source'],
+      focusedPanel: null,
+      searchPanel: null,
+      searchQuery: '',
+      searchMatchIndex: 0,
       policy: batchPolicy,
       rules: batchRules,
       forceOcr: batchForceOcr,
@@ -893,6 +911,100 @@ export const useSessionStore = defineStore('session', () => {
     }
     if (doc.activePanels.length === 1) return
     doc.activePanels.splice(index, 1)
+    // A search bar cannot outlive the panel it belongs to.
+    if (doc.searchPanel === id) closeSearch()
+    if (doc.focusedPanel === id) doc.focusedPanel = null
+  }
+
+  // ---------------------------------------------------------------------
+  // Panel search (per document, in the panel the reviewer last worked in)
+  // ---------------------------------------------------------------------
+
+  /**
+   * Whether the app can search a panel — meaning MARK the hit where the
+   * reviewer is looking.
+   *
+   * A PDF panel renders a browser PDF viewer in an iframe: JavaScript can
+   * neither search it nor highlight in it. Searching the text behind it would
+   * answer a different question than the one the panel is showing (a hit count
+   * about pages that show nothing, or "Kein Treffer" for a name that is
+   * plainly visible in the source), so those panels have no search bar at all
+   * and the viewer's own find bar is the tool there.
+   */
+  function isSearchablePanel(panel: ResultPanelId): boolean {
+    if (panel === 'pdf') return false
+    if (panel === 'original') return !isPdfResult(activeDocument.value?.result ?? null)
+    return true
+  }
+
+  /** The text a searchable panel is searched against. */
+  function panelSearchText(panel: ResultPanelId, response: AnonymizeResponse): string {
+    return panel === 'anonymized' ? response.anonymized_text : response.source_text
+  }
+
+  const focusedPanel = computed(() => activeDocument.value?.focusedPanel ?? null)
+  const searchPanel = computed(() => activeDocument.value?.searchPanel ?? null)
+
+  /** Writable so the search bar can `v-model` it; a new term restarts at hit 1. */
+  const searchQuery = computed<string>({
+    get: () => activeDocument.value?.searchQuery ?? '',
+    set: (value: string) => {
+      const doc = activeDocument.value
+      if (!doc) return
+      doc.searchQuery = value
+      doc.searchMatchIndex = 0
+    },
+  })
+
+  /** Hits of the current term in the searched panel's text, in document order. */
+  const searchMatches = computed<MatchRange[]>(() => {
+    const doc = activeDocument.value
+    if (!doc || doc.result === null || doc.searchPanel === null) return []
+    return findMatches(panelSearchText(doc.searchPanel, doc.result), doc.searchQuery)
+  })
+
+  /** The active hit, clamped on READ — the hit count changes under it (re-runs). */
+  const searchMatchIndex = computed<number>(() => {
+    const doc = activeDocument.value
+    const total = searchMatches.value.length
+    if (!doc || total === 0) return 0
+    return Math.min(Math.max(doc.searchMatchIndex, 0), total - 1)
+  })
+
+  /** Remember where the reviewer is working; Ctrl/Cmd+F opens the search there. */
+  function focusPanel(id: ResultPanelId): void {
+    const doc = activeDocument.value
+    if (!doc) return
+    doc.focusedPanel = id
+  }
+
+  function openSearch(id: ResultPanelId): void {
+    const doc = activeDocument.value
+    if (!doc || !isSearchablePanel(id)) return
+    doc.searchPanel = id
+    doc.focusedPanel = id
+    doc.searchMatchIndex = 0
+  }
+
+  function closeSearch(): void {
+    const doc = activeDocument.value
+    if (!doc) return
+    doc.searchPanel = null
+  }
+
+  /** Step to the next (+1) or previous (−1) hit, wrapping around. */
+  function stepSearch(delta: 1 | -1): void {
+    const doc = activeDocument.value
+    const total = searchMatches.value.length
+    if (!doc || total === 0) return
+    doc.searchMatchIndex = (searchMatchIndex.value + delta + total) % total
+  }
+
+  /** Search a term in a specific panel — "is this name really gone?" in one click. */
+  function searchInPanel(id: ResultPanelId, term: string): void {
+    activatePanel(id)
+    openSearch(id)
+    searchQuery.value = term
   }
 
   // ---------------------------------------------------------------------
@@ -940,6 +1052,7 @@ export const useSessionStore = defineStore('session', () => {
         doc.forceOcr,
         doc.ocrProfile,
         doc.outputLanguage,
+        useSettingsStore().redactionBars,
       )
       if (token !== doc.pdfPreviewToken) return
       if (doc.pdfPreviewUrl !== null) URL.revokeObjectURL(doc.pdfPreviewUrl)
@@ -957,6 +1070,20 @@ export const useSessionStore = defineStore('session', () => {
   async function refreshPdfPreview(): Promise<void> {
     const doc = activeDocument.value
     if (doc) await refreshPdfPreviewFor(doc)
+  }
+
+  /**
+   * Re-export the preview of every finished SCANNED document — what the
+   * redaction-bar option changes. It has to be the whole batch, not just the
+   * document on screen: the ZIP export bundles these preview blobs, so leaving
+   * the others behind would hand out a batch that disagrees with itself.
+   */
+  async function refreshReconstructedPreviews(): Promise<void> {
+    await Promise.all(
+      documents.value
+        .filter((doc) => doc.status === 'done' && doc.result?.source_type === 'pdf-ocr')
+        .map((doc) => refreshPdfPreviewFor(doc)),
+    )
   }
 
   // ---------------------------------------------------------------------
@@ -1480,11 +1607,23 @@ export const useSessionStore = defineStore('session', () => {
     activePanels,
     activatePanel,
     togglePanel,
+    focusedPanel,
+    focusPanel,
+    isSearchablePanel,
+    searchPanel,
+    searchQuery,
+    searchMatches,
+    searchMatchIndex,
+    openSearch,
+    closeSearch,
+    stepSearch,
+    searchInPanel,
     pdfPreviewUrl,
     pdfPreviewBlob,
     pdfPreviewLoading,
     pdfPreviewError,
     refreshPdfPreview,
+    refreshReconstructedPreviews,
     originalPreviewUrl,
     ensureOriginalPreviewUrl,
     redactAreas,
