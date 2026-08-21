@@ -78,6 +78,71 @@ test.describe('anonymization workflow', () => {
     await expect(outputPanel).not.toContainText('Max Mustermann', { timeout: 30_000 })
   })
 
+  test('checks in the result whether a redacted name is really gone', async ({ page }) => {
+    await page.goto('/')
+
+    await page.getByLabel('Text einfügen').fill(DISCHARGE_LETTER)
+    await page.getByRole('button', { name: 'Anonymisieren' }).click()
+    await waitForResult(page)
+
+    const output = page.getByRole('heading', { name: 'Anonymisierter Text' })
+    const outputPanel = page.locator('section', { has: output }).last()
+
+    // One click from a find to "is this text still in the output?".
+    await page.locator('[data-entity-index]', { hasText: 'Max Mustermann' }).first().click()
+    const details = page.getByLabel('Details zur ausgewählten Entität')
+    await details.getByRole('button', { name: 'Im Ergebnis suchen' }).click()
+
+    const search = outputPanel.getByRole('search')
+    const field = search.getByLabel('In dieser Ansicht suchen')
+    await expect(field).toHaveValue('Max Mustermann')
+    await expect(search).toContainText('Kein Treffer')
+    await expect(outputPanel.locator('[data-match-index]')).toHaveCount(0)
+
+    // The placeholder that replaced it IS there — and is marked in the panel.
+    await field.fill('[PERSON_1]')
+    await expect(search).toContainText('1/1')
+    await expect(outputPanel.locator('[data-match-index]')).toHaveCount(1)
+
+    // The search belongs to one panel: the source review is untouched by it.
+    const sourcePanel = page
+      .locator('section', { has: page.getByRole('heading', { name: 'Quellprüfung' }) })
+      .last()
+    await expect(sourcePanel.locator('[data-match-index]')).toHaveCount(0)
+  })
+
+  test('opens the search in the panel the reviewer is working in', async ({ page }) => {
+    await page.goto('/')
+
+    await page.getByLabel('Text einfügen').fill(DISCHARGE_LETTER)
+    await page.getByRole('button', { name: 'Anonymisieren' }).click()
+    await waitForResult(page)
+
+    const outputPanel = page
+      .locator('section', { has: page.getByRole('heading', { name: 'Anonymisierter Text' }) })
+      .last()
+    const sourcePanel = page
+      .locator('section', { has: page.getByRole('heading', { name: 'Quellprüfung' }) })
+      .last()
+
+    // Nothing touched yet: the shortcut lands on the result, which is what a
+    // final check is about.
+    await page.keyboard.press('ControlOrMeta+f')
+    await expect(outputPanel.getByRole('search')).toBeVisible()
+    await page.getByLabel('In dieser Ansicht suchen').fill('[PERSON_1]')
+    await expect(outputPanel.getByRole('search')).toContainText('1/1')
+
+    // Escape closes it again.
+    await page.keyboard.press('Escape')
+    await expect(outputPanel.getByRole('search')).toHaveCount(0)
+
+    // After working in the source review, the shortcut follows the reviewer.
+    await sourcePanel.locator('[data-entity-index]').first().click()
+    await page.keyboard.press('ControlOrMeta+f')
+    await expect(sourcePanel.getByRole('search')).toBeVisible()
+    await expect(outputPanel.getByRole('search')).toHaveCount(0)
+  })
+
   test('selects several finds at once and changes them in one go', async ({ page }) => {
     await page.goto('/')
 
@@ -232,6 +297,35 @@ test.describe('anonymization workflow', () => {
       .getByRole('menuitem', { name: 'Als PDF' })
       .click()
     expect((await download).suggestedFilename()).toContain('.pdf')
+  })
+
+  test('checks a PDF result in the text view, which can mark the hit', async ({ page }) => {
+    await page.goto('/')
+
+    await page.locator('input[type="file"]').setInputFiles(path.join(FIXTURES, '9874562_text.pdf'))
+    await page.getByRole('button', { name: 'Anonymisieren' }).click()
+    await waitForResult(page)
+
+    // The result panel starts on the redacted PDF, which carries no search:
+    // a browser PDF viewer cannot be searched or highlighted from the app.
+    const pdfPanel = page
+      .locator('section', { has: page.getByRole('heading', { name: 'Geschwärztes PDF' }) })
+      .last()
+    await expect(pdfPanel.getByRole('button', { name: 'Suchen', exact: true })).toHaveCount(0)
+
+    // "Im Ergebnis suchen" therefore switches to the anonymized TEXT, where the
+    // answer can actually be shown.
+    await page.locator('[data-entity-index]').first().click()
+    await page
+      .getByLabel('Details zur ausgewählten Entität')
+      .getByRole('button', { name: 'Im Ergebnis suchen' })
+      .click()
+
+    const outputPanel = page
+      .locator('section', { has: page.getByRole('heading', { name: 'Anonymisierter Text' }) })
+      .last()
+    await expect(outputPanel.getByRole('search')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Geschwärztes PDF' })).toHaveCount(0)
   })
 
   test('shows the automatic redactions in the area editor', async ({ page }) => {

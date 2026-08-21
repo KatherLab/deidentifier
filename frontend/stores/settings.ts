@@ -7,6 +7,7 @@ import { defineStore } from 'pinia'
 
 const EXPERT_MODE_KEY = 'expertMode'
 const KEEP_FILENAMES_KEY = 'keepFilenames'
+const REDACTION_BARS_KEY = 'redactionBars'
 
 function readFlag(key: string): boolean {
   try {
@@ -49,5 +50,25 @@ export const useSettingsStore = defineStore('settings', () => {
     writeFlag(KEEP_FILENAMES_KEY, value)
   }
 
-  return { expertMode, setExpertMode, keepFilenames, setKeepFilenames }
+  /**
+   * Black bars instead of readable placeholders in a SCANNED document's
+   * redacted PDF. Off by default: the placeholders say what was removed and
+   * which person a tag refers to, which is worth more than looking like the
+   * native export — but a site that hands the file on often wants the bars.
+   */
+  const redactionBars = ref(readFlag(REDACTION_BARS_KEY))
+
+  function setRedactionBars(value: boolean): void {
+    redactionBars.value = value
+    writeFlag(REDACTION_BARS_KEY, value)
+  }
+
+  return {
+    expertMode,
+    setExpertMode,
+    keepFilenames,
+    setKeepFilenames,
+    redactionBars,
+    setRedactionBars,
+  }
 })

@@ -57,6 +57,38 @@ Chips above the panels toggle up to three views side by side:
 In [expert mode](advanced-settings.md#expert-mode) the redacted PDF and the
 anonymized text become separate chips, so you can show both at once.
 
+## Searching inside a panel
+
+Each text panel has a magnifier in its header, and `Ctrl+F` (`Cmd+F` on a Mac)
+opens the search **in the panel you last worked in** — so the final check is one
+shortcut away from wherever you are reading. `Enter` and `Shift+Enter` step
+through the hits, `Esc` closes the bar. Every hit is marked in the text and the
+counter shows which one you are on.
+
+The search ignores case and diacritics, so `muller` finds *Müller*. Each panel
+searches on its own; opening the search in one leaves the others untouched.
+
+The point of it is the last check before you export: search a name in the
+**Ergebnis** panel and read the counter. **Kein Treffer** means that string does
+not occur in the anonymized text. A selected find offers this in one click —
+**Im Ergebnis suchen** puts its text straight into the anonymized text's search,
+switching the result panel to that view if the redacted PDF was showing.
+
+!!! warning "What a hit count is, and is not"
+
+    It is a statement about **one string in one panel's text**, nothing more. A
+    name spelled differently, split across a line break, or mangled by OCR does
+    not turn up — "Kein Treffer" is not a proof of anonymization
+    ([Warnings & validation](validation.md)).
+
+!!! note "PDF views have no search of their own"
+
+    A PDF is rendered by the browser's own viewer, which this app can neither
+    search nor highlight in — so the **Original** panel of a PDF source and the
+    **Geschwärztes PDF** panel carry no magnifier, and the shortcut skips them
+    for the nearest text panel. To search the pages themselves, click into the
+    PDF and use the viewer's own find function.
+
 ## Reading the highlights
 
 <figure markdown>
@@ -93,6 +125,7 @@ have to look away from the passage you are judging:
 |---|---|
 | **Beibehalten** | Keep this passage visible. |
 | **Schwärzen** | Redact a passage that was preserved. |
+| **Im Ergebnis suchen** | Look this text up in the anonymized text — see [Searching inside a panel](#searching-inside-a-panel). |
 | Type dropdown | Correct a wrong type — the new type's transformation applies immediately. |
 | **Zurücksetzen** | Undo your change for this entity. |
 

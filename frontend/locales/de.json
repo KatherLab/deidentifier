@@ -203,6 +203,8 @@
       "zip": "Alle Dokumente (.zip)",
       "keep_filenames": "Dateinamen beibehalten",
       "keep_filenames_hint": "Vorsicht: Dateinamen können personenbezogene Daten enthalten.",
+      "redaction_bars": "Schwarze Balken statt Platzhaltern",
+      "redaction_bars_hint": "Nur für gescannte Dokumente: Die Rekonstruktion zeigt dann schwarze Balken – wie bei nativen PDFs.",
       "filename": "anonymisiert",
       "document_fallback": "dokument"
     },
@@ -253,6 +255,18 @@
     "redact": "Schwärzen",
     "redact_label": "Auswahl manuell schwärzen"
   },
+  "search": {
+    "open": "Suchen",
+    "open_title": "In dieser Ansicht suchen (Strg/Cmd + F)",
+    "label": "In dieser Ansicht suchen",
+    "placeholder": "Suchen …",
+    "count": "{current}/{total}",
+    "count_label": "Treffer {current} von {total}",
+    "no_matches": "Kein Treffer",
+    "next": "Nächster Treffer",
+    "previous": "Vorheriger Treffer",
+    "close": "Suche schließen"
+  },
   "detail": {
     "panel_label": "Details zur ausgewählten Entität",
     "changed": "Geändert",
@@ -263,6 +277,8 @@
     "redact": "Schwärzen",
     "change_type": "Entitätstyp ändern",
     "select_all_occurrences": "Alle {count} Vorkommen wählen",
+    "search_in_result": "Im Ergebnis suchen",
+    "search_in_result_title": "Diesen Text im Ergebnis suchen",
     "close": "Details schließen"
   },
   "selection": {

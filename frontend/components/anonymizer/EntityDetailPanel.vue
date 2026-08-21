@@ -96,6 +96,17 @@
           >
             {{ t('detail.select_all_occurrences', { count: occurrenceCount }, occurrenceCount) }}
           </BaseButton>
+          <!-- The final check, in one click: does this text still occur in the
+               output? Opens the result panel's search on exactly this term. -->
+          <BaseButton
+            size="sm"
+            variant="ghost"
+            :title="t('detail.search_in_result_title')"
+            @click="emit('search', entity.text)"
+          >
+            <Search class="h-3.5 w-3.5" aria-hidden="true" />
+            {{ t('detail.search_in_result') }}
+          </BaseButton>
           <span
             v-if="rerunning"
             class="inline-flex items-center gap-1.5 text-xs text-content-subtle"
@@ -116,7 +127,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { X } from '@lucide/vue'
+import { Search, X } from '@lucide/vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -142,6 +153,8 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   (e: 'close'): void
+  /** Look this text up in the result panel's search. */
+  (e: 'search', term: string): void
 }>()
 
 const { t } = useI18n()

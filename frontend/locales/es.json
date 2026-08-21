@@ -203,6 +203,8 @@
       "zip": "Todos los documentos (.zip)",
       "keep_filenames": "Conservar los nombres de archivo",
       "keep_filenames_hint": "Atención: los nombres de archivo pueden contener datos personales.",
+      "redaction_bars": "Barras negras en vez de marcadores",
+      "redaction_bars_hint": "Solo para documentos escaneados: la reconstrucción muestra barras negras, como un PDF nativo.",
       "filename": "anonimizado",
       "document_fallback": "documento"
     },
@@ -253,6 +255,18 @@
     "redact": "Ocultar",
     "redact_label": "Ocultar la selección manualmente"
   },
+  "search": {
+    "open": "Buscar",
+    "open_title": "Buscar en esta vista (Ctrl/Cmd + F)",
+    "label": "Buscar en esta vista",
+    "placeholder": "Buscar …",
+    "count": "{current}/{total}",
+    "count_label": "Coincidencia {current} de {total}",
+    "no_matches": "Sin coincidencias",
+    "next": "Coincidencia siguiente",
+    "previous": "Coincidencia anterior",
+    "close": "Cerrar la búsqueda"
+  },
   "detail": {
     "panel_label": "Detalles de la entidad seleccionada",
     "changed": "Modificada",
@@ -263,6 +277,8 @@
     "redact": "Ocultar",
     "change_type": "Cambiar el tipo de entidad",
     "select_all_occurrences": "Seleccionar las {count} apariciones",
+    "search_in_result": "Buscar en el resultado",
+    "search_in_result_title": "Buscar este texto en el resultado",
     "close": "Cerrar los detalles"
   },
   "selection": {

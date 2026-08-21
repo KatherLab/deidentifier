@@ -20,7 +20,7 @@
       class="relative min-h-0 flex-1 overflow-y-auto p-6 font-sans text-[15px] leading-relaxed whitespace-pre-wrap break-words text-content"
       @scroll.passive="hidePopover"
     >
-      <template v-for="segment in segments" :key="segment.key">
+      <template v-for="(segment, index) in segments" :key="segment.key">
         <!--
           A SPAN, not a button, on purpose. Browsers force `display: inline-block`
           on form controls whatever the stylesheet says, and an inline-block box
@@ -36,8 +36,9 @@
           v-if="segment.entityIndex !== null"
           role="button"
           tabindex="0"
-          class="inline cursor-pointer rounded-md px-1 py-0.5 box-decoration-clone transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          class="inline cursor-pointer py-0.5 box-decoration-clone transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :class="[
+            markEdgeClass(index),
             entityHighlightClass(entityAt(segment.entityIndex).status),
             isSelected(segment.entityIndex) ? 'ring-2 ring-ring shadow-sm' : '',
             segment.entityIndex === focusIndex ? 'ring-offset-1 ring-offset-surface' : '',
@@ -59,7 +60,13 @@
             span holding EXACTLY the segment text, not on the button (which may
             also contain badge text).
           -->
-          <span :data-start="segment.start" v-text="segment.text"></span>
+          <span
+            :data-start="segment.start"
+            :class="matchClass(segment)"
+            :data-match-index="segment.matchIndex ?? undefined"
+            :aria-current="segment.matchIndex === activeMatchIndex ? 'true' : undefined"
+            v-text="segment.text"
+          ></span>
           <!-- Replacement/type badge only on the SELECTED entity (all other
                marks expose the same info via the title tooltip). -->
           <span
@@ -82,9 +89,22 @@
           :class="WARNING_HIGHLIGHT_CLASS"
           :title="t('highlights.warning_title')"
         >
-          <span :data-start="segment.start" v-text="segment.text"></span>
+          <span
+            :data-start="segment.start"
+            :class="matchClass(segment)"
+            :data-match-index="segment.matchIndex ?? undefined"
+            :aria-current="segment.matchIndex === activeMatchIndex ? 'true' : undefined"
+            v-text="segment.text"
+          ></span>
         </mark>
-        <span v-else :data-start="segment.start" v-text="segment.text"></span>
+        <span
+          v-else
+          :data-start="segment.start"
+          :class="matchClass(segment)"
+          :data-match-index="segment.matchIndex ?? undefined"
+          :aria-current="segment.matchIndex === activeMatchIndex ? 'true' : undefined"
+          v-text="segment.text"
+        ></span>
       </template>
 
       <!--
@@ -131,7 +151,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { EyeOff } from '@lucide/vue'
-import { buildHighlightSegments } from '@/utils/textSegments'
+import {
+  buildHighlightSegments,
+  type HighlightSegment,
+  type MatchRange,
+} from '@/utils/textSegments'
 import { getPillClass } from '@/utils/statusStyles'
 import { overrideKey, useSessionStore } from '@/stores/session'
 import { useToast } from '@/composables/useToast'
@@ -140,6 +164,8 @@ import {
   ENTITY_STATUSES,
   ENTITY_DOT_CLASSES,
   WARNING_DOT_CLASS,
+  SEARCH_MATCH_ACTIVE_CLASS,
+  SEARCH_MATCH_CLASS,
   WARNING_HIGHLIGHT_CLASS,
   entityHighlightClass,
   entityStatusLabel,
@@ -156,9 +182,16 @@ interface Props {
   selectedIndices: number[]
   /** The last-touched entity — scrolled into view, never color alone. */
   focusIndex: number | null
+  /** Panel-search hits over the source text (empty when no search is open). */
+  matches?: MatchRange[]
+  /** Index of the hit the reviewer is currently on, or null. */
+  activeMatchIndex?: number | null
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  matches: () => [],
+  activeMatchIndex: null,
+})
 
 const emit = defineEmits<{
   /** Plain click: this entity becomes the whole selection. */
@@ -176,7 +209,45 @@ const session = useSessionStore()
 const toast = useToast()
 
 const segments = computed(() =>
-  buildHighlightSegments(props.sourceText, props.entities, props.warnings),
+  buildHighlightSegments(props.sourceText, props.entities, props.warnings, props.matches),
+)
+
+/**
+ * One entity can render as several segments — a validation warning or a search
+ * hit runs through it. Rounding and padding only the OUTER edges keeps those
+ * pieces reading as the one mark they are, instead of as adjacent finds.
+ */
+function markEdgeClass(index: number): string {
+  const all = segments.value
+  const entityIndex = all[index]?.entityIndex ?? null
+  const classes: string[] = []
+  if (all[index - 1]?.entityIndex !== entityIndex) classes.push('rounded-l-md pl-1')
+  if (all[index + 1]?.entityIndex !== entityIndex) classes.push('rounded-r-md pr-1')
+  return classes.join(' ')
+}
+
+/** Search-hit styling, layered on top of whatever mark the segment sits in. */
+function matchClass(segment: HighlightSegment): string {
+  if (segment.matchIndex === null) return ''
+  return segment.matchIndex === props.activeMatchIndex
+    ? `${SEARCH_MATCH_CLASS} ${SEARCH_MATCH_ACTIVE_CLASS}`
+    : SEARCH_MATCH_CLASS
+}
+
+/**
+ * Bring the active hit on screen. A hit can be split across several segments
+ * (an entity or warning boundary runs through it) — the first one is where the
+ * match starts, so that is what to scroll to.
+ */
+watch(
+  () => [props.activeMatchIndex, props.matches] as const,
+  async () => {
+    if (props.activeMatchIndex === null) return
+    await nextTick()
+    textContainer.value
+      ?.querySelector(`[data-match-index="${props.activeMatchIndex}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  },
 )
 
 function entityAt(index: number): AnonymizedEntity {

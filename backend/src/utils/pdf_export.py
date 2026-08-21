@@ -618,6 +618,7 @@ def rebuild_scanned_pdf(
     entities: list[AppliedEntity],
     page_count: int,
     areas: list[RedactArea] | None = None,
+    bars: bool = False,
 ) -> bytes:
     from reportlab.lib.colors import grey
     from reportlab.pdfgen import canvas
@@ -632,6 +633,7 @@ def rebuild_scanned_pdf(
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=_PAGE_A4)
     pages = max(page_count, max(line.page_number for line in layout))
+    bar_tokens = _bar_tokens(entities) if bars else []
 
     for page_number in range(1, pages + 1):
         pdf.setFillColor(grey)
@@ -653,6 +655,8 @@ def rebuild_scanned_pdf(
             for index, wrapped_line in enumerate(wrapped):
                 baseline = height - top - (index + 1) * font_size * _LINE_SPACING + font_size * 0.2
                 pdf.drawString(x, baseline, wrapped_line)
+                if bar_tokens:
+                    _draw_bars(pdf, wrapped_line, bar_tokens, x, baseline, font_size)
         pdf.showPage()
     pdf.save()
     output = buffer.getvalue()
@@ -668,6 +672,60 @@ def rebuild_scanned_pdf(
 
 _LINE_SPACING = 1.25
 _FONT_CANDIDATES = (11.0, 10.0, 9.0, 8.0, 7.0, 6.0)
+
+# How far a bar reaches below and above the baseline, as a share of the font
+# size, plus the horizontal padding that makes it read as a bar rather than a
+# tight box around the token. Sized to the text line rather than to the glyphs,
+# which is what the native export's boxes cover — the two should look alike.
+_BAR_DESCENT = 0.25
+_BAR_ASCENT = 0.95
+_BAR_PADDING = 0.12
+
+
+def _bar_tokens(entities: list[AppliedEntity]) -> list[str]:
+    """The replacement strings a black bar is drawn over, longest first.
+
+    Mirrors the native export (`_redact_native_true`): everything it blacks out
+    gets a bar here too, while a GENERALIZED replacement — a date reduced to its
+    year — stays readable there and so stays readable here. PRESERVED entities
+    keep their original text and are not replacements at all.
+    """
+    tokens = {
+        _latin1_safe(entity.replacement)
+        for entity in entities
+        if entity.replacement
+        and entity.status not in (SpanStatus.PRESERVED, SpanStatus.GENERALIZED)
+    }
+    return sorted(tokens, key=len, reverse=True)
+
+
+def _draw_bars(pdf, text: str, tokens: list[str], x: float, baseline: float, size: float) -> None:
+    """Black out every placeholder occurrence in one drawn line.
+
+    The bar is painted OVER the placeholder, which stays in the text layer: the
+    token is never sensitive (that is the point of it), and keeping it means a
+    reader extracting the text still gets `[PERSON_1]` — including which person
+    it was. Locating the tokens by searching the drawn string is exact, because
+    this is the same string, font and size `drawString` just rendered, and
+    placeholders contain no spaces, so wrapping can never split one.
+    """
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    for token in tokens:
+        position = text.find(token)
+        while position != -1:
+            padding = size * _BAR_PADDING
+            start = x + stringWidth(text[:position], "Helvetica", size) - padding
+            token_width = stringWidth(token, "Helvetica", size) + 2 * padding
+            pdf.rect(
+                start,
+                baseline - size * _BAR_DESCENT,
+                token_width,
+                size * (_BAR_DESCENT + _BAR_ASCENT),
+                fill=1,
+                stroke=0,
+            )
+            position = text.find(token, position + len(token))
 
 
 def _fit_text(text: str, box_width: float, box_height: float) -> tuple[float, list[str]]:

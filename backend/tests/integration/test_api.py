@@ -591,3 +591,88 @@ def test_health_endpoints(client):
     assert client.get("/health/live").json() == {"status": "ok"}
     ready = client.get("/health/ready").json()
     assert ready["status"] == "ready"
+
+
+def _fake_scan_extraction(text: str, lines: list[str]):
+    """A pdf-ocr extraction with one layout box per line, stacked down page 1.
+
+    Lets the export route exercise the scanned-document reconstruction without
+    an OCR service — the same substitution the reconstruction itself sees."""
+    from backend.src.utils.extraction import ExtractedDocument, LayoutLine, PageRange
+
+    layout = []
+    position = 0
+    for index, line in enumerate(lines):
+        start = text.index(line, position)
+        layout.append(
+            LayoutLine(
+                page_number=1,
+                x1=100,
+                y1=100 + index * 40,
+                x2=900,
+                y2=130 + index * 40,
+                start=start,
+                end=start + len(line),
+            )
+        )
+        position = start + len(line)
+    return ExtractedDocument(
+        text=text,
+        source_type="pdf-ocr",
+        pages=[PageRange(page_number=1, start=0, end=len(text))],
+        layout=layout,
+    )
+
+
+def test_export_scanned_pdf_draws_bars_only_when_asked(client, monkeypatch):
+    """The `redaction_bars` flag reaches the reconstruction."""
+    import io
+
+    import pymupdf
+
+    from backend.src.routers.v1.endpoints import export as export_endpoint
+    from backend.tests.pdf_builder import make_pdf
+
+    lines = [
+        "Patient: Max Mustermann, geb. 01.02.1980",
+        "Der Patient wurde stationaer aufgenommen und komplikationslos behandelt.",
+    ]
+    text = "\n".join(lines)
+    pdf = make_pdf(lines)
+
+    async def fake_extract(*args, **kwargs):
+        return _fake_scan_extraction(text, lines)
+
+    monkeypatch.setattr(export_endpoint, "extract_document", fake_extract)
+
+    def black_rects(content: bytes) -> int:
+        document = pymupdf.open(stream=content, filetype="pdf")
+        try:
+            return sum(
+                1
+                for drawing in document[0].get_drawings()
+                if drawing.get("fill") == (0.0, 0.0, 0.0)
+            )
+        finally:
+            document.close()
+
+    def export(**data):
+        response = client.post(
+            "/api/v1/export/pdf",
+            files={"file": ("scan.pdf", pdf, "application/pdf")},
+            data={"overrides": "[]", **data},
+        )
+        assert response.status_code == 200
+        return response.content
+
+    plain = export()
+    barred = export(redaction_bars="true")
+    assert black_rects(plain) == 0
+    assert black_rects(barred) > 0
+
+    # The bar is drawn over the placeholder, which stays in the text layer.
+    from pypdf import PdfReader
+
+    extracted = "".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(barred)).pages)
+    assert "Max Mustermann" not in extracted
+    assert "[PERSON_1]" in extracted
