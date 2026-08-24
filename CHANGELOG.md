@@ -11,6 +11,16 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+### Added
+
+- The text panels of a result can be searched — `Ctrl/Cmd+F` opens the search in
+  the panel you last worked in, and a selected find offers **Im Ergebnis
+  suchen** to check whether its text still occurs in the output. See
+  [Reviewing a result](docs/user-guide/review.md).
+- **Schwarze Balken statt Platzhaltern** in the export menu draws black bars
+  over the placeholders of a scanned document's rebuilt PDF, so it looks like a
+  native redacted PDF — see [Exporting](docs/user-guide/export.md#redacted-pdf).
+
 ## [0.3.0] — 2026-08-20
 
 ### Added

@@ -33,6 +33,24 @@ Both paths **fail closed**. If the redaction cannot be verified afterwards, the
 export is refused with an error rather than handing you a file that looks
 redacted but is not.
 
+### Black bars in a rebuilt document
+
+The two paths look different by nature: a native PDF blacks its redactions out,
+while a rebuilt one prints the replacements as words — `[PERSON_1]`,
+`[ADRESSE]`. **Schwarze Balken statt Platzhaltern** in the export menu (shown
+for scanned sources only) draws a bar over each placeholder instead, so the two
+kinds of document look alike.
+
+The bar is painted over the placeholder, which stays in the text layer: copying
+the text out still yields `[PERSON_1]`, including which person the tag refers
+to. Nothing sensitive sits under a bar — the original text was never written
+into the rebuilt page in the first place.
+
+Dates reduced to their year stay readable either way, exactly as in a native
+export. The setting is remembered, applies to the preview and to every document
+of the batch, and changes nothing about what was redacted — only how it is
+drawn.
+
 Any [areas you blacked out](review.md#blacking-out-areas-of-a-pdf) are applied
 on top, in both paths.
 

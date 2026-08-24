@@ -203,6 +203,8 @@
       "zip": "Tous les documents (.zip)",
       "keep_filenames": "Conserver les noms de fichiers",
       "keep_filenames_hint": "Attention : les noms de fichiers peuvent contenir des données personnelles.",
+      "redaction_bars": "Barres noires au lieu des marqueurs",
+      "redaction_bars_hint": "Documents numérisés uniquement : la reconstruction affiche des barres noires – comme un PDF natif.",
       "filename": "anonymise",
       "document_fallback": "document"
     },
@@ -253,6 +255,18 @@
     "redact": "Masquer",
     "redact_label": "Masquer manuellement la sélection"
   },
+  "search": {
+    "open": "Rechercher",
+    "open_title": "Rechercher dans cette vue (Ctrl/Cmd + F)",
+    "label": "Rechercher dans cette vue",
+    "placeholder": "Rechercher …",
+    "count": "{current}/{total}",
+    "count_label": "Résultat {current} sur {total}",
+    "no_matches": "Aucun résultat",
+    "next": "Résultat suivant",
+    "previous": "Résultat précédent",
+    "close": "Fermer la recherche"
+  },
   "detail": {
     "panel_label": "Détails de l’entité sélectionnée",
     "changed": "Modifiée",
@@ -263,6 +277,8 @@
     "redact": "Masquer",
     "change_type": "Changer le type d’entité",
     "select_all_occurrences": "Sélectionner les {count} occurrences",
+    "search_in_result": "Rechercher dans le résultat",
+    "search_in_result_title": "Rechercher ce texte dans le résultat",
     "close": "Fermer les détails"
   },
   "selection": {

@@ -120,6 +120,16 @@ export function entityHighlightClass(status: string): string {
 export const WARNING_HIGHLIGHT_CLASS =
   'bg-yellow-100 text-yellow-900 ring-1 ring-yellow-400 dark:bg-yellow-900/40 dark:text-yellow-200 dark:ring-yellow-600'
 
+/**
+ * Search hit inside a panel. Teal is deliberately not an entity-status or
+ * warning color: a hit sits INSIDE those marks in the source review, so it has
+ * to read as a different kind of thing. The active hit is never distinguished
+ * by color alone — it is scrolled into view and counted in the search bar.
+ */
+export const SEARCH_MATCH_CLASS =
+  'rounded-sm bg-teal-200 text-teal-950 dark:bg-teal-700 dark:text-teal-50'
+export const SEARCH_MATCH_ACTIVE_CLASS = 'ring-2 ring-teal-600 dark:ring-teal-300'
+
 /** Compact legend dot per entity status (always paired with a text label). */
 export const ENTITY_DOT_CLASSES: Record<EntityStatus, string> = {
   REDACTED: 'bg-red-400 dark:bg-red-500',
