@@ -296,7 +296,7 @@ route is protected by default rather than by remembering a dependency):
 | `POST /api/v1/anonymize/stream` | Same inputs, streams NDJSON `{"event":"progress"…}` lines then `{"event":"result"…}`. Inputs are parsed *before* streaming starts, so malformed requests still fail with normal HTTP errors. A client disconnect cancels the pipeline. |
 | `POST /api/v1/anonymize/{request_id}/extend` | Keep a cached result for another TTL, never past the hard lifetime ceiling. 410 when it is already gone. Backs the review view's countdown + **Verlängern**. |
 | `DELETE /api/v1/anonymize/{request_id}` | Forget one cached detection now. Always 204 (an unknown id must not be distinguishable). Called by the UI when a document is closed, reset, or the tab unloads. |
-| `POST /api/v1/export/pdf` | Redacted-PDF export. The client **re-sends the original file** (nothing is stored); `request_id` + matching hash avoids re-running OCR/detection. |
+| `POST /api/v1/export/pdf` | Redacted-PDF export. The client **re-sends the original file** (nothing is stored); `request_id` + matching hash avoids re-running OCR/detection. A refusal answers `{detail, code, forceable, items}`; `force_export=true` re-runs it and is honoured for `forceable` findings only. |
 | `POST /api/v1/export/pdf/pages` | Renders pages as PNGs for the area-redaction editor, with embedded-image boxes as one-click suggestions. |
 | `GET /api/v1/status` | Configured detectors + OCR engine, endpoint **hosts** and their locality, limits. Never returns paths, keys, or full URLs. |
 | `GET /health/live`, `GET /health/ready` | Liveness/readiness. |
@@ -324,7 +324,7 @@ extensions `.txt/.docx/.pdf`. `Cache-Control: no-store` on content routes
 | `utils/policy.py`, `utils/transformation.py` | Default policy, labels, pure transformations. |
 | `utils/leakage.py` | Output validation + `compute_status`. |
 | `utils/cache.py` | `request_cache` (TTL, bounded, in-memory). |
-| `utils/pdf_export.py` | Native-PDF true redaction, rasterized fallback, scanned-PDF reconstruction, page rendering. **Fails closed**: an export that cannot be verified is refused. |
+| `utils/pdf_export.py` | Native-PDF true redaction, rasterized fallback, scanned-PDF reconstruction, page rendering. **Fails closed**: an export that cannot be verified is refused. The one exception is a residual the anonymized *text* has too (`expected_text`), which is refused as `forceable` and exported only after the reviewer confirms it. |
 | `utils/notices.py` | Stable codes + English text for every non-fatal message (the translation contract). |
 | `utils/policy.py` | Default policy + the replacement placeholders of every output language. |
 | `utils/auth.py` | Session + login-state tokens for the OIDC gate (HS256, PKCE helpers). No session store: the signed cookie *is* the session. |
@@ -757,7 +757,9 @@ npm run test:e2e            # when you touched the API or the UI flow
   exactly this; don't skip it because "it's only a label".
 - **Silent degradation.** Never catch a `DetectorError` and continue with
   fewer detectors, and never let a failed export produce an unverified PDF.
-  Failing loudly is the feature.
+  Failing loudly is the feature. `force_export` is not a hole in that: it
+  applies to one classified finding, the reviewer is told what stays visible,
+  and the PDF panel keeps saying so afterwards.
 - **The cache is not persistence.** A 410 is normal; the frontend re-posts the
   source text. Don't "fix" it by extending the TTL indefinitely or writing to
   disk.

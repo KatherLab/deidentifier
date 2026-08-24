@@ -8,7 +8,7 @@
  * through to the backend text rather than to a generic message.
  */
 import { isAxiosError } from 'axios'
-import { t } from '@/i18n'
+import { hasMessage, t } from '@/i18n'
 
 const STATUS_MESSAGE_KEYS: Record<number, string> = {
   // Only reachable with the sign-in gate on: the session ran out mid-work.
@@ -29,13 +29,31 @@ export function isExpiredResultError(err: unknown): boolean {
 }
 
 /**
- * Error message for the redacted-PDF export. The export request uses
- * `responseType: 'blob'`, so error bodies arrive as a Blob and must be parsed
- * back into `{"detail": string}` before the usual mapping. A 422 detail (e.g.
- * "redaction could not be verified") is user-appropriate English from the
- * backend — surface it behind a translated prefix.
+ * A refused redacted-PDF export, in the form the review UI acts on.
+ *
+ * `forceable` is the backend's judgement, never re-derived here: only it knows
+ * whether the finding is one the anonymized text download carries too (a
+ * passage the reviewer kept that also occurs in redacted form) or a blackout
+ * that failed to apply. `items` are the passages that would stay visible —
+ * document content, so they live in memory and never in a log or storage.
+ * `count` is how many there are: `items` is capped for display, and a notice
+ * that undercounts is worse than one that lists fewer examples.
  */
-export async function extractPdfExportErrorMessage(err: unknown): Promise<string> {
+export interface PdfExportFailure {
+  message: string
+  code: string | null
+  forceable: boolean
+  items: string[]
+  count: number
+}
+
+/**
+ * Parse an export error. The request uses `responseType: 'blob'`, so error
+ * bodies arrive as a Blob and must be read back into JSON before the usual
+ * mapping. A known `code` is translated; anything else falls back to the
+ * backend's English `detail` behind a translated prefix.
+ */
+export async function parsePdfExportError(err: unknown): Promise<PdfExportFailure> {
   if (isAxiosError(err) && err.response && err.response.data instanceof Blob) {
     try {
       err.response.data = JSON.parse(await err.response.data.text())
@@ -44,12 +62,42 @@ export async function extractPdfExportErrorMessage(err: unknown): Promise<string
       err.response.data = undefined
     }
   }
-  if (isAxiosError(err) && err.response?.status === 422) {
-    const data = err.response.data as { detail?: unknown } | undefined
-    const detail = typeof data?.detail === 'string' ? data.detail.trim() : ''
-    if (detail) return t('errors.pdf_export_detail', { detail })
+  const data = isAxiosError(err)
+    ? (err.response?.data as
+        | {
+            detail?: unknown
+            code?: unknown
+            items?: unknown
+            forceable?: unknown
+            count?: unknown
+          }
+        | undefined)
+    : undefined
+  const code = typeof data?.code === 'string' ? data.code : null
+  const items = Array.isArray(data?.items) ? data.items.filter((i) => typeof i === 'string') : []
+  const forceable = data?.forceable === true
+  const count = typeof data?.count === 'number' ? data.count : items.length
+
+  const key = code === null ? null : `errors.export.${code}`
+  if (key !== null && hasMessage(key)) {
+    return { message: t(key, { count }), code, forceable, items, count }
   }
-  return extractApiErrorMessage(err, t('errors.pdf_export_failed'))
+  const detail = typeof data?.detail === 'string' ? data.detail.trim() : ''
+  if (isAxiosError(err) && err.response?.status === 422 && detail) {
+    return { message: t('errors.pdf_export_detail', { detail }), code, forceable, items, count }
+  }
+  return {
+    message: extractApiErrorMessage(err, t('errors.pdf_export_failed')),
+    code,
+    forceable,
+    items,
+    count,
+  }
+}
+
+/** The message alone, for the places that only show one (toasts). */
+export async function extractPdfExportErrorMessage(err: unknown): Promise<string> {
+  return (await parsePdfExportError(err)).message
 }
 
 export function extractApiErrorMessage(err: unknown, fallback?: string): string {

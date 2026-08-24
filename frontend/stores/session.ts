@@ -23,8 +23,9 @@ import { anonymizeFileStream, anonymizeTextStream } from '@/services/anonymizeSt
 import { statusApi } from '@/services/statusApi'
 import {
   extractApiErrorMessage,
-  extractPdfExportErrorMessage,
   isExpiredResultError,
+  parsePdfExportError,
+  type PdfExportFailure,
 } from '@/utils/errors'
 import { DEFAULT_POLICY, policyDeviations } from '@/utils/policy'
 import { formatRemaining, remainingSeconds } from '@/utils/lifetime'
@@ -101,6 +102,26 @@ export interface SessionDocument {
   pdfPreviewBlob: Blob | null
   pdfPreviewLoading: boolean
   pdfPreviewError: string | null
+  /**
+   * A refused export the reviewer may confirm (a redacted text that also
+   * occurs outside the redacted passages, exactly as in the text download).
+   * Set instead of a plain error so the panel can offer "export anyway".
+   */
+  pdfExportBlock: PdfExportFailure | null
+  /**
+   * Every passage they have confirmed may stay visible in this document's PDF.
+   * Kept so an override re-run does not ask again about a finding that is
+   * already answered — while a finding they have NOT seen still stops the
+   * export, however often they confirmed the others.
+   */
+  pdfExportConfirmed: string[]
+  /**
+   * The finding the preview currently on screen was exported past, or null.
+   * Set means this PDF carries an unresolved finding, which the panel says out
+   * loud for as long as it is showing — a confirmation dialog is gone in a
+   * second, the document is not.
+   */
+  pdfExportForced: PdfExportFailure | null
   /** Bumped on every refresh/cleanup so stale in-flight responses are ignored. */
   pdfPreviewToken: number
   /** Object URL for the ORIGINAL uploaded PDF (lazy, "Original" panel). */
@@ -330,6 +351,12 @@ export const useSessionStore = defineStore('session', () => {
   const pdfPreviewBlob = computed(() => activeDocument.value?.pdfPreviewBlob ?? null)
   const pdfPreviewLoading = computed(() => activeDocument.value?.pdfPreviewLoading ?? false)
   const pdfPreviewError = computed(() => activeDocument.value?.pdfPreviewError ?? null)
+  const pdfExportBlock = computed<PdfExportFailure | null>(
+    () => activeDocument.value?.pdfExportBlock ?? null,
+  )
+  const pdfExportForced = computed<PdfExportFailure | null>(
+    () => activeDocument.value?.pdfExportForced ?? null,
+  )
   const originalPreviewUrl = computed(() => activeDocument.value?.originalPreviewUrl ?? null)
   const activePanels = computed<ResultPanelId[]>(() => activeDocument.value?.activePanels ?? [])
 
@@ -545,6 +572,9 @@ export const useSessionStore = defineStore('session', () => {
       pdfPreviewBlob: null,
       pdfPreviewLoading: false,
       pdfPreviewError: null,
+      pdfExportBlock: null,
+      pdfExportConfirmed: [],
+      pdfExportForced: null,
       pdfPreviewToken: 0,
       originalPreviewUrl: null,
       redactAreas: [],
@@ -750,6 +780,9 @@ export const useSessionStore = defineStore('session', () => {
     doc.pdfPreviewBlob = null
     doc.pdfPreviewLoading = false
     doc.pdfPreviewError = null
+    doc.pdfExportBlock = null
+    doc.pdfExportConfirmed = []
+    doc.pdfExportForced = null
     if (doc.originalPreviewUrl !== null) URL.revokeObjectURL(doc.originalPreviewUrl)
     doc.originalPreviewUrl = null
     // Rendered pages are data URLs (no revoke needed) — just drop the memory.
@@ -1032,8 +1065,20 @@ export const useSessionStore = defineStore('session', () => {
    * PDF run and after every successful override re-run, so the preview always
    * reflects the user's overrides. Can take up to a minute for scans on a
    * backend cache miss (hence the dedicated loading state).
+   *
+   * A refusal the backend marks `forceable` lands in `pdfExportBlock` instead
+   * of the error line: the export is still refused, but the reviewer can
+   * confirm it with `forcePdfExport()` rather than being left without a PDF.
+   * The request always goes out unforced first — the confirmation is then
+   * re-applied only if it covers everything this refusal names, so a finding
+   * they have never seen cannot ride along on an earlier "yes".
+   *
+   * `forcing` is the refusal being waved through (null = plain export).
    */
-  async function refreshPdfPreviewFor(doc: SessionDocument): Promise<void> {
+  async function refreshPdfPreviewFor(
+    doc: SessionDocument,
+    forcing: PdfExportFailure | null = null,
+  ): Promise<void> {
     const current = doc.result
     const file = doc.file
     if (current === null || file === null || !isPdfResult(current)) return
@@ -1041,6 +1086,7 @@ export const useSessionStore = defineStore('session', () => {
     const token = ++doc.pdfPreviewToken
     doc.pdfPreviewLoading = true
     doc.pdfPreviewError = null
+    doc.pdfExportBlock = null
     try {
       const { data } = await anonymizeApi.exportPdf(
         file,
@@ -1053,17 +1099,52 @@ export const useSessionStore = defineStore('session', () => {
         doc.ocrProfile,
         doc.outputLanguage,
         useSettingsStore().redactionBars,
+        forcing !== null,
       )
       if (token !== doc.pdfPreviewToken) return
       if (doc.pdfPreviewUrl !== null) URL.revokeObjectURL(doc.pdfPreviewUrl)
       doc.pdfPreviewBlob = data
       doc.pdfPreviewUrl = URL.createObjectURL(data)
+      doc.pdfExportForced = forcing
     } catch (err) {
       if (token !== doc.pdfPreviewToken) return
-      doc.pdfPreviewError = await extractPdfExportErrorMessage(err)
+      const failure = await parsePdfExportError(err)
+      if (!failure.forceable) {
+        doc.pdfPreviewError = failure.message
+        doc.pdfExportForced = null
+        return
+      }
+      // Only when the refusal lists ALL of its findings — a list capped for
+      // display would let an unconfirmed one through on a sample that matches.
+      const complete = failure.items.length === failure.count
+      if (
+        forcing === null &&
+        complete &&
+        failure.items.every((item) => doc.pdfExportConfirmed.includes(item))
+      ) {
+        return await refreshPdfPreviewFor(doc, failure)
+      }
+      doc.pdfExportBlock = failure
+      doc.pdfExportForced = null
     } finally {
       if (token === doc.pdfPreviewToken) doc.pdfPreviewLoading = false
     }
+  }
+
+  /**
+   * Confirm the refusal in `pdfExportBlock` and export anyway. Only reachable
+   * from the button that block renders, so only for a finding the backend
+   * called forceable — every other check keeps refusing, flag or no flag.
+   */
+  async function forcePdfExport(): Promise<void> {
+    const doc = activeDocument.value
+    const block = doc?.pdfExportBlock
+    if (!doc || !block) return
+    doc.pdfExportConfirmed = [
+      ...doc.pdfExportConfirmed,
+      ...block.items.filter((item) => !doc.pdfExportConfirmed.includes(item)),
+    ]
+    await refreshPdfPreviewFor(doc, block)
   }
 
   /** Refresh the ACTIVE document's redacted-PDF preview. */
@@ -1622,6 +1703,9 @@ export const useSessionStore = defineStore('session', () => {
     pdfPreviewBlob,
     pdfPreviewLoading,
     pdfPreviewError,
+    pdfExportBlock,
+    pdfExportForced,
+    forcePdfExport,
     refreshPdfPreview,
     refreshReconstructedPreviews,
     originalPreviewUrl,

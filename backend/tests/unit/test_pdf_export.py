@@ -776,3 +776,116 @@ def test_true_redaction_really_does_black_out_the_preserved_duplicate():
     # Both are gone, including the one the reviewer chose to keep.
     assert "Mueller" not in extracted.replace("\n", "")
     assert pdf_export.preserved_texts_at_risk(entities) == ["Mueller"]
+
+
+# --- a residual the anonymized TEXT has too: warn, never silently export ------
+
+
+def _twin_name_document() -> tuple[str, list[LayoutLine], list[AppliedEntity], str]:
+    """A scanned report where the patient and the treating physician share a
+    first name, and the reviewer kept the physician's. The rebuild applies
+    replacements by OFFSET, so the kept occurrence stays on the page — which is
+    exactly what the anonymized text download shows too."""
+    lines = ["Patientin: Anna Musterfrau", "Aerztin: Anna Beispiel"]
+    source = "\n".join(lines)
+    patient = source.index("Anna")
+    doctor = source.index("Anna", patient + 1)
+    entities = [
+        applied("Anna", patient, replacement="[PERSON_1]"),
+        applied("Anna", doctor, replacement=None),
+    ]
+    expected = source[:patient] + "[PERSON_1]" + source[patient + 4 :]
+    return source, make_layout(source, lines), entities, expected
+
+
+def test_rebuild_without_a_reference_text_still_refuses_any_residual():
+    source, layout, entities, _ = _twin_name_document()
+    with pytest.raises(ExportError) as excinfo:
+        rebuild_scanned_pdf(source, layout, entities, page_count=1)
+    assert excinfo.value.forceable is False
+
+
+def test_rebuild_offers_to_force_a_residual_the_text_output_has_too():
+    source, layout, entities, expected = _twin_name_document()
+    with pytest.raises(ExportError) as excinfo:
+        rebuild_scanned_pdf(source, layout, entities, page_count=1, expected_text=expected)
+    error = excinfo.value
+    assert error.code == pdf_export.RESIDUAL_EXPLAINED
+    assert error.forceable is True
+    # Named, so the confirmation can say what stays visible.
+    assert error.items == ["Anna"]
+
+
+def test_forced_rebuild_exports_and_keeps_the_passage_the_reviewer_kept():
+    from pypdf import PdfReader
+
+    source, layout, entities, expected = _twin_name_document()
+    output = rebuild_scanned_pdf(
+        source, layout, entities, page_count=1, expected_text=expected, force=True
+    )
+    extracted = "\n".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(output)).pages)
+    assert "[PERSON_1]" in extracted
+    assert "Anna Beispiel" in extracted
+    assert "Anna Musterfrau" not in extracted
+
+
+def test_force_cannot_wave_through_a_residual_the_text_output_redacted():
+    """The machinery-failure case: the text output has no "Anna", the PDF does.
+    That is a blackout that did not happen — no confirmation may pass it."""
+    source, layout, entities, _ = _twin_name_document()
+    both_redacted = source.replace("Anna", "[PERSON_1]")
+    with pytest.raises(ExportError) as excinfo:
+        rebuild_scanned_pdf(
+            source, layout, entities, page_count=1, expected_text=both_redacted, force=True
+        )
+    error = excinfo.value
+    assert error.code == pdf_export.RESIDUAL_UNEXPLAINED
+    assert error.forceable is False
+
+
+def test_native_export_does_not_fall_back_to_raster_on_a_forceable_finding(monkeypatch):
+    """The rasterizer would stop on the same finding after a full render, and
+    report it as an unforceable one — the reviewer would lose the button."""
+    text = "Befund von Mueller.\nZweitmeinung von Mueller.\n"
+    first = text.index("Mueller")
+    second = text.index("Mueller", first + 1)
+    entities = [applied("Mueller", first), applied("Mueller", second, replacement=None)]
+    monkeypatch.setattr(
+        pdf_export,
+        "_redact_native_raster",
+        lambda *args, **kwargs: pytest.fail("rasterized a forceable finding"),
+    )
+    # Both occurrences are blacked out, so make the text layer the arbiter:
+    # a stubbed verification that reports the kept one as surviving.
+    monkeypatch.setattr(
+        pdf_export,
+        "_verify_native",
+        lambda output, needles, expected_text="", force=False: pdf_export._check_residuals(
+            "Zweitmeinung von Mueller.", needles, expected_text, force, "test"
+        ),
+    )
+    with pytest.raises(ExportError) as excinfo:
+        redact_native_pdf(
+            make_pdf(text),
+            entities,
+            Settings(),
+            expected_text="Befund von [PERSON_1].\nZweitmeinung von Mueller.\n",
+        )
+    assert excinfo.value.forceable is True
+
+
+def test_every_export_code_has_an_english_sentence():
+    """The response is built from the code alone, so a code without a sentence
+    would silently degrade to the generic one."""
+    codes = {
+        value
+        for name, value in vars(pdf_export).items()
+        if name.isupper() and isinstance(value, str) and value.startswith("pdf_export_")
+    }
+    assert codes == set(pdf_export.EXPORT_DETAILS)
+
+
+def test_an_export_error_says_exactly_what_its_code_says():
+    error = pdf_export.ExportError(pdf_export.NOT_LOCATED, count=3)
+    assert str(error) == pdf_export.export_detail(pdf_export.NOT_LOCATED, 3)
+    assert "3 redacted item(s)" in str(error)

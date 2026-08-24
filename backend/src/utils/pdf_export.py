@@ -15,6 +15,18 @@ Scanned PDFs → layout-faithful rebuild. The original pixels are discarded
 entirely (fail-closed); the anonymized text is re-typeset at the OCR bounding
 boxes (0–1000 normalized). The result is re-extracted and checked: no
 redacted entity string may survive in the output.
+
+Both verifications compare against the anonymized TEXT output (`expected_text`)
+rather than against an empty page, because the two are not the same claim:
+
+* A redacted string that survives in the PDF but NOT in the text output means
+  a blackout was not applied — the export machinery failed. Refused, always.
+* A redacted string that survives in BOTH is the reviewer's own doing: they
+  kept one of several identical passages, or a detector found only one
+  occurrence of it. The PDF is then exactly as redacted as the text download
+  the user already has, and `leakage.py` has already flagged it as a HIGH
+  residual. Refused with `forceable=True` so the UI can offer "export anyway"
+  — never exported silently.
 """
 
 import base64
@@ -38,10 +50,89 @@ _MIN_SEARCH_LENGTH = 2
 _SHORT_NEEDLE_MAX = 3
 
 
+# Stable codes for the export failures, mirrored under `errors.export.*` in
+# the locale catalogs.
+EXPORT_FAILED = "pdf_export_failed"
+RESIDUAL_EXPLAINED = "pdf_export_residual_explained"
+RESIDUAL_UNEXPLAINED = "pdf_export_residual_unexplained"
+NOT_LOCATED = "pdf_export_not_located"
+AREA_RESIDUAL = "pdf_export_area_residual"
+NO_LAYOUT = "pdf_export_no_layout"
+PDF_UNREADABLE = "pdf_export_unreadable"
+PDF_NO_PAGES = "pdf_export_no_pages"
+
+# One English sentence per code — the ONLY text an export failure ever puts in
+# front of a caller. Written here rather than at the throw site so that the
+# endpoint can build its response from the code alone: nothing derived from the
+# raised exception, let alone from an upstream library's message, can reach the
+# client. `{count}` is filled from the error's own count where it has one.
+EXPORT_DETAILS: dict[str, str] = {
+    EXPORT_FAILED: "The redacted PDF could not be generated.",
+    RESIDUAL_EXPLAINED: (
+        "{count} redacted text(s) also occur outside the passages that were redacted and "
+        "therefore stay visible in the PDF — exactly as they do in the anonymized text. "
+        "The PDF was not generated; confirm to export it anyway."
+    ),
+    RESIDUAL_UNEXPLAINED: (
+        "Verification failed: a redacted string is still present in the exported PDF; "
+        "the export was aborted."
+    ),
+    NOT_LOCATED: (
+        "{count} redacted item(s) could not be located in the PDF text layer; the "
+        "redacted PDF was NOT generated. The anonymized text download remains safe to use."
+    ),
+    AREA_RESIDUAL: (
+        "Verification failed: text is still present under a blacked-out area; the "
+        "redacted PDF was NOT generated."
+    ),
+    NO_LAYOUT: (
+        "No layout information is available for this document; re-run the anonymization "
+        "and export again."
+    ),
+    PDF_UNREADABLE: "The PDF could not be opened.",
+    PDF_NO_PAGES: "The PDF contains no pages.",
+}
+
+# Cap on the residual strings echoed back to the client. They are document
+# content: the client already holds the source text and the entity list, so
+# this is nothing new to it — but it never goes to a log.
+_MAX_REPORTED_RESIDUALS = 20
+
+
 class ExportError(Exception):
-    def __init__(self, message: str, status_code: int = 422):
-        super().__init__(message)
+    """A refused export, identified by its `code`.
+
+    The code carries the message (`EXPORT_DETAILS`), the UI's translation key
+    and the decision the endpoint makes; there is no free-text message, so a
+    throw site cannot leak an upstream error into the response by accident.
+
+    `forceable` marks the one failure the reviewer may overrule (see the module
+    docstring) and `items` are the strings that would stay visible, so the
+    confirmation can name them. `count` is how many there are, which is NOT
+    `len(items)` once the list is capped for display — a notice that says "20"
+    about 37 findings understates exactly the thing it exists to state.
+    """
+
+    def __init__(
+        self,
+        code: str = EXPORT_FAILED,
+        *,
+        status_code: int = 422,
+        forceable: bool = False,
+        items: list[str] | None = None,
+        count: int | None = None,
+    ):
+        self.code = code
         self.status_code = status_code
+        self.forceable = forceable
+        self.items = items or []
+        self.count = len(self.items) if count is None else count
+        super().__init__(export_detail(code, self.count))
+
+
+def export_detail(code: str, count: int = 0) -> str:
+    """The English sentence for an export failure code."""
+    return EXPORT_DETAILS.get(code, EXPORT_DETAILS[EXPORT_FAILED]).format(count=count)
 
 
 def _page_areas(
@@ -144,10 +235,7 @@ def _verify_areas(data: bytes, areas: list[RedactArea] | None) -> None:
                     x0 * page_width, y0 * page_height, x1 * page_width, y1 * page_height
                 )
                 if any(word[4].strip() for word in page.get_text("words", clip=rect)):
-                    raise ExportError(
-                        "Verification failed: text is still present under a blacked-out "
-                        "area; the redacted PDF was NOT generated."
-                    )
+                    raise ExportError(AREA_RESIDUAL)
     finally:
         document.close()
 
@@ -176,15 +264,24 @@ def redact_native_pdf(
     entities: list[AppliedEntity],
     settings: Settings,
     areas: list[RedactArea] | None = None,
+    *,
+    expected_text: str = "",
+    force: bool = False,
 ) -> bytes:
     try:
-        return _redact_native_true(data, entities, settings, areas)
-    except Exception as exc:
-        logger.warning(
-            "true_redaction_fallback",
-            reason=type(exc).__name__,
+        return _redact_native_true(
+            data, entities, settings, areas, expected_text=expected_text, force=force
         )
-        return _redact_native_raster(data, entities, settings, areas)
+    except ExportError as exc:
+        if exc.forceable:
+            # Not a machinery failure — the rasterizer would black out the same
+            # passages and stop on the same finding, only after a full render,
+            # and its own error would hide the one the reviewer can act on.
+            raise
+        logger.warning("true_redaction_fallback", reason=type(exc).__name__)
+    except Exception as exc:
+        logger.warning("true_redaction_fallback", reason=type(exc).__name__)
+    return _redact_native_raster(data, entities, settings, areas)
 
 
 def _redact_native_true(
@@ -192,6 +289,9 @@ def _redact_native_true(
     entities: list[AppliedEntity],
     settings: Settings,
     areas: list[RedactArea] | None = None,
+    *,
+    expected_text: str = "",
+    force: bool = False,
 ) -> bytes:
     import pymupdf
 
@@ -254,10 +354,7 @@ def _redact_native_true(
 
         missing = [n for n in needles if n not in found and not _covered(n, found)]
         if missing:
-            raise ExportError(
-                f"{len(missing)} redacted item(s) could not be located in the PDF text "
-                "layer; the redacted PDF was NOT generated."
-            )
+            raise ExportError(NOT_LOCATED, count=len(missing))
 
         # Scrub metadata, XMP, embedded/attached files, JavaScript, hidden text.
         try:
@@ -269,7 +366,7 @@ def _redact_native_true(
     finally:
         document.close()
 
-    _verify_native(output, needles)
+    _verify_native(output, needles, expected_text, force)
     _verify_areas(output, areas)
     return output
 
@@ -324,7 +421,52 @@ def _needle_survives(needle: str, text: str, collapsed: str, compact: str | None
     return _compact(needle) in compact
 
 
-def _verify_native(output: bytes, needles: list[str]) -> None:
+def _surviving(needles: list[str], text: str) -> list[str]:
+    """The needles that are still present in `text`, in the given order."""
+    collapsed = re.sub(r"\s+", " ", text)
+    compact = _compact(text)
+    return [needle for needle in needles if _needle_survives(needle, text, collapsed, compact)]
+
+
+def _check_residuals(
+    output_text: str,
+    needles: list[str],
+    expected_text: str,
+    force: bool,
+    location: str,
+) -> None:
+    """Classify the redacted strings that survived in the exported PDF.
+
+    Split by whether the anonymized TEXT output has them too (see the module
+    docstring): one is the reviewer's decision, the other is a broken export.
+    An empty `expected_text` means "nothing may survive", the strict default
+    for callers that have no text output to compare against."""
+    surviving = _surviving(needles, output_text)
+    if not surviving:
+        return
+
+    explained = set(_surviving(surviving, expected_text)) if expected_text else set()
+    unexplained = [needle for needle in surviving if needle not in explained]
+    if unexplained:
+        # Not in the text output, so no reviewer decision put it there: a
+        # blackout that should have covered it did not. Never forceable.
+        logger.warning("export_residual_unexplained", count=len(unexplained), location=location)
+        raise ExportError(RESIDUAL_UNEXPLAINED)
+
+    if not force:
+        raise ExportError(
+            RESIDUAL_EXPLAINED,
+            forceable=True,
+            items=surviving[:_MAX_REPORTED_RESIDUALS],
+            count=len(surviving),
+        )
+
+    logger.warning("export_forced_residuals", count=len(surviving), location=location)
+
+
+def _verify_native(
+    output: bytes, needles: list[str], expected_text: str = "", force: bool = False
+) -> None:
     """Mandatory: re-extract the redacted PDF and assert no redacted string
     survived anywhere in the remaining text layer."""
     import pymupdf
@@ -334,14 +476,7 @@ def _verify_native(output: bytes, needles: list[str]) -> None:
         text = "\n".join(page.get_text() for page in document)
     finally:
         document.close()
-    collapsed = re.sub(r"\s+", " ", text)
-    compact = _compact(text)
-    for needle in needles:
-        if _needle_survives(needle, text, collapsed, compact):
-            raise ExportError(
-                "Verification failed: a redacted string is still present in the "
-                "redacted PDF's text layer."
-            )
+    _check_residuals(text, needles, expected_text, force, "redacted PDF's text layer")
 
 
 def _redact_native_raster(
@@ -368,7 +503,7 @@ def _redact_native_raster(
     try:
         document = pdfium.PdfDocument(data)
     except Exception as exc:
-        raise ExportError("The PDF could not be opened for export.", status_code=415) from exc
+        raise ExportError(PDF_UNREADABLE, status_code=415) from exc
     try:
         images = []
         for page_index, page in enumerate(document):
@@ -434,13 +569,9 @@ def _redact_native_raster(
     if missing:
         # Fail closed: the text layer diverges from what we extracted, so a
         # blackout might be incomplete. Never emit a possibly leaky PDF.
-        raise ExportError(
-            f"{len(missing)} redacted item(s) could not be located in the PDF text "
-            "layer; the redacted PDF was NOT generated. The anonymized text "
-            "download remains safe to use."
-        )
+        raise ExportError(NOT_LOCATED, count=len(missing))
     if not images:
-        raise ExportError("The PDF contains no pages.", status_code=415)
+        raise ExportError(PDF_NO_PAGES, status_code=415)
 
     buffer = io.BytesIO()
     images[0].save(
@@ -566,13 +697,13 @@ def render_pdf_pages(data: bytes) -> tuple[list[dict], bool]:
     try:
         document = pdfium.PdfDocument(data)
     except Exception as exc:
-        raise ExportError("The PDF could not be opened.", status_code=415) from exc
+        raise ExportError(PDF_UNREADABLE, status_code=415) from exc
 
     pages: list[dict] = []
     try:
         total = len(document)
         if total == 0:
-            raise ExportError("The PDF contains no pages.", status_code=415)
+            raise ExportError(PDF_NO_PAGES, status_code=415)
         for index in range(min(total, _MAX_RENDER_PAGES)):
             page = document[index]
             width, height = page.get_size()
@@ -619,15 +750,15 @@ def rebuild_scanned_pdf(
     page_count: int,
     areas: list[RedactArea] | None = None,
     bars: bool = False,
+    *,
+    expected_text: str = "",
+    force: bool = False,
 ) -> bytes:
     from reportlab.lib.colors import grey
     from reportlab.pdfgen import canvas
 
     if not layout:
-        raise ExportError(
-            "No layout information is available for this document; "
-            "re-run the anonymization and export again."
-        )
+        raise ExportError(NO_LAYOUT)
 
     width, height = _PAGE_A4
     buffer = io.BytesIO()
@@ -666,7 +797,7 @@ def rebuild_scanned_pdf(
     # text would leave that text selectable underneath.
     output = _apply_areas(output, areas)
 
-    _verify_rebuilt(output, entities)
+    _verify_rebuilt(output, entities, expected_text, force)
     return output
 
 
@@ -794,17 +925,23 @@ def _latin1_safe(text: str) -> str:
     return text.translate(_UNICODE_FALLBACKS).encode("latin-1", errors="replace").decode("latin-1")
 
 
-def _verify_rebuilt(output: bytes, entities: list[AppliedEntity]) -> None:
-    """Re-extract the generated PDF and assert no redacted string survived."""
+def _verify_rebuilt(
+    output: bytes, entities: list[AppliedEntity], expected_text: str = "", force: bool = False
+) -> None:
+    """Re-extract the generated PDF and assert no redacted string survived.
+
+    The rebuild types the anonymized text through `_latin1_safe`, so the
+    comparison text goes through it too — otherwise a passage the reviewer
+    kept would read as unexplained purely because an en dash became a hyphen
+    on the page."""
     from pypdf import PdfReader
 
     reader = PdfReader(io.BytesIO(output))
     extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
-    collapsed = re.sub(r"\s+", " ", extracted)
-    compact = _compact(extracted)
-    for needle in redacted_texts(entities):
-        if _needle_survives(needle, extracted, collapsed, compact):
-            raise ExportError(
-                "Verification failed: a redacted string is still present in the "
-                "rebuilt PDF; the export was aborted."
-            )
+    _check_residuals(
+        extracted,
+        redacted_texts(entities),
+        _latin1_safe(expected_text) if expected_text else "",
+        force,
+        "rebuilt PDF",
+    )

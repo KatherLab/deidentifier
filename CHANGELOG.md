@@ -21,6 +21,15 @@ documentation, and CI work are left out.
   over the placeholders of a scanned document's rebuilt PDF, so it looks like a
   native redacted PDF — see [Exporting](docs/user-guide/export.md#redacted-pdf).
 
+### Changed
+
+- A PDF export refused because a redacted text also occurs outside the redacted
+  passages — a name you kept, or an occurrence no detector found — now names
+  those passages and offers **Trotzdem exportieren** instead of failing, since
+  the anonymized text download shows them too. Every other verification failure
+  is still refused outright. See
+  [Exporting](docs/user-guide/export.md#when-the-check-finds-text-you-kept).
+
 ## [0.3.0] — 2026-08-20
 
 ### Added

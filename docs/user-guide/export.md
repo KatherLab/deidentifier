@@ -33,6 +33,38 @@ Both paths **fail closed**. If the redaction cannot be verified afterwards, the
 export is refused with an error rather than handing you a file that looks
 redacted but is not.
 
+### When the check finds text you kept
+
+One finding is not a failure of the export, and it is the one you are most
+likely to meet: a redacted text that **also occurs outside the redacted
+passages**. Two everyday examples —
+
+- the patient and the treating physician share a first name, and you kept the
+  physician's;
+- a phrase was redacted in one place and occurs again in a section where no
+  detector found it.
+
+Applying your decisions by position leaves that occurrence standing, so the PDF
+would show it — but so does the anonymized text you can already download, and
+the [validation](validation.md) has flagged it there. Refusing the PDF would
+only make it stricter than the text.
+
+So the export stops, names the passages that would stay visible, and offers
+**Trotzdem exportieren**. The **Geschwärztes PDF** panel then keeps a notice
+saying the document was exported despite an open finding, for as long as it is
+on screen. Confirm once per finding: adjusting other entities does not ask
+again, a *new* passage does.
+
+This applies to reconstructed (scanned) PDFs. A native PDF removes every
+occurrence of a redacted text, so it does not run into it — see the warning
+below for what that costs instead.
+
+Everything else stays refused with no way around it, because it means a
+blackout did not apply: a redacted text still in the PDF that the anonymized
+text does *not* contain, a passage the exporter could not locate on the page,
+or text surviving under an area you blacked out. Use the text export in that
+case, and report the document.
+
 ### Black bars in a rebuilt document
 
 The two paths look different by nature: a native PDF blacks its redactions out,

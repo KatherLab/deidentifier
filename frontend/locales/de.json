@@ -236,7 +236,11 @@
       "reconstructed": "Rekonstruiertes Dokument – Layout angenähert, Originalpixel werden verworfen.",
       "generating": "PDF wird erzeugt …",
       "preview_title": "Geschwärztes PDF (Vorschau)",
-      "no_preview": "Keine Vorschau verfügbar."
+      "no_preview": "Keine Vorschau verfügbar.",
+      "export_anyway": "Trotzdem exportieren",
+      "export_anyway_hint": "Das PDF zeigt dann dieselben Stellen wie der anonymisierte Text.",
+      "forced_notice": "Dieses PDF wurde trotz eines offenen Prüfbefunds erzeugt: 1 geschwärzter Text ist darin weiterhin sichtbar. | Dieses PDF wurde trotz eines offenen Prüfbefunds erzeugt: {count} geschwärzte Texte sind darin weiterhin sichtbar.",
+      "export_more": "und {count} weitere"
     },
     "entities": {
       "section_label": "Erkannte Entitäten",
@@ -420,7 +424,16 @@
     "backend_unreachable": "Server nicht erreichbar. Bitte prüfen Sie, ob das Backend läuft.",
     "pdf_export_failed": "PDF-Export fehlgeschlagen. Bitte versuchen Sie es erneut.",
     "pdf_export_detail": "PDF-Export fehlgeschlagen: {detail}",
-    "unauthorized": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an."
+    "unauthorized": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+    "export": {
+      "pdf_export_residual_explained": "PDF nicht erzeugt: {count} geschwärzte Textstelle(n) kommen auch außerhalb der geschwärzten Passagen vor und blieben im PDF sichtbar – genau wie im anonymisierten Text.",
+      "pdf_export_residual_unexplained": "Prüfung fehlgeschlagen: Eine Schwärzung wurde im PDF nicht angewendet. Das PDF wurde nicht erzeugt.",
+      "pdf_export_not_located": "Prüfung fehlgeschlagen: Nicht alle geschwärzten Inhalte konnten im PDF gefunden werden. Das PDF wurde nicht erzeugt.",
+      "pdf_export_area_residual": "Prüfung fehlgeschlagen: Unter einem geschwärzten Bereich ist noch Text vorhanden. Das PDF wurde nicht erzeugt.",
+      "pdf_export_no_layout": "Für dieses Dokument liegen keine Layout-Informationen vor. Bitte die Anonymisierung erneut ausführen und dann exportieren.",
+      "pdf_export_unreadable": "Das PDF konnte nicht geöffnet werden.",
+      "pdf_export_no_pages": "Das PDF enthält keine Seiten."
+    }
   },
   "toast": {
     "copy_success": "Anonymisierter Text in die Zwischenablage kopiert.",
