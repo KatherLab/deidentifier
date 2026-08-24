@@ -676,3 +676,79 @@ def test_export_scanned_pdf_draws_bars_only_when_asked(client, monkeypatch):
     extracted = "".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(barred)).pages)
     assert "Max Mustermann" not in extracted
     assert "[PERSON_1]" in extracted
+
+
+def test_refused_export_names_its_code_and_whether_it_can_be_forced(client, monkeypatch):
+    """The contract the review UI's "export anyway" button reads."""
+    from backend.src.routers.v1.endpoints import export as export_endpoint
+    from backend.src.utils import pdf_export
+    from backend.tests.pdf_builder import make_pdf
+
+    pdf = make_pdf(
+        [
+            "Patient: Max Mustermann, geb. 01.02.1980",
+            "Der Patient wurde stationaer aufgenommen und komplikationslos behandelt.",
+            "Die Entlassung erfolgte in gutem Allgemeinzustand nach Hause.",
+        ]
+    )
+    seen: dict[str, bool] = {}
+
+    def fake_export(data, entities, settings, areas=None, *, expected_text="", force=False):
+        seen["force"] = force
+        seen["expected_text"] = bool(expected_text)
+        if force:
+            return b"%PDF-forced"
+        raise pdf_export.ExportError(
+            "1 redacted text(s) also occur outside the redacted passages.",
+            code=pdf_export.RESIDUAL_EXPLAINED,
+            forceable=True,
+            items=["Mustermann"],
+        )
+
+    monkeypatch.setattr(export_endpoint, "redact_native_pdf", fake_export)
+
+    refused = client.post(
+        "/api/v1/export/pdf", files={"file": ("brief.pdf", pdf, "application/pdf")}
+    )
+    assert refused.status_code == 422
+    body = refused.json()
+    assert body["code"] == "pdf_export_residual_explained"
+    assert body["forceable"] is True
+    assert body["items"] == ["Mustermann"]
+    assert isinstance(body["detail"], str)  # unchanged for older clients
+    # The exporter is handed the anonymized text to judge the residual against.
+    assert seen["expected_text"] is True
+
+    forced = client.post(
+        "/api/v1/export/pdf",
+        files={"file": ("brief.pdf", pdf, "application/pdf")},
+        data={"force_export": "true"},
+    )
+    assert forced.status_code == 200
+    assert seen["force"] is True
+
+
+def test_a_refused_export_never_logs_the_passages_it_names(client, caplog, monkeypatch):
+    import logging
+
+    from backend.src.routers.v1.endpoints import export as export_endpoint
+    from backend.src.utils import pdf_export
+    from backend.tests.pdf_builder import make_pdf
+
+    pdf = make_pdf(
+        [
+            "Patient: Max Mustermann, geb. 01.02.1980",
+            "Der Patient wurde stationaer aufgenommen und komplikationslos behandelt.",
+            "Die Entlassung erfolgte in gutem Allgemeinzustand nach Hause.",
+        ]
+    )
+
+    def fake_export(data, entities, settings, areas=None, *, expected_text="", force=False):
+        raise pdf_export.ExportError(
+            "refused", code=pdf_export.RESIDUAL_EXPLAINED, forceable=True, items=["Mustermann"]
+        )
+
+    monkeypatch.setattr(export_endpoint, "redact_native_pdf", fake_export)
+    with caplog.at_level(logging.INFO):
+        client.post("/api/v1/export/pdf", files={"file": ("brief.pdf", pdf, "application/pdf")})
+    assert "Mustermann" not in caplog.text

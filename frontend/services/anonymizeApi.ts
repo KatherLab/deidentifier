@@ -159,6 +159,7 @@ export const anonymizeApi = {
     ocrProfile?: string | null,
     outputLanguage?: OutputLanguage | null,
     redactionBars?: boolean,
+    force?: boolean,
   ): Promise<AxiosResponse<Blob>> {
     const formData = new FormData()
     formData.append('file', file)
@@ -175,6 +176,10 @@ export const anonymizeApi = {
     // Scanned sources only: black bars over the placeholders of the rebuilt
     // page. Ignored for native PDFs, which black their redactions out anyway.
     if (redactionBars) formData.append('redaction_bars', 'true')
+    // The reviewer confirmed the one refusal that can be confirmed: a redacted
+    // text that also occurs outside the redacted passages, which the anonymized
+    // text download shows too. Every other check stays in force.
+    if (force) formData.append('force_export', 'true')
     return api.post<Blob>('/export/pdf', formData, { responseType: 'blob' })
   },
 

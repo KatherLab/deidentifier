@@ -236,7 +236,11 @@
       "reconstructed": "Document reconstruit – mise en page approximative, les pixels d’origine sont supprimés.",
       "generating": "Génération du PDF …",
       "preview_title": "PDF caviardé (aperçu)",
-      "no_preview": "Aucun aperçu disponible."
+      "no_preview": "Aucun aperçu disponible.",
+      "export_anyway": "Exporter quand même",
+      "export_anyway_hint": "Le PDF affichera alors les mêmes passages que le texte anonymisé.",
+      "forced_notice": "Ce PDF a été créé malgré un constat non résolu : 1 texte caviardé y reste visible. | Ce PDF a été créé malgré un constat non résolu : {count} textes caviardés y restent visibles.",
+      "export_more": "et {count} de plus"
     },
     "entities": {
       "section_label": "Entités détectées",
@@ -420,7 +424,13 @@
     "backend_unreachable": "Serveur injoignable. Veuillez vérifier que le backend fonctionne.",
     "pdf_export_failed": "L’export PDF a échoué. Veuillez réessayer.",
     "pdf_export_detail": "L’export PDF a échoué : {detail}",
-    "unauthorized": "Votre session a expiré. Veuillez vous reconnecter."
+    "unauthorized": "Votre session a expiré. Veuillez vous reconnecter.",
+    "export": {
+      "pdf_export_residual_explained": "PDF non créé : {count} texte(s) caviardé(s) apparaissent aussi en dehors des passages caviardés et resteraient visibles dans le PDF — exactement comme dans le texte anonymisé.",
+      "pdf_export_residual_unexplained": "Échec de la vérification : un caviardage n'a pas été appliqué dans le PDF. Le PDF n'a pas été créé.",
+      "pdf_export_not_located": "Échec de la vérification : tous les contenus caviardés n'ont pas pu être localisés dans le PDF. Le PDF n'a pas été créé.",
+      "pdf_export_area_residual": "Échec de la vérification : du texte subsiste sous une zone noircie. Le PDF n'a pas été créé."
+    }
   },
   "toast": {
     "copy_success": "Texte anonymisé copié dans le presse-papiers.",

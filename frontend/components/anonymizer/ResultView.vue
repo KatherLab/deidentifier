@@ -376,6 +376,23 @@
           >
             {{ noticeMessage(pdfPreserveNotice) }}
           </p>
+          <!-- This PDF was exported past an open finding. The dialog that asked
+               is long gone; the document is still here, so the notice stays for
+               as long as the PDF is on screen. -->
+          <p
+            v-if="session.pdfExportForced"
+            class="shrink-0 border-b border-default px-4 py-2.5 text-xs"
+            :class="getBannerClass('amber')"
+            role="status"
+          >
+            {{
+              t(
+                'result.pdf.forced_notice',
+                { count: session.pdfExportForced.count },
+                session.pdfExportForced.count,
+              )
+            }}
+          </p>
           <PdfAreaEditor v-if="areaEditing" class="min-h-0 flex-1" @done="areaEditing = false" />
           <template v-else>
             <div
@@ -385,6 +402,33 @@
             >
               <LoadingSpinner size="small" color="gray" inline label="" />
               {{ t('result.pdf.generating') }}
+            </div>
+            <!-- Refused, but by a finding the anonymized TEXT download carries
+                 too: a passage the reviewer kept that also occurs in redacted
+                 form. Name the passages and let them decide — refusing outright
+                 would make the PDF stricter than the text they already have. -->
+            <div v-else-if="session.pdfExportBlock" class="space-y-3 p-4">
+              <div class="rounded-card px-3 py-2 text-sm" :class="getBannerClass('amber')">
+                <p>{{ session.pdfExportBlock.message }}</p>
+                <ul
+                  v-if="session.pdfExportBlock.items.length > 0"
+                  class="mt-2 flex flex-wrap gap-1"
+                >
+                  <li
+                    v-for="item in session.pdfExportBlock.items"
+                    :key="item"
+                    class="rounded bg-surface px-1.5 py-0.5 font-mono text-xs"
+                  >
+                    {{ item }}
+                  </li>
+                </ul>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <BaseButton size="sm" variant="secondary" @click="session.forcePdfExport()">
+                  {{ t('result.pdf.export_anyway') }}
+                </BaseButton>
+                <p class="text-xs text-content-subtle">{{ t('result.pdf.export_anyway_hint') }}</p>
+              </div>
             </div>
             <div v-else-if="session.pdfPreviewError" class="space-y-3 p-4">
               <p class="rounded-card px-3 py-2 text-sm" :class="getBannerClass('red')">
@@ -572,8 +616,6 @@ import { usePopover } from '@/composables/usePopover'
 import { useResultLifetime } from '@/composables/useResultLifetime'
 import { useToast } from '@/composables/useToast'
 import { useFileDownload } from '@/composables/useFileDownload'
-import { anonymizeApi } from '@/services/anonymizeApi'
-import { extractPdfExportErrorMessage } from '@/utils/errors'
 import type { MatchRange } from '@/utils/textSegments'
 import { getBannerClass } from '@/utils/statusStyles'
 import { entityTypeLabel, sourceTypeLabel } from '@/utils/entityLabels'
@@ -584,7 +626,7 @@ const { t } = useI18n()
 const session = useSessionStore()
 const settings = useSettingsStore()
 const toast = useToast()
-const { downloadBlob, downloadFromApi } = useFileDownload()
+const { downloadBlob } = useFileDownload()
 
 /** The ACTIVE document of the batch — everything below renders its state. */
 const doc = computed(() => session.activeDocument)
@@ -998,38 +1040,27 @@ const exportingPdf = ref(false)
  */
 async function downloadRedactedPdf() {
   const entry = doc.value
-  const file = entry?.file
-  const requestId = entry?.result?.request_id
-  if (!entry || !file || requestId === undefined || exportingPdf.value) return
+  if (!entry || entry.file === null || entry.result === null || exportingPdf.value) return
   if (entry.pdfPreviewBlob !== null && !entry.pdfPreviewLoading) {
     downloadBlob(entry.pdfPreviewBlob, exportFilename('pdf'))
     return
   }
-  const overrides = [...entry.overrides.values()]
   exportingPdf.value = true
   try {
-    await downloadFromApi(
-      () =>
-        anonymizeApi.exportPdf(
-          file,
-          requestId,
-          overrides,
-          entry.policy,
-          entry.rules,
-          entry.redactAreas,
-          // These matter only on a backend cache miss, where the document is
-          // re-extracted and re-transformed: without them the fallback would
-          // skip the forced OCR, use another OCR profile, and write German
-          // placeholders.
-          entry.forceOcr,
-          entry.ocrProfile,
-          entry.outputLanguage,
-          settings.redactionBars,
-        ),
-      exportFilename('pdf'),
-    )
-  } catch (err) {
-    toast.error(await extractPdfExportErrorMessage(err))
+    // The same request the preview panel makes (overrides, areas, OCR profile
+    // and output language included), so a refusal lands where the "export
+    // anyway" button is instead of in a dead-end toast.
+    await session.refreshPdfPreview()
+    if (entry.pdfPreviewBlob !== null) {
+      downloadBlob(entry.pdfPreviewBlob, exportFilename('pdf'))
+      return
+    }
+    if (entry.pdfExportBlock !== null) {
+      session.activatePanel('pdf')
+      toast.error(entry.pdfExportBlock.message)
+    } else if (entry.pdfPreviewError !== null) {
+      toast.error(entry.pdfPreviewError)
+    }
   } finally {
     exportingPdf.value = false
   }

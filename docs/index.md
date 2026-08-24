@@ -40,7 +40,8 @@ Document → extraction → rule + LLM detection → span merging
   re-runs the deterministic transformation server-side.
 - **Redacted PDF export.** Native PDFs get true blackout at the character
   boxes; scanned PDFs are rebuilt from the anonymized text. Both fail closed —
-  an export that cannot be verified is refused.
+  an export that cannot be verified is refused, except for a finding the
+  anonymized text download carries too, which the reviewer may confirm.
 - **An evaluation harness** for scoring the pipeline against annotated ground
   truth, reporting document-level leakage alongside the usual metrics.
 

@@ -7,12 +7,16 @@ repeated; otherwise the full pipeline runs first.
 
 Native PDFs are rasterized with exact char-box blackout; scanned PDFs are
 rebuilt from the anonymized text at the OCR layout positions. Both paths fail
-closed — an export that cannot be verified is refused."""
+closed — an export that cannot be verified is refused. The single exception is
+a finding the anonymized *text* download carries too (a passage the reviewer
+kept that also occurs in redacted form): that one is refused with
+`forceable: true` and exported only after the reviewer confirms it."""
 
 import hashlib
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import TypeAdapter, ValidationError
 from starlette.datastructures import UploadFile
 
@@ -95,6 +99,27 @@ def _parse_terms(raw) -> list[str] | None:
         raise HTTPException(status_code=422, detail="Invalid terms payload.") from None
 
 
+def _export_error_response(exc: ExportError) -> JSONResponse:
+    """A refused export, as a body the UI can act on.
+
+    `detail` stays the English sentence every other error route returns, so an
+    older client keeps showing something sensible; `code` and `forceable` are
+    what tells the review UI whether to offer "export anyway", and `items` are
+    the passages that would stay visible so the confirmation can name them —
+    up to a display cap, which is why `count` is reported separately. They are
+    document content and go to the client only — never to a log."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": str(exc),
+            "code": exc.code,
+            "forceable": exc.forceable,
+            "items": exc.items,
+            "count": exc.count,
+        },
+    )
+
+
 @router.post("/export/pdf")
 async def export_pdf(
     request: Request,
@@ -132,6 +157,11 @@ async def export_pdf(
     # page, so a reconstruction looks like the native export instead of reading
     # its replacements out in words.
     redaction_bars = _parse_bool(form.get("redaction_bars"))
+    # The reviewer confirmed a refused export whose only finding is that a
+    # redacted string also occurs outside the redacted passages — i.e. the PDF
+    # would show exactly what the anonymized text download already shows.
+    # Ignored by every other check; nothing else can be waved through.
+    force_export = _parse_bool(form.get("force_export"))
     raw_profile = form.get("ocr_profile")
     ocr_profile = (
         raw_profile.strip() if isinstance(raw_profile, str) and raw_profile.strip() else None
@@ -161,7 +191,14 @@ async def export_pdf(
 
     try:
         if source_type == "pdf":
-            pdf_bytes = redact_native_pdf(data, result.entities, settings, areas=redact_areas)
+            pdf_bytes = redact_native_pdf(
+                data,
+                result.entities,
+                settings,
+                areas=redact_areas,
+                expected_text=result.anonymized_text,
+                force=force_export,
+            )
         elif source_type == "pdf-ocr":
             pdf_bytes = rebuild_scanned_pdf(
                 result.source_text,
@@ -170,13 +207,15 @@ async def export_pdf(
                 page_count,
                 areas=redact_areas,
                 bars=redaction_bars,
+                expected_text=result.anonymized_text,
+                force=force_export,
             )
         else:
             raise HTTPException(
                 status_code=415, detail="Redacted-PDF export is available for PDF uploads only."
             )
     except ExportError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+        return _export_error_response(exc)
 
     logger.info(
         "export_pdf",
@@ -184,6 +223,7 @@ async def export_pdf(
         source_type=source_type,
         entities=len(result.entities),
         areas=len(redact_areas),
+        forced=force_export,
         size=len(pdf_bytes),
     )
     return Response(

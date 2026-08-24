@@ -26,7 +26,7 @@ listed controls.
 | S1 | The app is exposed without the auth proxy | Backend publishes no port; checklist; docs state the requirement repeatedly; optional built-in OIDC gate (`OIDC_ENABLED`) for deployments with no proxy, which refuses to start half-configured | **Low**, if reviewed at deployment | Operator |
 | S2 | Prompt injection from document content | Fenced document markers, untrusted-data system prompt, strings-only model output, deterministic grounding, independent validation | **Low** for integrity; contributes to P1 | Developers |
 | S3 | Parser vulnerability in a document library | Extension allow-list, size caps, read-only non-root container, no persistence, Dependabot + CI scanning | **Low** | Developers |
-| S4 | A redacted PDF that is not actually redacted | Text removal + box coverage, post-export verification, fail-closed refusal, reconstruction for scans | **Low** | Developers |
+| S4 | A redacted PDF that is not actually redacted | Text removal + box coverage, post-export verification, fail-closed refusal, reconstruction for scans. The single overridable finding is one the anonymized text carries too, is named to the reviewer, and stays on screen after the export | **Low** | Developers |
 | S5 | Dependency compromise | Pinned lockfiles, weekly updates, CodeQL/pip-audit/npm audit/Trivy | **Medium** — CI is currently manual-trigger only | Developers |
 | S6 | A leaked request id lets someone re-run a cached document | Unguessable ids, 15-minute TTL, no listing endpoint, authenticated callers | **Low** | — |
 

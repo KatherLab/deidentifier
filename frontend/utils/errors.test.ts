@@ -4,6 +4,7 @@ import {
   extractApiErrorMessage,
   extractPdfExportErrorMessage,
   isExpiredResultError,
+  parsePdfExportError,
 } from '@/utils/errors'
 
 function apiError(status: number, data?: unknown): AxiosError {
@@ -95,5 +96,46 @@ describe('extractPdfExportErrorMessage', () => {
     await expect(extractPdfExportErrorMessage(apiError(500, blob))).resolves.toContain(
       'PDF-Export fehlgeschlagen',
     )
+  })
+})
+
+describe('parsePdfExportError', () => {
+  function blobError(body: unknown, status = 422) {
+    return apiError(status, new Blob([JSON.stringify(body)], { type: 'application/json' }))
+  }
+
+  it('reports a refusal the reviewer may confirm, with what would stay visible', async () => {
+    const failure = await parsePdfExportError(
+      blobError({
+        detail: 'english fallback',
+        code: 'pdf_export_residual_explained',
+        forceable: true,
+        items: ['Anna'],
+      }),
+    )
+
+    expect(failure.forceable).toBe(true)
+    expect(failure.items).toEqual(['Anna'])
+    // Translated from the code, not echoed from the English detail.
+    expect(failure.message).not.toContain('english fallback')
+    expect(failure.message).toContain('1')
+  })
+
+  it('never marks a failed blackout as confirmable', async () => {
+    const failure = await parsePdfExportError(
+      blobError({ detail: 'verification failed', code: 'pdf_export_residual_unexplained' }),
+    )
+
+    expect(failure.forceable).toBe(false)
+    expect(failure.code).toBe('pdf_export_residual_unexplained')
+  })
+
+  it('falls back to the backend text for a code it does not know', async () => {
+    const failure = await parsePdfExportError(
+      blobError({ detail: 'something new went wrong', code: 'pdf_export_future_case' }),
+    )
+
+    expect(failure.forceable).toBe(false)
+    expect(failure.message).toContain('something new went wrong')
   })
 })

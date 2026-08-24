@@ -236,7 +236,11 @@
       "reconstructed": "Documento reconstruido: diseño aproximado, los píxeles originales se descartan.",
       "generating": "Generando el PDF …",
       "preview_title": "PDF censurado (vista previa)",
-      "no_preview": "No hay vista previa disponible."
+      "no_preview": "No hay vista previa disponible.",
+      "export_anyway": "Exportar de todos modos",
+      "export_anyway_hint": "El PDF mostrará entonces los mismos pasajes que el texto anonimizado.",
+      "forced_notice": "Este PDF se creó a pesar de un hallazgo sin resolver: 1 texto redactado sigue visible en él. | Este PDF se creó a pesar de un hallazgo sin resolver: {count} textos redactados siguen visibles en él.",
+      "export_more": "y {count} más"
     },
     "entities": {
       "section_label": "Entidades detectadas",
@@ -420,7 +424,13 @@
     "backend_unreachable": "Servidor no accesible. Compruebe si el backend está en marcha.",
     "pdf_export_failed": "La exportación a PDF ha fallado. Inténtelo de nuevo.",
     "pdf_export_detail": "La exportación a PDF ha fallado: {detail}",
-    "unauthorized": "Su sesión ha caducado. Vuelva a iniciar sesión."
+    "unauthorized": "Su sesión ha caducado. Vuelva a iniciar sesión.",
+    "export": {
+      "pdf_export_residual_explained": "PDF no creado: {count} texto(s) redactado(s) aparecen también fuera de los pasajes redactados y quedarían visibles en el PDF, igual que en el texto anonimizado.",
+      "pdf_export_residual_unexplained": "Verificación fallida: una redacción no se aplicó en el PDF. El PDF no se creó.",
+      "pdf_export_not_located": "Verificación fallida: no se pudo localizar todo el contenido redactado en el PDF. El PDF no se creó.",
+      "pdf_export_area_residual": "Verificación fallida: todavía hay texto bajo un área tachada. El PDF no se creó."
+    }
   },
   "toast": {
     "copy_success": "Texto anonimizado copiado al portapapeles.",

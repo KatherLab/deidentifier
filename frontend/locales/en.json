@@ -236,7 +236,11 @@
       "reconstructed": "Reconstructed document – layout approximated, the original pixels are discarded.",
       "generating": "Generating PDF …",
       "preview_title": "Redacted PDF (preview)",
-      "no_preview": "No preview available."
+      "no_preview": "No preview available.",
+      "export_anyway": "Export anyway",
+      "export_anyway_hint": "The PDF will then show the same passages as the anonymized text.",
+      "forced_notice": "This PDF was created despite an unresolved finding: 1 redacted text is still visible in it. | This PDF was created despite an unresolved finding: {count} redacted texts are still visible in it.",
+      "export_more": "and {count} more"
     },
     "entities": {
       "section_label": "Detected entities",
@@ -420,7 +424,13 @@
     "backend_unreachable": "Server unreachable. Please check whether the backend is running.",
     "pdf_export_failed": "PDF export failed. Please try again.",
     "pdf_export_detail": "PDF export failed: {detail}",
-    "unauthorized": "Your session has expired. Please sign in again."
+    "unauthorized": "Your session has expired. Please sign in again.",
+    "export": {
+      "pdf_export_residual_explained": "PDF not created: {count} redacted text(s) also occur outside the redacted passages and would stay visible in the PDF — exactly as they do in the anonymized text.",
+      "pdf_export_residual_unexplained": "Verification failed: a redaction was not applied in the PDF. The PDF was not created.",
+      "pdf_export_not_located": "Verification failed: not all redacted content could be located in the PDF. The PDF was not created.",
+      "pdf_export_area_residual": "Verification failed: text is still present under a blacked-out area. The PDF was not created."
+    }
   },
   "toast": {
     "copy_success": "Anonymized text copied to the clipboard.",
