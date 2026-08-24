@@ -699,10 +699,7 @@ def test_refused_export_names_its_code_and_whether_it_can_be_forced(client, monk
         if force:
             return b"%PDF-forced"
         raise pdf_export.ExportError(
-            "1 redacted text(s) also occur outside the redacted passages.",
-            code=pdf_export.RESIDUAL_EXPLAINED,
-            forceable=True,
-            items=["Mustermann"],
+            pdf_export.RESIDUAL_EXPLAINED, forceable=True, items=["Mustermann"]
         )
 
     monkeypatch.setattr(export_endpoint, "redact_native_pdf", fake_export)
@@ -745,7 +742,7 @@ def test_a_refused_export_never_logs_the_passages_it_names(client, caplog, monke
 
     def fake_export(data, entities, settings, areas=None, *, expected_text="", force=False):
         raise pdf_export.ExportError(
-            "refused", code=pdf_export.RESIDUAL_EXPLAINED, forceable=True, items=["Mustermann"]
+            pdf_export.RESIDUAL_EXPLAINED, forceable=True, items=["Mustermann"]
         )
 
     monkeypatch.setattr(export_endpoint, "redact_native_pdf", fake_export)

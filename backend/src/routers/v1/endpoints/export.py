@@ -34,6 +34,7 @@ from ....utils.extraction import ExtractionError, LayoutLine, extract_document
 from ....utils.ocr_profiles import OcrProfileError, resolve_vision_ocr_profile
 from ....utils.pdf_export import (
     ExportError,
+    export_detail,
     rebuild_scanned_pdf,
     redact_native_pdf,
     render_pdf_pages,
@@ -102,8 +103,10 @@ def _parse_terms(raw) -> list[str] | None:
 def _export_error_response(exc: ExportError) -> JSONResponse:
     """A refused export, as a body the UI can act on.
 
-    `detail` stays the English sentence every other error route returns, so an
-    older client keeps showing something sensible; `code` and `forceable` are
+    `detail` is looked up from the code rather than taken off the exception, so
+    no message an upstream library produced can reach the client; it stays the
+    English sentence every other error route returns, so a client that does not
+    know the code keeps showing something sensible. `code` and `forceable` are
     what tells the review UI whether to offer "export anyway", and `items` are
     the passages that would stay visible so the confirmation can name them —
     up to a display cap, which is why `count` is reported separately. They are
@@ -111,7 +114,7 @@ def _export_error_response(exc: ExportError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "detail": str(exc),
+            "detail": export_detail(exc.code, exc.count),
             "code": exc.code,
             "forceable": exc.forceable,
             "items": exc.items,
@@ -250,7 +253,9 @@ async def export_pdf_pages(
     try:
         pages, truncated = render_pdf_pages(data)
     except ExportError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+        raise HTTPException(
+            status_code=exc.status_code, detail=export_detail(exc.code, exc.count)
+        ) from None
     logger.info("export_pdf_pages", pages=len(pages), truncated=truncated)
     return PdfPagesResponse.model_validate({"pages": pages, "truncated": truncated})
 

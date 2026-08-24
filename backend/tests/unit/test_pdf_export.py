@@ -872,3 +872,20 @@ def test_native_export_does_not_fall_back_to_raster_on_a_forceable_finding(monke
             expected_text="Befund von [PERSON_1].\nZweitmeinung von Mueller.\n",
         )
     assert excinfo.value.forceable is True
+
+
+def test_every_export_code_has_an_english_sentence():
+    """The response is built from the code alone, so a code without a sentence
+    would silently degrade to the generic one."""
+    codes = {
+        value
+        for name, value in vars(pdf_export).items()
+        if name.isupper() and isinstance(value, str) and value.startswith("pdf_export_")
+    }
+    assert codes == set(pdf_export.EXPORT_DETAILS)
+
+
+def test_an_export_error_says_exactly_what_its_code_says():
+    error = pdf_export.ExportError(pdf_export.NOT_LOCATED, count=3)
+    assert str(error) == pdf_export.export_detail(pdf_export.NOT_LOCATED, 3)
+    assert "3 redacted item(s)" in str(error)

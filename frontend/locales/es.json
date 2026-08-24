@@ -429,7 +429,10 @@
       "pdf_export_residual_explained": "PDF no creado: {count} texto(s) redactado(s) aparecen también fuera de los pasajes redactados y quedarían visibles en el PDF, igual que en el texto anonimizado.",
       "pdf_export_residual_unexplained": "Verificación fallida: una redacción no se aplicó en el PDF. El PDF no se creó.",
       "pdf_export_not_located": "Verificación fallida: no se pudo localizar todo el contenido redactado en el PDF. El PDF no se creó.",
-      "pdf_export_area_residual": "Verificación fallida: todavía hay texto bajo un área tachada. El PDF no se creó."
+      "pdf_export_area_residual": "Verificación fallida: todavía hay texto bajo un área tachada. El PDF no se creó.",
+      "pdf_export_no_layout": "No hay información de diseño para este documento. Vuelva a ejecutar la anonimización y expórtelo después.",
+      "pdf_export_unreadable": "No se pudo abrir el PDF.",
+      "pdf_export_no_pages": "El PDF no contiene páginas."
     }
   },
   "toast": {

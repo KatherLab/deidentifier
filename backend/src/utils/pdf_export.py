@@ -50,13 +50,48 @@ _MIN_SEARCH_LENGTH = 2
 _SHORT_NEEDLE_MAX = 3
 
 
-# Stable codes for the export failures the UI reacts to, mirrored under
-# `errors.export.*` in the locale catalogs.
+# Stable codes for the export failures, mirrored under `errors.export.*` in
+# the locale catalogs.
 EXPORT_FAILED = "pdf_export_failed"
 RESIDUAL_EXPLAINED = "pdf_export_residual_explained"
 RESIDUAL_UNEXPLAINED = "pdf_export_residual_unexplained"
 NOT_LOCATED = "pdf_export_not_located"
 AREA_RESIDUAL = "pdf_export_area_residual"
+NO_LAYOUT = "pdf_export_no_layout"
+PDF_UNREADABLE = "pdf_export_unreadable"
+PDF_NO_PAGES = "pdf_export_no_pages"
+
+# One English sentence per code — the ONLY text an export failure ever puts in
+# front of a caller. Written here rather than at the throw site so that the
+# endpoint can build its response from the code alone: nothing derived from the
+# raised exception, let alone from an upstream library's message, can reach the
+# client. `{count}` is filled from the error's own count where it has one.
+EXPORT_DETAILS: dict[str, str] = {
+    EXPORT_FAILED: "The redacted PDF could not be generated.",
+    RESIDUAL_EXPLAINED: (
+        "{count} redacted text(s) also occur outside the passages that were redacted and "
+        "therefore stay visible in the PDF — exactly as they do in the anonymized text. "
+        "The PDF was not generated; confirm to export it anyway."
+    ),
+    RESIDUAL_UNEXPLAINED: (
+        "Verification failed: a redacted string is still present in the exported PDF; "
+        "the export was aborted."
+    ),
+    NOT_LOCATED: (
+        "{count} redacted item(s) could not be located in the PDF text layer; the "
+        "redacted PDF was NOT generated. The anonymized text download remains safe to use."
+    ),
+    AREA_RESIDUAL: (
+        "Verification failed: text is still present under a blacked-out area; the "
+        "redacted PDF was NOT generated."
+    ),
+    NO_LAYOUT: (
+        "No layout information is available for this document; re-run the anonymization "
+        "and export again."
+    ),
+    PDF_UNREADABLE: "The PDF could not be opened.",
+    PDF_NO_PAGES: "The PDF contains no pages.",
+}
 
 # Cap on the residual strings echoed back to the client. They are document
 # content: the client already holds the source text and the entity list, so
@@ -65,30 +100,39 @@ _MAX_REPORTED_RESIDUALS = 20
 
 
 class ExportError(Exception):
-    """`code` is stable and translated by the UI. `forceable` marks the one
-    failure the reviewer may overrule (see the module docstring); `items` are
-    the strings that would stay visible, so the confirmation can name them.
+    """A refused export, identified by its `code`.
 
-    `count` is how many there are, which is NOT `len(items)` once the list is
-    capped for display — a notice that says "20" about 37 findings understates
-    exactly the thing it exists to state."""
+    The code carries the message (`EXPORT_DETAILS`), the UI's translation key
+    and the decision the endpoint makes; there is no free-text message, so a
+    throw site cannot leak an upstream error into the response by accident.
+
+    `forceable` marks the one failure the reviewer may overrule (see the module
+    docstring) and `items` are the strings that would stay visible, so the
+    confirmation can name them. `count` is how many there are, which is NOT
+    `len(items)` once the list is capped for display — a notice that says "20"
+    about 37 findings understates exactly the thing it exists to state.
+    """
 
     def __init__(
         self,
-        message: str,
-        status_code: int = 422,
-        *,
         code: str = EXPORT_FAILED,
+        *,
+        status_code: int = 422,
         forceable: bool = False,
         items: list[str] | None = None,
         count: int | None = None,
     ):
-        super().__init__(message)
-        self.status_code = status_code
         self.code = code
+        self.status_code = status_code
         self.forceable = forceable
         self.items = items or []
         self.count = len(self.items) if count is None else count
+        super().__init__(export_detail(code, self.count))
+
+
+def export_detail(code: str, count: int = 0) -> str:
+    """The English sentence for an export failure code."""
+    return EXPORT_DETAILS.get(code, EXPORT_DETAILS[EXPORT_FAILED]).format(count=count)
 
 
 def _page_areas(
@@ -191,11 +235,7 @@ def _verify_areas(data: bytes, areas: list[RedactArea] | None) -> None:
                     x0 * page_width, y0 * page_height, x1 * page_width, y1 * page_height
                 )
                 if any(word[4].strip() for word in page.get_text("words", clip=rect)):
-                    raise ExportError(
-                        "Verification failed: text is still present under a blacked-out "
-                        "area; the redacted PDF was NOT generated.",
-                        code=AREA_RESIDUAL,
-                    )
+                    raise ExportError(AREA_RESIDUAL)
     finally:
         document.close()
 
@@ -314,11 +354,7 @@ def _redact_native_true(
 
         missing = [n for n in needles if n not in found and not _covered(n, found)]
         if missing:
-            raise ExportError(
-                f"{len(missing)} redacted item(s) could not be located in the PDF text "
-                "layer; the redacted PDF was NOT generated.",
-                code=NOT_LOCATED,
-            )
+            raise ExportError(NOT_LOCATED, count=len(missing))
 
         # Scrub metadata, XMP, embedded/attached files, JavaScript, hidden text.
         try:
@@ -414,18 +450,12 @@ def _check_residuals(
     if unexplained:
         # Not in the text output, so no reviewer decision put it there: a
         # blackout that should have covered it did not. Never forceable.
-        raise ExportError(
-            f"Verification failed: a redacted string is still present in the {location}; "
-            "the export was aborted.",
-            code=RESIDUAL_UNEXPLAINED,
-        )
+        logger.warning("export_residual_unexplained", count=len(unexplained), location=location)
+        raise ExportError(RESIDUAL_UNEXPLAINED)
 
     if not force:
         raise ExportError(
-            f"{len(surviving)} redacted text(s) also occur outside the passages that were "
-            "redacted and therefore stay visible in the PDF — exactly as they do in the "
-            "anonymized text. The PDF was not generated; confirm to export it anyway.",
-            code=RESIDUAL_EXPLAINED,
+            RESIDUAL_EXPLAINED,
             forceable=True,
             items=surviving[:_MAX_REPORTED_RESIDUALS],
             count=len(surviving),
@@ -473,7 +503,7 @@ def _redact_native_raster(
     try:
         document = pdfium.PdfDocument(data)
     except Exception as exc:
-        raise ExportError("The PDF could not be opened for export.", status_code=415) from exc
+        raise ExportError(PDF_UNREADABLE, status_code=415) from exc
     try:
         images = []
         for page_index, page in enumerate(document):
@@ -539,13 +569,9 @@ def _redact_native_raster(
     if missing:
         # Fail closed: the text layer diverges from what we extracted, so a
         # blackout might be incomplete. Never emit a possibly leaky PDF.
-        raise ExportError(
-            f"{len(missing)} redacted item(s) could not be located in the PDF text "
-            "layer; the redacted PDF was NOT generated. The anonymized text "
-            "download remains safe to use."
-        )
+        raise ExportError(NOT_LOCATED, count=len(missing))
     if not images:
-        raise ExportError("The PDF contains no pages.", status_code=415)
+        raise ExportError(PDF_NO_PAGES, status_code=415)
 
     buffer = io.BytesIO()
     images[0].save(
@@ -671,13 +697,13 @@ def render_pdf_pages(data: bytes) -> tuple[list[dict], bool]:
     try:
         document = pdfium.PdfDocument(data)
     except Exception as exc:
-        raise ExportError("The PDF could not be opened.", status_code=415) from exc
+        raise ExportError(PDF_UNREADABLE, status_code=415) from exc
 
     pages: list[dict] = []
     try:
         total = len(document)
         if total == 0:
-            raise ExportError("The PDF contains no pages.", status_code=415)
+            raise ExportError(PDF_NO_PAGES, status_code=415)
         for index in range(min(total, _MAX_RENDER_PAGES)):
             page = document[index]
             width, height = page.get_size()
@@ -732,10 +758,7 @@ def rebuild_scanned_pdf(
     from reportlab.pdfgen import canvas
 
     if not layout:
-        raise ExportError(
-            "No layout information is available for this document; "
-            "re-run the anonymization and export again."
-        )
+        raise ExportError(NO_LAYOUT)
 
     width, height = _PAGE_A4
     buffer = io.BytesIO()

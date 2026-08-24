@@ -429,7 +429,10 @@
       "pdf_export_residual_explained": "PDF not created: {count} redacted text(s) also occur outside the redacted passages and would stay visible in the PDF — exactly as they do in the anonymized text.",
       "pdf_export_residual_unexplained": "Verification failed: a redaction was not applied in the PDF. The PDF was not created.",
       "pdf_export_not_located": "Verification failed: not all redacted content could be located in the PDF. The PDF was not created.",
-      "pdf_export_area_residual": "Verification failed: text is still present under a blacked-out area. The PDF was not created."
+      "pdf_export_area_residual": "Verification failed: text is still present under a blacked-out area. The PDF was not created.",
+      "pdf_export_no_layout": "No layout information is available for this document. Run the anonymization again and export afterwards.",
+      "pdf_export_unreadable": "The PDF could not be opened.",
+      "pdf_export_no_pages": "The PDF contains no pages."
     }
   },
   "toast": {

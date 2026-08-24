@@ -429,7 +429,10 @@
       "pdf_export_residual_explained": "PDF non créé : {count} texte(s) caviardé(s) apparaissent aussi en dehors des passages caviardés et resteraient visibles dans le PDF — exactement comme dans le texte anonymisé.",
       "pdf_export_residual_unexplained": "Échec de la vérification : un caviardage n'a pas été appliqué dans le PDF. Le PDF n'a pas été créé.",
       "pdf_export_not_located": "Échec de la vérification : tous les contenus caviardés n'ont pas pu être localisés dans le PDF. Le PDF n'a pas été créé.",
-      "pdf_export_area_residual": "Échec de la vérification : du texte subsiste sous une zone noircie. Le PDF n'a pas été créé."
+      "pdf_export_area_residual": "Échec de la vérification : du texte subsiste sous une zone noircie. Le PDF n'a pas été créé.",
+      "pdf_export_no_layout": "Aucune information de mise en page n'est disponible pour ce document. Relancez l'anonymisation, puis exportez.",
+      "pdf_export_unreadable": "Le PDF n'a pas pu être ouvert.",
+      "pdf_export_no_pages": "Le PDF ne contient aucune page."
     }
   },
   "toast": {

@@ -429,7 +429,10 @@
       "pdf_export_residual_explained": "PDF nicht erzeugt: {count} geschwärzte Textstelle(n) kommen auch außerhalb der geschwärzten Passagen vor und blieben im PDF sichtbar – genau wie im anonymisierten Text.",
       "pdf_export_residual_unexplained": "Prüfung fehlgeschlagen: Eine Schwärzung wurde im PDF nicht angewendet. Das PDF wurde nicht erzeugt.",
       "pdf_export_not_located": "Prüfung fehlgeschlagen: Nicht alle geschwärzten Inhalte konnten im PDF gefunden werden. Das PDF wurde nicht erzeugt.",
-      "pdf_export_area_residual": "Prüfung fehlgeschlagen: Unter einem geschwärzten Bereich ist noch Text vorhanden. Das PDF wurde nicht erzeugt."
+      "pdf_export_area_residual": "Prüfung fehlgeschlagen: Unter einem geschwärzten Bereich ist noch Text vorhanden. Das PDF wurde nicht erzeugt.",
+      "pdf_export_no_layout": "Für dieses Dokument liegen keine Layout-Informationen vor. Bitte die Anonymisierung erneut ausführen und dann exportieren.",
+      "pdf_export_unreadable": "Das PDF konnte nicht geöffnet werden.",
+      "pdf_export_no_pages": "Das PDF enthält keine Seiten."
     }
   },
   "toast": {
