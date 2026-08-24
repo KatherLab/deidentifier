@@ -11,24 +11,22 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-24
+
 ### Added
 
-- The text panels of a result can be searched — `Ctrl/Cmd+F` opens the search in
-  the panel you last worked in, and a selected find offers **Im Ergebnis
-  suchen** to check whether its text still occurs in the output. See
-  [Reviewing a result](docs/user-guide/review.md).
+- `Ctrl/Cmd+F` searches the text panels of a result, and a selected find offers
+  **Im Ergebnis suchen** — see [Reviewing a result](docs/user-guide/review.md).
 - **Schwarze Balken statt Platzhaltern** in the export menu draws black bars
-  over the placeholders of a scanned document's rebuilt PDF, so it looks like a
-  native redacted PDF — see [Exporting](docs/user-guide/export.md#redacted-pdf).
+  over the placeholders of a rebuilt scanned PDF — see
+  [Exporting](docs/user-guide/export.md#redacted-pdf).
 
 ### Changed
 
-- A PDF export refused because a redacted text also occurs outside the redacted
-  passages — a name you kept, or an occurrence no detector found — now names
-  those passages and offers **Trotzdem exportieren** instead of failing, since
-  the anonymized text download shows them too. Every other verification failure
-  is still refused outright. See
-  [Exporting](docs/user-guide/export.md#when-the-check-finds-text-you-kept).
+- A PDF export refused only because a redacted text also occurs outside the
+  redacted passages now names those passages and offers **Trotzdem
+  exportieren**; every other verification failure is still refused outright —
+  see [Exporting](docs/user-guide/export.md#when-the-check-finds-text-you-kept).
 
 ## [0.3.0] — 2026-08-20
 
@@ -166,6 +164,7 @@ First tagged version.
   configurable deployment banner sits above the header.
 - Documentation site (MkDocs Material) under `docs/`.
 
+[0.4.0]: https://github.com/KatherLab/deidentifier/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/KatherLab/deidentifier/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/KatherLab/deidentifier/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/KatherLab/deidentifier/compare/v0.1.3...v0.2.0
