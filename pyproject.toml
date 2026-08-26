@@ -32,7 +32,7 @@ dev = [
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "httpx==0.28.1",
-    "ruff==0.16.3",
+    "ruff==0.16.4",
 ]
 # Documentation site (MkDocs Material). Installed on its own so neither the
 # runtime image nor the test environment pulls it in:
