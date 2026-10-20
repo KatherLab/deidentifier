@@ -11,6 +11,12 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-10-20
+
+### Changed
+
+- Maintenance release: updated backend and frontend dependencies.
+
 ## [0.4.0] — 2026-08-24
 
 ### Added
@@ -164,6 +170,7 @@ First tagged version.
   configurable deployment banner sits above the header.
 - Documentation site (MkDocs Material) under `docs/`.
 
+[0.4.1]: https://github.com/KatherLab/deidentifier/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/KatherLab/deidentifier/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/KatherLab/deidentifier/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/KatherLab/deidentifier/compare/v0.2.0...v0.2.1

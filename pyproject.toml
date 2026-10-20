@@ -1,29 +1,29 @@
 [project]
 name = "deidentifier"
-version = "0.4.0"
+version = "0.4.1"
 description = "Locally deployable anonymizer for German clinical documents"
 requires-python = ">=3.13,<3.15"
 # Every dependency is pinned exactly, like the frontend's package.json: this is
 # a clinical tool that ships as a container, so the version an operator runs
 # should be the version that was tested. Dependabot proposes the bumps.
 dependencies = [
-    "fastapi==0.142.2",
+    "fastapi==0.151.0",
     "uvicorn[standard]==0.54.0",
-    "pydantic==2.13.5",
-    "pydantic-settings==2.15.0",
+    "pydantic==2.14.1",
+    "pydantic-settings==2.16.0",
     "python-multipart==0.0.32",
     "httpx==0.28.1",
     # Only used by the optional OIDC gate: signs the session cookie and
     # verifies the provider's id_token against its JWKS ([crypto] pulls in the
     # RSA/EC support that needs).
     "pyjwt[crypto]==2.15.1",
-    "openai==3.24.0",
-    "pypdf==6.19.0",
+    "openai==3.35.1",
+    "pypdf==6.21.1",
     "python-docx==1.2.0",
     "pypdfium2==5.14.0",
-    "pillow==12.3.0",
+    "pillow==13.0.0",
     "reportlab==5.0.1",
-    "pymupdf==1.28.2",
+    "pymupdf==2.0",
 ]
 
 [dependency-groups]
@@ -32,7 +32,7 @@ dev = [
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "httpx==0.28.1",
-    "ruff==0.16.10",
+    "ruff==0.17.1",
 ]
 # Documentation site (MkDocs Material). Installed on its own so neither the
 # runtime image nor the test environment pulls it in:

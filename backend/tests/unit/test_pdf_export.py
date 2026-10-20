@@ -113,7 +113,7 @@ def test_native_true_redaction_keeps_text_layer_minus_redacted():
     assert "Max Mustermann" not in text
     # 2. A visible black redaction bar exists on the rendered page.
     image = page.render(scale=2.0).to_pil().convert("L")
-    dark = sum(1 for value in image.getdata() if value < 60)
+    dark = sum(1 for value in image.get_flattened_data() if value < 60)
     assert dark > 500, "expected a visible black redaction bar"
     document.close()
 
@@ -216,7 +216,7 @@ def test_native_generalized_dob_shows_year_not_black_bar():
             int((page_height - bottom + 2) * scale),
         )
     )
-    pixels = list(crop.getdata())
+    pixels = list(crop.get_flattened_data())
     dark = sum(1 for value in pixels if value < 100)
     light = sum(1 for value in pixels if value > 200)
     assert light > len(pixels) * 0.4, "expected mostly erased (white) region"
@@ -289,7 +289,7 @@ def _dark_fraction_in_area(pdf_bytes: bytes, area: RedactArea, scale: float = 2.
             int(area.y1 / 1000 * height * scale),
         )
     )
-    pixels = list(crop.getdata())
+    pixels = list(crop.get_flattened_data())
     return sum(1 for value in pixels if value < 60) / max(len(pixels), 1)
 
 
@@ -710,7 +710,7 @@ def test_native_raster_locates_needle_split_by_injected_whitespace():
     document = pdfium.PdfDocument(output)
     image = document[0].render(scale=2.0).to_pil().convert("L")
     document.close()
-    dark = sum(1 for value in image.getdata() if value < 60)
+    dark = sum(1 for value in image.get_flattened_data() if value < 60)
     assert dark > 300, "expected a visible black redaction bar over the split token"
 
 
