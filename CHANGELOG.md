@@ -11,6 +11,8 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-04
+
 ### Added
 
 - `APP_PAGE_TITLE` and `APP_TAB_TITLE` set the header heading and browser-tab title independently; see [Configuration](docs/operations/configuration.md#titles).
@@ -179,6 +181,7 @@ First tagged version.
   configurable deployment banner sits above the header.
 - Documentation site (MkDocs Material) under `docs/`.
 
+[0.5.0]: https://github.com/KatherLab/deidentifier/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/KatherLab/deidentifier/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/KatherLab/deidentifier/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/KatherLab/deidentifier/compare/v0.2.1...v0.3.0

@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-The Medical Document Anonymizer (version `0.4.1`) is distributed
+The Medical Document Anonymizer (version `0.5.0`) is distributed
 under the `AGPL-3.0-or-later` license. It bundles the third-party
 open-source components listed below, each governed by its own license.
 Full license texts are available in each project's repository (linked
@@ -15,84 +15,90 @@ is excluded because it is not distributed.
 
 ## Backend (Python — production dependencies)
 
-| Name               | Version   | License                                                          | URL                                                                                |
-|--------------------|-----------|------------------------------------------------------------------|------------------------------------------------------------------------------------|
-| protobuf           | 7.36.2    | 3-Clause BSD License                                             | https://developers.google.com/protocol-buffers/                                    |
-| flatbuffers        | 25.12.19  | Apache Software License                                          | https://google.github.io/flatbuffers/                                              |
-| sniffio            | 1.3.1     | Apache Software License; MIT License                             | https://github.com/python-trio/sniffio                                             |
-| uvloop             | 0.23.0    | Apache Software License; MIT License                             | UNKNOWN                                                                            |
-| openai             | 3.35.1    | Apache-2.0                                                       | https://github.com/openai/openai-python                                            |
-| opentelemetry-api  | 1.45.0    | Apache-2.0                                                       | https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-api |
-| python-multipart   | 0.0.32    | Apache-2.0                                                       | https://github.com/Kludex/python-multipart                                         |
-| packaging          | 26.3      | Apache-2.0 OR BSD-2-Clause                                       | https://github.com/pypa/packaging                                                  |
-| cryptography       | 50.0.2    | Apache-2.0 OR BSD-3-Clause                                       | https://github.com/pyca/cryptography                                               |
-| httpx              | 0.28.1    | BSD License                                                      | https://github.com/encode/httpx                                                    |
-| reportlab          | 5.0.1     | BSD License                                                      | https://www.reportlab.com/                                                         |
-| click              | 8.5.0     | BSD-3-Clause                                                     | https://github.com/pallets/click/                                                  |
-| httpcore           | 1.0.9     | BSD-3-Clause                                                     | https://www.encode.io/httpcore/                                                    |
-| httpcore2          | 2.13.1    | BSD-3-Clause                                                     | https://github.com/pydantic/httpx2                                                 |
-| httpx2             | 2.13.1    | BSD-3-Clause                                                     | https://github.com/pydantic/httpx2                                                 |
-| idna               | 3.20      | BSD-3-Clause                                                     | https://github.com/kjd/idna                                                        |
-| lxml               | 6.1.3     | BSD-3-Clause                                                     | https://lxml.de/                                                                   |
-| networkx           | 3.7       | BSD-3-Clause                                                     | https://networkx.org/                                                              |
-| psutil             | 7.2.2     | BSD-3-Clause                                                     | https://github.com/giampaolo/psutil                                                |
-| pycparser          | 3.0       | BSD-3-Clause                                                     | https://github.com/eliben/pycparser                                                |
-| pypdf              | 6.21.1    | BSD-3-Clause                                                     | https://github.com/py-pdf/pypdf                                                    |
-| python-dotenv      | 1.2.4     | BSD-3-Clause                                                     | https://github.com/theskumar/python-dotenv                                         |
-| starlette          | 1.7.0     | BSD-3-Clause                                                     | https://github.com/Kludex/starlette                                                |
-| uvicorn            | 0.54.0    | BSD-3-Clause                                                     | https://uvicorn.dev/                                                               |
-| websockets         | 17.2      | BSD-3-Clause                                                     | https://github.com/python-websockets/websockets                                    |
-| numpy              | 2.5.4     | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0               | https://numpy.org                                                                  |
-| pypdfium2          | 5.14.0    | BSD-3-Clause, Apache-2.0, dependency licenses                    | https://github.com/pypdfium2-team/pypdfium2                                        |
-| pymupdf            | 2.0       | Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License | https://github.com/pymupdf/pymupdf                                                 |
-| PyJWT              | 2.15.1    | MIT                                                              | https://github.com/jpadilla/pyjwt                                                  |
-| annotated-doc      | 0.0.5     | MIT                                                              | https://github.com/fastapi/annotated-doc                                           |
-| annotated-types    | 0.8.0     | MIT                                                              | https://github.com/annotated-types/annotated-types                                 |
-| anyio              | 4.15.1    | MIT                                                              | https://anyio.readthedocs.io/en/stable/versionhistory.html                         |
-| charset-normalizer | 3.5.2     | MIT                                                              | https://github.com/jawah/charset_normalizer/blob/master/CHANGELOG.md               |
-| fastapi            | 0.151.0   | MIT                                                              | https://github.com/fastapi/fastapi                                                 |
-| httptools          | 0.8.0     | MIT                                                              | https://github.com/MagicStack/httptools                                            |
-| jiter              | 0.17.0    | MIT                                                              | https://github.com/pydantic/jiter/                                                 |
-| pydantic           | 2.14.1    | MIT                                                              | https://github.com/pydantic/pydantic                                               |
-| pydantic-settings  | 2.16.0    | MIT                                                              | https://github.com/pydantic/pydantic-settings                                      |
-| pydantic_core      | 2.50.1    | MIT                                                              | https://github.com/pydantic                                                        |
-| tabulate           | 0.10.0    | MIT                                                              | https://github.com/astanin/python-tabulate                                         |
-| truststore         | 0.10.4    | MIT                                                              | https://github.com/sethmlarson/truststore                                          |
-| typing-inspection  | 0.4.4     | MIT                                                              | https://github.com/pydantic/typing-inspection                                      |
-| PyYAML             | 6.0.3     | MIT License                                                      | https://pyyaml.org/                                                                |
-| h11                | 0.16.0    | MIT License                                                      | https://github.com/python-hyper/h11                                                |
-| onnxruntime        | 1.31.0    | MIT License                                                      | https://onnxruntime.ai                                                             |
-| python-docx        | 1.2.0     | MIT License                                                      | https://github.com/python-openxml/python-docx                                      |
-| watchfiles         | 1.3.0     | MIT License                                                      | https://github.com/samuelcolvin/watchfiles                                         |
-| cffi               | 2.1.1     | MIT-0                                                            | https://cffi.readthedocs.io/en/latest/whatsnew.html                                |
-| pillow             | 13.0.0    | MIT-CMU                                                          | https://python-pillow.org                                                          |
-| certifi            | 2026.7.22 | Mozilla Public License 2.0 (MPL 2.0)                             | https://github.com/certifi/python-certifi                                          |
-| typing_extensions  | 4.16.0    | PSF-2.0                                                          | https://github.com/python/typing_extensions                                        |
-| pymupdf4llm        | 2.0       | UNKNOWN                                                          | UNKNOWN                                                                            |
-| pymupdf_layout     | 2.0       | UNKNOWN                                                          | UNKNOWN                                                                            |
+| Name               | Version    | License                                                          | URL                                                                                |
+|--------------------|------------|------------------------------------------------------------------|------------------------------------------------------------------------------------|
+| protobuf           | 7.36.2     | 3-Clause BSD License                                             | https://developers.google.com/protocol-buffers/                                    |
+| flatbuffers        | 25.12.19   | Apache Software License                                          | https://google.github.io/flatbuffers/                                              |
+| sniffio            | 1.3.1      | Apache Software License; MIT License                             | https://github.com/python-trio/sniffio                                             |
+| uvloop             | 0.23.0     | Apache Software License; MIT License                             | UNKNOWN                                                                            |
+| openai             | 3.45.0     | Apache-2.0                                                       | https://github.com/openai/openai-python                                            |
+| opentelemetry-api  | 1.45.2     | Apache-2.0                                                       | https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-api |
+| python-multipart   | 0.0.33     | Apache-2.0                                                       | https://github.com/Kludex/python-multipart                                         |
+| packaging          | 26.3       | Apache-2.0 OR BSD-2-Clause                                       | https://github.com/pypa/packaging                                                  |
+| cryptography       | 50.0.2     | Apache-2.0 OR BSD-3-Clause                                       | https://github.com/pyca/cryptography                                               |
+| httpx              | 0.28.1     | BSD License                                                      | https://github.com/encode/httpx                                                    |
+| reportlab          | 5.1.0      | BSD License                                                      | https://www.reportlab.com/                                                         |
+| click              | 8.5.0      | BSD-3-Clause                                                     | https://github.com/pallets/click/                                                  |
+| httpcore           | 1.0.9      | BSD-3-Clause                                                     | https://www.encode.io/httpcore/                                                    |
+| httpcore2          | 2.16.0     | BSD-3-Clause                                                     | https://github.com/pydantic/httpx2                                                 |
+| httpx2             | 2.16.0     | BSD-3-Clause                                                     | https://github.com/pydantic/httpx2                                                 |
+| idna               | 3.20       | BSD-3-Clause                                                     | https://github.com/kjd/idna                                                        |
+| lxml               | 6.1.3      | BSD-3-Clause                                                     | https://lxml.de/                                                                   |
+| networkx           | 3.7        | BSD-3-Clause                                                     | https://networkx.org/                                                              |
+| psutil             | 7.2.2      | BSD-3-Clause                                                     | https://github.com/giampaolo/psutil                                                |
+| pycparser          | 3.12       | BSD-3-Clause                                                     | https://github.com/eliben/pycparser                                                |
+| pypdf              | 6.21.4     | BSD-3-Clause                                                     | https://github.com/py-pdf/pypdf                                                    |
+| python-dotenv      | 1.2.4      | BSD-3-Clause                                                     | https://github.com/theskumar/python-dotenv                                         |
+| starlette          | 1.10.0     | BSD-3-Clause                                                     | https://github.com/Kludex/starlette                                                |
+| uvicorn            | 0.54.0     | BSD-3-Clause                                                     | https://uvicorn.dev/                                                               |
+| websockets         | 17.4       | BSD-3-Clause                                                     | https://github.com/python-websockets/websockets                                    |
+| numpy              | 2.5.4      | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0               | https://numpy.org                                                                  |
+| pypdfium2          | 5.14.0     | BSD-3-Clause, Apache-2.0, dependency licenses                    | https://github.com/pypdfium2-team/pypdfium2                                        |
+| pymupdf            | 2.1        | Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License | https://github.com/pymupdf/pymupdf                                                 |
+| PyJWT              | 2.15.1     | MIT                                                              | https://github.com/jpadilla/pyjwt                                                  |
+| annotated-doc      | 0.0.5      | MIT                                                              | https://github.com/fastapi/annotated-doc                                           |
+| annotated-types    | 0.8.0      | MIT                                                              | https://github.com/annotated-types/annotated-types                                 |
+| anyio              | 4.16.0     | MIT                                                              | https://anyio.readthedocs.io/en/stable/versionhistory.html                         |
+| charset-normalizer | 3.5.2      | MIT                                                              | https://github.com/jawah/charset_normalizer/blob/master/CHANGELOG.md               |
+| fastapi            | 0.162.0    | MIT                                                              | https://github.com/fastapi/fastapi                                                 |
+| httptools          | 0.9.0      | MIT                                                              | https://github.com/MagicStack/httptools                                            |
+| jiter              | 0.18.0     | MIT                                                              | https://github.com/pydantic/jiter/                                                 |
+| pydantic           | 2.14.2     | MIT                                                              | https://github.com/pydantic/pydantic                                               |
+| pydantic-settings  | 2.16.2     | MIT                                                              | https://github.com/pydantic/pydantic-settings                                      |
+| pydantic_core      | 2.50.2     | MIT                                                              | https://github.com/pydantic                                                        |
+| tabulate           | 0.10.0     | MIT                                                              | https://github.com/astanin/python-tabulate                                         |
+| truststore         | 0.10.5     | MIT                                                              | https://github.com/sethmlarson/truststore                                          |
+| typing-inspection  | 0.4.5      | MIT                                                              | https://github.com/pydantic/typing-inspection                                      |
+| PyYAML             | 6.0.3      | MIT License                                                      | https://pyyaml.org/                                                                |
+| h11                | 0.16.0     | MIT License                                                      | https://github.com/python-hyper/h11                                                |
+| onnxruntime        | 1.31.1     | MIT License                                                      | https://onnxruntime.ai                                                             |
+| python-docx        | 1.2.0      | MIT License                                                      | https://github.com/python-openxml/python-docx                                      |
+| watchfiles         | 1.3.0      | MIT License                                                      | https://github.com/samuelcolvin/watchfiles                                         |
+| cffi               | 2.1.1      | MIT-0                                                            | https://cffi.readthedocs.io/en/latest/whatsnew.html                                |
+| pillow             | 13.0.0     | MIT-CMU                                                          | https://python-pillow.org                                                          |
+| certifi            | 2026.10.23 | Mozilla Public License 2.0 (MPL 2.0)                             | https://github.com/certifi/python-certifi                                          |
+| typing_extensions  | 4.16.0     | PSF-2.0                                                          | https://github.com/python/typing_extensions                                        |
+| pymupdf4llm        | 2.1        | UNKNOWN                                                          | UNKNOWN                                                                            |
+| pymupdf_layout     | 2.1        | UNKNOWN                                                          | UNKNOWN                                                                            |
 
 ## Frontend (npm — production dependencies)
 
-- [@babel/helper-string-parser@7.29.7](https://github.com/babel/babel) - MIT
+- [@babel/helper-string-parser@7.29.13](https://github.com/babel/babel) - MIT
 - [@babel/helper-validator-identifier@7.29.7](https://github.com/babel/babel) - MIT
-- [@babel/parser@7.29.9](https://github.com/babel/babel) - MIT
-- [@babel/types@7.29.8](https://github.com/babel/babel) - MIT
-- [@intlify/core-base@11.4.16](https://github.com/intlify/vue-i18n) - MIT
-- [@intlify/devtools-types@11.4.16](https://github.com/intlify/vue-i18n) - MIT
-- [@intlify/message-compiler@11.4.16](https://github.com/intlify/vue-i18n) - MIT
-- [@intlify/shared@11.4.16](https://github.com/intlify/vue-i18n) - MIT
+- [@babel/parser@7.29.13](https://github.com/babel/babel) - MIT
+- [@babel/types@7.29.11](https://github.com/babel/babel) - MIT
+- [@emnapi/core@1.11.3](https://github.com/toyobayashi/emnapi) - MIT
+- [@emnapi/runtime@1.11.3](https://github.com/toyobayashi/emnapi) - MIT
+- [@emnapi/wasi-threads@1.2.3](https://github.com/toyobayashi/emnapi) - MIT
+- [@intlify/core-base@11.4.18](https://github.com/intlify/vue-i18n) - MIT
+- [@intlify/devtools-types@11.4.18](https://github.com/intlify/vue-i18n) - MIT
+- [@intlify/message-compiler@11.4.18](https://github.com/intlify/vue-i18n) - MIT
+- [@intlify/shared@11.4.18](https://github.com/intlify/vue-i18n) - MIT
 - [@jridgewell/gen-mapping@0.3.13](https://github.com/jridgewell/sourcemaps) - MIT
 - [@jridgewell/remapping@2.3.5](https://github.com/jridgewell/sourcemaps) - MIT
 - [@jridgewell/resolve-uri@3.1.2](https://github.com/jridgewell/resolve-uri) - MIT
 - [@jridgewell/sourcemap-codec@1.6.0](https://github.com/jridgewell/sourcemaps) - MIT
 - [@jridgewell/trace-mapping@0.3.31](https://github.com/jridgewell/sourcemaps) - MIT
-- [@lucide/vue@1.60.0](https://github.com/lucide-icons/lucide) - ISC
-- [@oxc-project/types@0.152.0](https://github.com/oxc-project/oxc) - MIT
+- [@lucide/vue@1.68.0](https://github.com/lucide-icons/lucide) - ISC
+- [@napi-rs/wasm-runtime@1.2.2](https://github.com/napi-rs/napi-rs) - MIT
+- [@oxc-project/types@0.156.0](https://github.com/oxc-project/oxc) - MIT
 - [@rolldown/pluginutils@1.0.1](https://github.com/rolldown/plugins) - MIT
-- [@tailwindcss/node@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
-- [@tailwindcss/oxide@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
-- [@tailwindcss/vite@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
-- [@types/node@26.6.5](https://github.com/DefinitelyTyped/DefinitelyTyped) - MIT
+- [@tailwindcss/node@4.3.4](https://github.com/tailwindlabs/tailwindcss) - MIT
+- [@tailwindcss/oxide-wasm32-wasi@4.3.4](https://github.com/tailwindlabs/tailwindcss) - MIT
+- [@tailwindcss/oxide@4.3.4](https://github.com/tailwindlabs/tailwindcss) - MIT
+- [@tailwindcss/vite@4.3.4](https://github.com/tailwindlabs/tailwindcss) - MIT
+- [@tybys/wasm-util@0.10.3](https://github.com/toyobayashi/wasm-util) - MIT
+- [@types/node@26.6.6](https://github.com/DefinitelyTyped/DefinitelyTyped) - MIT
 - [@vue/compiler-core@3.5.44](https://github.com/vuejs/core) - MIT
 - [@vue/compiler-dom@3.5.44](https://github.com/vuejs/core) - MIT
 - [@vue/compiler-sfc@3.5.44](https://github.com/vuejs/core) - MIT
@@ -108,7 +114,7 @@ is excluded because it is not distributed.
 - [@vue/shared@3.5.44](https://github.com/vuejs/core) - MIT
 - [agent-base@6.0.2](https://github.com/TooTallNate/node-agent-base) - MIT
 - [asynckit@0.4.0](https://github.com/alexindigo/asynckit) - MIT
-- [axios@1.20.0](https://github.com/axios/axios) - MIT
+- [axios@1.21.0](https://github.com/axios/axios) - MIT
 - [birpc@2.9.0](https://github.com/antfu-collective/birpc) - MIT
 - [call-bind-apply-helpers@1.0.2](https://github.com/ljharb/call-bind-apply-helpers) - MIT
 - [combined-stream@1.0.8](https://github.com/felixge/node-combined-stream) - MIT
@@ -117,7 +123,7 @@ is excluded because it is not distributed.
 - [delayed-stream@1.0.0](https://github.com/felixge/node-delayed-stream) - MIT
 - [detect-libc@2.1.2](https://github.com/lovell/detect-libc) - Apache-2.0
 - [dunder-proto@1.0.1](https://github.com/es-shims/dunder-proto) - MIT
-- [enhanced-resolve@5.24.3](https://github.com/webpack/enhanced-resolve) - MIT
+- [enhanced-resolve@5.26.1](https://github.com/webpack/enhanced-resolve) - MIT
 - [entities@7.0.1](https://github.com/fb55/entities) - BSD-2-Clause
 - [es-define-property@1.0.1](https://github.com/ljharb/es-define-property) - MIT
 - [es-errors@1.3.0](https://github.com/ljharb/es-errors) - MIT
@@ -126,7 +132,7 @@ is excluded because it is not distributed.
 - [estree-walker@2.0.2](https://github.com/Rich-Harris/estree-walker) - MIT
 - [fdir@6.5.0](https://github.com/thecodrr/fdir) - MIT
 - [fflate@0.8.3](https://github.com/101arrowz/fflate) - MIT
-- [follow-redirects@1.16.0](https://github.com/follow-redirects/follow-redirects) - MIT
+- [follow-redirects@1.16.2](https://github.com/follow-redirects/follow-redirects) - MIT
 - [form-data@4.0.6](https://github.com/form-data/form-data) - MIT
 - [function-bind@1.1.2](https://github.com/Raynos/function-bind) - MIT
 - [get-intrinsic@1.3.0](https://github.com/ljharb/get-intrinsic) - MIT
@@ -139,28 +145,29 @@ is excluded because it is not distributed.
 - [hookable@5.5.3](https://github.com/unjs/hookable) - MIT
 - [https-proxy-agent@5.0.1](https://github.com/TooTallNate/node-https-proxy-agent) - MIT
 - [jiti@2.7.0](https://github.com/unjs/jiti) - MIT
-- [lightningcss@1.32.0](https://github.com/parcel-bundler/lightningcss) - MPL-2.0
 - [lightningcss@1.33.0](https://github.com/parcel-bundler/lightningcss) - MPL-2.0
 - [magic-string@0.30.21](https://github.com/Rich-Harris/magic-string) - MIT
+- [magic-string@1.4.5](https://github.com/Rich-Harris/magic-string) - MIT
 - [math-intrinsics@1.1.0](https://github.com/es-shims/math-intrinsics) - MIT
 - [mime-db@1.52.0](https://github.com/jshttp/mime-db) - MIT
 - [mime-types@2.1.35](https://github.com/jshttp/mime-types) - MIT
 - [ms@2.1.3](https://github.com/vercel/ms) - MIT
 - [nanoid@3.3.20](https://github.com/ai/nanoid) - MIT
-- [nostics@1.2.0](https://github.com/vercel-labs/nostics) - MIT
+- [nostics@1.3.0](https://github.com/vercel-labs/nostics) - MIT
 - [perfect-debounce@2.1.0](https://github.com/unjs/perfect-debounce) - MIT
 - [picocolors@1.1.1](https://github.com/alexeyraspopov/picocolors) - ISC
 - [picomatch@4.0.7](https://github.com/micromatch/picomatch) - MIT
 - [pinia@4.1.0](https://github.com/vuejs/pinia) - MIT
-- [postcss@8.5.29](https://github.com/postcss/postcss) - MIT
+- [postcss@8.5.32](https://github.com/postcss/postcss) - MIT
 - [proxy-from-env@2.1.0](https://github.com/Rob--W/proxy-from-env) - MIT
-- [rolldown@1.2.12](https://github.com/rolldown/rolldown) - MIT
+- [rolldown@1.2.16](https://github.com/rolldown/rolldown) - MIT
 - [source-map-js@1.2.2](https://github.com/7rulnik/source-map-js) - BSD-3-Clause
-- [tailwindcss@4.3.3](https://github.com/tailwindlabs/tailwindcss) - MIT
+- [tailwindcss@4.3.4](https://github.com/tailwindlabs/tailwindcss) - MIT
 - [tapable@2.3.3](https://github.com/webpack/tapable) - MIT
 - [tinyglobby@0.2.17](https://github.com/SuperchupuDev/tinyglobby) - MIT
+- [tslib@2.8.1](https://github.com/Microsoft/tslib) - 0BSD
 - [typescript@6.0.3](https://github.com/microsoft/TypeScript) - Apache-2.0
 - [undici-types@8.9.0](https://github.com/nodejs/undici) - MIT
-- [vite@8.3.4](https://github.com/vitejs/vite) - MIT
-- [vue-i18n@11.4.16](https://github.com/intlify/vue-i18n) - MIT
+- [vite@8.3.5](https://github.com/vitejs/vite) - MIT
+- [vue-i18n@11.4.18](https://github.com/intlify/vue-i18n) - MIT
 - [vue@3.5.44](https://github.com/vuejs/core) - MIT
