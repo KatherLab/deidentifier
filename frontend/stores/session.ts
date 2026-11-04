@@ -462,9 +462,14 @@ export const useSessionStore = defineStore('session', () => {
   // Status endpoint / banners
   // ---------------------------------------------------------------------
 
-  /** External (non-local) endpoints that document content is sent to. */
-  const externalEndpoints = computed<ExternalEndpoint[]>(
-    () => status.value?.external_endpoints.filter((endpoint) => !endpoint.local) ?? [],
+  /**
+   * External (non-local) endpoints the header warns about. Empty when the
+   * operator switched the warning off (DISABLE_EXTERNAL_ENDPOINT_WARNING).
+   */
+  const externalEndpoints = computed<ExternalEndpoint[]>(() =>
+    status.value?.external_endpoint_warning
+      ? status.value.external_endpoints.filter((endpoint) => !endpoint.local)
+      : [],
   )
 
   /** Deployment-wide banner configured by the operator (null when disabled). */

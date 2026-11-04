@@ -78,14 +78,16 @@ async def read_current_session(
 ) -> SessionResponse:
     """The frontend's first call. With no gate configured this reports
     `enabled=false` and the app runs exactly as it did before."""
+    titles = {"page_title": settings.page_title, "tab_title": settings.tab_title}
     if not settings.OIDC_ENABLED:
-        return SessionResponse(enabled=False, authenticated=True)
+        return SessionResponse(enabled=False, authenticated=True, **titles)
     user = read_session(settings, request.cookies.get(SESSION_COOKIE))
     return SessionResponse(
         enabled=True,
         authenticated=user is not None,
         user=AuthUser(name=user.name, email=user.email) if user else None,
         login_url=f"{settings.public_url}/api/v1/auth/login",
+        **titles,
     )
 
 

@@ -38,6 +38,9 @@ export const useAuthStore = defineStore('auth', () => {
   const authenticated = ref(false)
   const user = ref<AuthUser | null>(null)
   const loginUrl = ref('')
+  /** Operator-configured titles; empty means the translated default. */
+  const pageTitle = ref('')
+  const tabTitle = ref('')
   /** False until the first `/auth/session` answered — the app waits for it
    *  rather than flashing the input panel at someone who may not be let in. */
   const ready = ref(false)
@@ -56,6 +59,8 @@ export const useAuthStore = defineStore('auth', () => {
       authenticated.value = data.authenticated
       user.value = data.user
       loginUrl.value = data.login_url
+      pageTitle.value = data.page_title
+      tabTitle.value = data.tab_title
     } catch {
       // The backend is unreachable, which is not the same as being locked out:
       // stay out of the way and let the usual "server not reachable" errors
@@ -108,6 +113,8 @@ export const useAuthStore = defineStore('auth', () => {
     enabled,
     authenticated,
     user,
+    pageTitle,
+    tabTitle,
     loginUrl,
     ready,
     signingOut,

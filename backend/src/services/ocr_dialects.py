@@ -253,8 +253,8 @@ class ChandraDialect(OcrDialect):
 
 class PlainDialect(OcrDialect):
     """Any generic vision model that returns the transcription as plain text
-    or Markdown. No layout boxes, so scanned-PDF export falls back to the
-    rasterized full-page reconstruction."""
+    or Markdown. No layout boxes, so the scanned-PDF reconstruction lays the
+    text out in reading order (`utils/layout.py`)."""
 
     name = "plain"
     default_prompt = (

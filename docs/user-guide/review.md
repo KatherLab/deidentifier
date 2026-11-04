@@ -228,7 +228,7 @@ and **Schwärzungen anzeigen** switches back.
   preview, and the pages catch up a moment later.
 - **Scanned documents draw on the reconstruction.** Their export is not the
   scan: the original pixels are discarded and the anonymized text is re-typeset
-  at the OCR positions, so the editor shows that reconstruction — the page the
+  at the OCR positions or in reading order, so the editor shows that reconstruction — the page the
   areas are really applied to — and there is nothing to switch. The scan itself
   stays available in the **Original** panel.
 - **Fertig** (or the **Vorschau** view) takes you back to the redacted preview;

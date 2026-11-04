@@ -11,6 +11,15 @@ documentation, and CI work are left out.
 
 ## [Unreleased]
 
+### Added
+
+- `APP_PAGE_TITLE` and `APP_TAB_TITLE` set the header heading and browser-tab title independently; see [Configuration](docs/operations/configuration.md#titles).
+- `DISABLE_EXTERNAL_ENDPOINT_WARNING` removes the header's external-endpoint warning; see [Configuration](docs/operations/configuration.md#external-endpoint-warning).
+
+### Fixed
+
+- Scanned PDFs read without OCR positions (`docling_tesseract`, the `plain` dialect, fallback-prompt pages) now export in reading order instead of failing with `pdf_export_no_layout` or dropping that text; see [Export](docs/user-guide/export.md#redacted-pdf).
+
 ## [0.4.1] — 2026-10-20
 
 ### Changed

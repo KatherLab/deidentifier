@@ -58,8 +58,8 @@ happens next depends on `OCR_ENGINE`:
   The text carries a warning that recognition errors are possible.
 
 For a scanned source, the redacted PDF export is a **reconstruction**: the
-anonymized text is laid out at the recognized positions and the original pixels
-are discarded. That is deliberate — it is the only way to guarantee nothing
+anonymized text is laid out at the recognized positions (in reading order if the
+OCR engine reports none) and the original pixels are discarded. That is deliberate — it is the only way to guarantee nothing
 identifying survives in the image. The panel says so.
 
 If a PDF *has* an embedded text layer but the text is garbage (a bad scan

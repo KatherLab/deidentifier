@@ -185,5 +185,8 @@ class StatusResponse(BaseModel):
     #: Selectable OCR profiles; empty unless several are configured.
     ocr_profiles: list[OcrProfileStatus] = []
     external_endpoints: list[ExternalEndpoint]
+    #: False when the operator set DISABLE_EXTERNAL_ENDPOINT_WARNING. The list
+    #: above stays complete either way; this only tells the UI not to warn.
+    external_endpoint_warning: bool = True
     limits: Limits
     banner: Banner | None = None

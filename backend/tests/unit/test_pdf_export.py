@@ -562,9 +562,34 @@ def test_rebuild_wraps_paragraph_boxes_and_maps_bullets():
     assert "- Die Patientin" in extracted.replace("\n", " ")
 
 
-def test_rebuild_without_layout_fails():
-    with pytest.raises(ExportError):
-        rebuild_scanned_pdf("Text", [], [], page_count=1)
+def test_rebuild_without_layout_exports_in_reading_order():
+    from pypdf import PdfReader
+
+    source = "Patientin: Erika Musterfrau\n\nDiagnose: Akute Cholezystitis."
+    entities = entities_for(source, [("Erika Musterfrau", "[PERSON_1]")])
+
+    output = rebuild_scanned_pdf(source, [], entities, page_count=0)
+
+    extracted = PdfReader(io.BytesIO(output)).pages[0].extract_text()
+    assert "Erika Musterfrau" not in extracted
+    assert extracted.index("[PERSON_1]") < extracted.index("Akute Cholezystitis")
+    assert "rekonstruiertes" in extracted
+
+
+def test_rebuild_without_layout_still_verifies():
+    source = "Patientin: Erika Musterfrau"
+    # Replacement text that re-introduces the name: the verification must fire
+    # on this path just as it does with OCR boxes.
+    entity = applied("Erika Musterfrau", source.index("Erika"), replacement="Erika Musterfrau")
+    with pytest.raises(ExportError) as excinfo:
+        rebuild_scanned_pdf(source, [], [entity], page_count=0)
+    assert excinfo.value.code == pdf_export.RESIDUAL_UNEXPLAINED
+
+
+def test_rebuild_refuses_a_document_with_no_text():
+    with pytest.raises(ExportError) as excinfo:
+        rebuild_scanned_pdf("  \n ", [], [], page_count=1)
+    assert excinfo.value.code == pdf_export.EXPORT_FAILED
 
 
 def test_verify_rebuilt_catches_surviving_pii():

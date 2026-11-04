@@ -96,7 +96,9 @@ standalone as above, it is reachable from the backend container at
 
 1. `GET /api/v1/status` → the `llm` detector must report `ready: true`.
 2. Run a synthetic document through the UI and check that names are found.
-3. Confirm the header shows no external-endpoint banner.
+3. Confirm the header shows no external-endpoint banner (with
+   `DISABLE_EXTERNAL_ENDPOINT_WARNING` set, check `local` in `/api/v1/status`
+   instead).
 
 If the endpoint is unreachable, requests fail with *"Der KI-Erkennungsdienst
 ist nicht erreichbar. Das Dokument wurde NICHT anonymisiert."* — a deliberate

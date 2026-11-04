@@ -13,8 +13,9 @@ possibly incomplete redaction).
 
 Scanned PDFs → layout-faithful rebuild. The original pixels are discarded
 entirely (fail-closed); the anonymized text is re-typeset at the OCR bounding
-boxes (0–1000 normalized). The result is re-extracted and checked: no
-redacted entity string may survive in the output.
+boxes (0–1000 normalized), or in reading order where OCR reported none
+(`layout.complete_layout`). The result is re-extracted and checked: no redacted
+entity string may survive in the output.
 
 Both verifications compare against the anonymized TEXT output (`expected_text`)
 rather than against an empty page, because the two are not the same claim:
@@ -36,7 +37,7 @@ import re
 from ..core.config import Settings
 from ..schemas.anonymize import RedactArea
 from ..schemas.entities import AppliedEntity, SpanStatus
-from .extraction import LayoutLine
+from .layout import LayoutLine, complete_layout
 from .safe_logging import get_safe_logger
 
 logger = get_safe_logger(__name__)
@@ -57,7 +58,6 @@ RESIDUAL_EXPLAINED = "pdf_export_residual_explained"
 RESIDUAL_UNEXPLAINED = "pdf_export_residual_unexplained"
 NOT_LOCATED = "pdf_export_not_located"
 AREA_RESIDUAL = "pdf_export_area_residual"
-NO_LAYOUT = "pdf_export_no_layout"
 PDF_UNREADABLE = "pdf_export_unreadable"
 PDF_NO_PAGES = "pdf_export_no_pages"
 
@@ -84,10 +84,6 @@ EXPORT_DETAILS: dict[str, str] = {
     AREA_RESIDUAL: (
         "Verification failed: text is still present under a blacked-out area; the "
         "redacted PDF was NOT generated."
-    ),
-    NO_LAYOUT: (
-        "No layout information is available for this document; re-run the anonymization "
-        "and export again."
     ),
     PDF_UNREADABLE: "The PDF could not be opened.",
     PDF_NO_PAGES: "The PDF contains no pages.",
@@ -757,8 +753,11 @@ def rebuild_scanned_pdf(
     from reportlab.lib.colors import grey
     from reportlab.pdfgen import canvas
 
+    layout = layout or complete_layout(source_text, [], [])
     if not layout:
-        raise ExportError(NO_LAYOUT)
+        # Nothing to typeset: extraction refuses an empty transcript, so a page
+        # with only the notice on it could not be the document the user reviewed.
+        raise ExportError(EXPORT_FAILED)
 
     width, height = _PAGE_A4
     buffer = io.BytesIO()

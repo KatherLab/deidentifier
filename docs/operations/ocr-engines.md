@@ -35,8 +35,10 @@ degrading.
 ## `llm_vision`
 
 Renders each page to a PNG and has a vision model transcribe it. Much better on
-difficult scans, and it returns bounding boxes — which is what makes the
-reconstructed redacted PDF possible.
+difficult scans, and most dialects return bounding boxes, which place the text
+of the reconstructed redacted PDF near its original position. Text without
+boxes (`docling_tesseract`, the `plain` dialect, a page that needed the fallback
+prompt) is exported too, laid out in reading order on A4 pages instead.
 
 ```env
 OCR_ENGINE=llm_vision

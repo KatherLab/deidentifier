@@ -9,7 +9,7 @@
 
     <header class="border-b border-default">
       <div class="mx-auto flex items-center gap-3 px-4 py-4" :class="containerClass">
-        <h1 class="text-xl font-semibold text-content">{{ t('app.title') }}</h1>
+        <h1 class="text-xl font-semibold text-content">{{ pageTitle }}</h1>
 
         <div class="ml-auto flex items-center gap-1.5">
           <!-- How long the server keeps the current result — and the way to
@@ -193,7 +193,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle, LogOut, Moon, Plus, Settings, Sun, Timer, User } from '@lucide/vue'
 import InputPanel from '@/components/anonymizer/InputPanel.vue'
@@ -218,6 +218,13 @@ const settings = useSettingsStore()
 /** Providers are not required to send a name; the email is the fallback, and
  *  a generic word the fallback for that. */
 const accountName = computed(() => auth.user?.name || auth.user?.email || t('auth.user.signed_in'))
+
+// Operator-configured titles (APP_PAGE_TITLE, APP_TAB_TITLE), independent of
+// each other; whichever is unset follows the interface language.
+const pageTitle = computed(() => auth.pageTitle || t('app.title'))
+watchEffect(() => {
+  document.title = auth.tabTitle || t('app.title')
+})
 
 // ---------------------------------------------------------------------------
 // Result lifetime chip: the batch-wide countdown, extendable at any time

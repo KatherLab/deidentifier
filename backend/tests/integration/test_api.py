@@ -557,6 +557,23 @@ def test_status_endpoint(client):
     assert body["banner"] is None
 
 
+def test_status_warns_about_external_endpoints_by_default(client):
+    assert client.get("/api/v1/status").json()["external_endpoint_warning"] is True
+
+
+def test_status_keeps_endpoint_facts_when_the_warning_is_disabled(client, monkeypatch):
+    from backend.src.core.config import get_settings
+
+    monkeypatch.setenv("DISABLE_EXTERNAL_ENDPOINT_WARNING", "true")
+    monkeypatch.setenv("DETECTORS", "rules,llm")
+    monkeypatch.setenv("OPENAI_API_BASE", "https://llm.example.org/v1")
+    monkeypatch.setenv("LLM_MODEL", "test-model")
+    get_settings.cache_clear()
+    body = client.get("/api/v1/status").json()
+    assert body["external_endpoint_warning"] is False
+    assert {"name": "llm", "host": "llm.example.org", "local": False} in body["external_endpoints"]
+
+
 def test_status_reports_configured_banner(client, monkeypatch):
     from backend.src.core.config import get_settings
 
@@ -622,6 +639,36 @@ def _fake_scan_extraction(text: str, lines: list[str]):
         pages=[PageRange(page_number=1, start=0, end=len(text))],
         layout=layout,
     )
+
+
+def test_export_scanned_pdf_without_ocr_positions(client, monkeypatch):
+    """An OCR result with no boxes exports instead of answering 422."""
+    import io
+
+    from pypdf import PdfReader
+
+    from backend.src.routers.v1.endpoints import export as export_endpoint
+    from backend.src.utils.extraction import ExtractedDocument
+    from backend.src.utils.layout import complete_layout
+    from backend.tests.pdf_builder import make_pdf
+
+    text = "Patient: Max Mustermann, geb. 01.02.1980\nDer Patient wurde aufgenommen."
+
+    async def fake_extract(*_args, **_kwargs):
+        return ExtractedDocument(
+            text=text, source_type="pdf-ocr", layout=complete_layout(text, [], [])
+        )
+
+    monkeypatch.setattr(export_endpoint, "extract_document", fake_extract)
+    response = client.post(
+        "/api/v1/export/pdf",
+        files={"file": ("scan.pdf", make_pdf(["scan"]), "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    extracted = PdfReader(io.BytesIO(response.content)).pages[0].extract_text()
+    assert "Max Mustermann" not in extracted
+    assert "Der Patient wurde aufgenommen." in extracted
 
 
 def test_export_scanned_pdf_draws_bars_only_when_asked(client, monkeypatch):

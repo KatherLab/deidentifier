@@ -159,6 +159,47 @@ async def test_scanned_pdf_ocr_rebuild_to_redacted_pdf():
     assert "Fallnummer" in extracted
 
 
+async def test_scanned_pdf_plain_dialect_rebuilds_without_ocr_boxes():
+    """A vision model with no boxes: the transcript exports in reading order."""
+    import io
+
+    from pypdf import PdfReader
+
+    from backend.src.utils.extraction import extract_document
+    from backend.src.utils.pdf_export import rebuild_scanned_pdf
+    from backend.tests.pdf_builder import make_scanned_pdf
+
+    ocr_text = "Entlassungsbrief\nPatientin Erika Musterfrau\nFallnummer: 2026-00815."
+    entities = [{"text": "Erika Musterfrau", "type": "PERSON_NAME", "role": "patient"}]
+    with FakeLLM(entities, vision_text=ocr_text) as server:
+        settings = make_settings(
+            server.base_url,
+            OCR_ENGINE="llm_vision",
+            VISION_OCR_API_BASE=f"{server.base_url}/v1",
+            VISION_OCR_MODEL="any-vision-model",
+            VISION_OCR_DIALECT="plain",
+        )
+        document = await extract_document(make_scanned_pdf(pages=2), "scan.pdf", settings)
+        assert {line.page_number for line in document.layout} == {1, 2}
+        response = await run_anonymization(
+            document.text, settings, document.source_type, layout=document.layout
+        )
+        output = rebuild_scanned_pdf(
+            response.source_text,
+            document.layout,
+            response.entities,
+            len(document.pages),
+            expected_text=response.anonymized_text,
+        )
+
+    pages = [p.extract_text() or "" for p in PdfReader(io.BytesIO(output)).pages]
+    assert len(pages) == 2
+    for page in pages:
+        assert "Erika Musterfrau" not in page
+        assert "[PERSON_1]" in page
+        assert "Fallnummer" in page
+
+
 async def test_scanned_pdf_ocr_to_anonymized_text():
     """Full path: scanned PDF → vision OCR → detection → anonymized output."""
     from backend.src.utils.extraction import extract_document

@@ -5,7 +5,7 @@ import { applyLocale } from '@/composables/useLocale'
 import { i18n, t } from '@/i18n'
 import { anonymizeApi } from '@/services/anonymizeApi'
 import { useToastStore } from '@/stores/toast'
-import type { AnonymizeResponse, AnonymizedEntity } from '@/types/anonymizer'
+import type { AnonymizeResponse, AnonymizedEntity, StatusResponse } from '@/types/anonymizer'
 
 // The streaming pipeline is not under test here: every spec below drives the
 // store with results it sets itself, so a submit must never race a real (or
@@ -75,6 +75,37 @@ describe('output language', () => {
     expect(session.documents[0]!.outputLanguage).toBe('fr')
 
     session.reset()
+  })
+})
+
+describe('external-endpoint warning', () => {
+  const endpoints = [
+    { name: 'llm', host: 'llm.example.org', local: false },
+    { name: 'docling', host: 'docling', local: true },
+  ]
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('lists only the non-local endpoints while the warning is on', () => {
+    const session = useSessionStore()
+    session.status = {
+      external_endpoints: endpoints,
+      external_endpoint_warning: true,
+    } as StatusResponse
+
+    expect(session.externalEndpoints.map((endpoint) => endpoint.name)).toEqual(['llm'])
+  })
+
+  it('lists none once the operator disabled the warning', () => {
+    const session = useSessionStore()
+    session.status = {
+      external_endpoints: endpoints,
+      external_endpoint_warning: false,
+    } as StatusResponse
+
+    expect(session.externalEndpoints).toEqual([])
   })
 })
 

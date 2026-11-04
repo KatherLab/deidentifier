@@ -76,8 +76,9 @@ no external fonts or scripts. The app needs no internet access at runtime.
 - [ ] `APP_ENV=production`.
 - [ ] `APP_ALLOW_INSECURE_CONTENT_LOGGING=false` (production refuses otherwise).
 - [ ] `DETECTORS` contains no `mock` (production refuses otherwise).
-- [ ] Every configured endpoint is inside your network — the UI shows **no**
-      external-endpoint banner.
+- [ ] Every configured endpoint is inside your network — `GET /api/v1/status`
+      reports `local: true` for each. The UI's banner is not proof if
+      `DISABLE_EXTERNAL_ENDPOINT_WARNING` is set.
 - [ ] The backend publishes no port and mounts no volumes (the shipped
       `compose.yml` default).
 - [ ] Log shipping has been checked against a real run: no document content.

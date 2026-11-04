@@ -128,6 +128,8 @@ async def test_force_ocr_routes_text_pdf_through_ocr_engine(monkeypatch):
     )
     assert doc.source_type == "pdf-ocr"
     assert doc.text == "OCR: Herr Mustermann"
+    # docling reports no positions; the export still gets a place for the text.
+    assert [doc.text[line.start : line.end] for line in doc.layout] == [doc.text]
 
 
 async def test_unknown_extension_rejected():

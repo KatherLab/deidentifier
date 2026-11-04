@@ -12,6 +12,8 @@ function sessionResponse(overrides: Partial<AuthSession> = {}) {
       authenticated: true,
       user: { name: 'Dr. Müller', email: 'mueller@example.org' },
       login_url: 'https://deid.example.org/api/v1/auth/login',
+      page_title: '',
+      tab_title: '',
       ...overrides,
     } as AuthSession,
   }
@@ -45,6 +47,17 @@ describe('auth store', () => {
     expect(auth.enabled).toBe(false)
     expect(auth.blocked).toBe(false)
     expect(auth.ready).toBe(true)
+  })
+
+  it('takes the operator-configured titles from the session, independently', async () => {
+    vi.spyOn(authApi, 'getSession').mockResolvedValue(
+      sessionResponse({ enabled: false, tab_title: 'Nur Tab' }) as never,
+    )
+    const auth = useAuthStore()
+    await auth.initialize()
+
+    expect(auth.tabTitle).toBe('Nur Tab')
+    expect(auth.pageTitle).toBe('')
   })
 
   it('blocks the app when a gate is configured and nobody is signed in', async () => {

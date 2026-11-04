@@ -86,7 +86,24 @@ def test_without_a_gate_the_api_is_open(client):
 
 def test_without_a_gate_the_session_route_says_so(client):
     body = client.get("/api/v1/auth/session").json()
-    assert body == {"enabled": False, "authenticated": True, "user": None, "login_url": ""}
+    assert body == {
+        "enabled": False,
+        "authenticated": True,
+        "user": None,
+        "login_url": "",
+        "page_title": "",
+        "tab_title": "",
+    }
+
+
+def test_session_route_reports_titles_independently(client, monkeypatch):
+    from backend.src.core.config import get_settings
+
+    monkeypatch.setenv("APP_TAB_TITLE", "  Tab only  ")
+    get_settings.cache_clear()
+    body = client.get("/api/v1/auth/session").json()
+    assert body["tab_title"] == "Tab only"
+    assert body["page_title"] == ""
 
 
 def test_without_a_gate_there_is_nothing_to_sign_in_to(client):

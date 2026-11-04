@@ -6,7 +6,8 @@ the file hash matches the cached detection, no OCR or LLM detection is
 repeated; otherwise the full pipeline runs first.
 
 Native PDFs are rasterized with exact char-box blackout; scanned PDFs are
-rebuilt from the anonymized text at the OCR layout positions. Both paths fail
+rebuilt from the anonymized text at the OCR layout positions, or in reading
+order where OCR reported none. Both paths fail
 closed — an export that cannot be verified is refused. The single exception is
 a finding the anonymized *text* download carries too (a passage the reviewer
 kept that also occurs in redacted form): that one is refused with

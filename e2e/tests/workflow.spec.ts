@@ -461,6 +461,7 @@ test.describe('anonymization workflow', () => {
     // NOT warn about content leaving the installation.
     await expect(page.getByRole('button', { name: /Externer Endpunkt/ })).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Anonymisierer')
+    await expect(page).toHaveTitle(/Anonymisierer/)
 
     // The running version, for bug reports — it comes from the same status
     // call, so an empty footer means the backend never answered.

@@ -86,6 +86,7 @@ async def status(settings: Settings = Depends(get_settings)) -> StatusResponse:
             for index, p in enumerate(profiles)
         ],
         external_endpoints=endpoints,
+        external_endpoint_warning=not settings.DISABLE_EXTERNAL_ENDPOINT_WARNING,
         limits=Limits(
             max_upload_mb=settings.APP_MAX_UPLOAD_MB,
             max_text_chars=settings.APP_MAX_TEXT_CHARS,

@@ -95,6 +95,32 @@ OIDC_SESSION_SECRET=…            # openssl rand -hex 32
 APP_PUBLIC_URL=https://deid.klinik.de
 ```
 
+## Titles
+
+Both are shown verbatim in every interface language, and neither depends on the
+other. Whichever is unset keeps the translated application name. The sign-in
+screen uses them too. Before the app's first API answer, a tab briefly shows the
+built-in German name.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `APP_PAGE_TITLE` | *(empty)* | The heading in the page header. |
+| `APP_TAB_TITLE` | *(empty)* | The browser-tab title. |
+
+```bash
+APP_PAGE_TITLE='Anonymisierung Klinikum Musterstadt'
+APP_TAB_TITLE='Anonymisierung'
+```
+
+## External-endpoint warning
+
+| Variable | Default | Notes |
+|---|---|---|
+| `DISABLE_EXTERNAL_ENDPOINT_WARNING` | `false` | `true` removes the header warning about non-local endpoints. Document content still goes to those endpoints, and users are no longer told. `GET /api/v1/status` keeps reporting every endpoint's `local` flag. Warnings about detectors that are not ready stay. |
+
+Use it only where the endpoint has been approved and the warning would otherwise
+be permanent, for example a vetted institutional service on a public hostname.
+
 ## Deployment banner
 
 A bar above the header for a deployment-wide notice — "Research Use Only!",

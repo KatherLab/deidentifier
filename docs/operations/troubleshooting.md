@@ -31,7 +31,7 @@ unsafe configuration. The three causes:
 
 | Chip | Meaning |
 |---|---|
-| *Externer Endpunkt* | A configured endpoint is not loopback, not a private address, and not a single-label Docker service name. **Document content will leave this machine.** Verify it is intended. |
+| *Externer Endpunkt* | A configured endpoint is not loopback, not a private address, and not a single-label Docker service name. **Document content will leave this machine.** Verify it is intended. Absent when `DISABLE_EXTERNAL_ENDPOINT_WARNING=true`. |
 | *Detektor nicht bereit* | A detector is listed in `DETECTORS` but cannot run — usually `llm` without `OPENAI_API_BASE`/`LLM_MODEL`. Requests will fail rather than degrade. |
 
 `GET /api/v1/status` returns the same information as JSON.

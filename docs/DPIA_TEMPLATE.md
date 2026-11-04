@@ -75,7 +75,7 @@ Start from the [Risk register](RISK_REGISTER.md) and record your own ratings:
 | Measure | Status |
 |---|---|
 | Deployed behind an authenticating reverse proxy, TLS terminated there | |
-| All model and OCR endpoints inside the institutional network — no external-endpoint banner in the UI | |
+| All model and OCR endpoints inside the institutional network — `GET /api/v1/status` reports `local: true` for each (the UI banner can be disabled by `DISABLE_EXTERNAL_ENDPOINT_WARNING`) | |
 | Data processing agreements in place for any endpoint not operated by us | |
 | `APP_ENV=production`; content logging disabled | |
 | Pipeline evaluated on our own annotated documents; leakage rate recorded | |

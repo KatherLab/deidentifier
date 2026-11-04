@@ -111,8 +111,9 @@ branch in `extract_pdf()`. Requirements:
 - **fail closed** — a page that cannot be transcribed fails the document
   rather than yielding a partial transcript,
 - return `source_type="pdf-ocr"` and a recognition-error warning,
-- emit `LayoutLine` entries if you can: they are what makes the reconstructed
-  redacted PDF possible,
+- emit `LayoutLine` entries if you can, and pass the result through
+  `complete_layout()`: boxes keep the reconstructed redacted PDF near the
+  original layout, and text without them is placed in reading order,
 - respect a global concurrency cap via `utils/concurrency.py`,
 - document it in [OCR engines](../operations/ocr-engines.md).
 

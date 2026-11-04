@@ -51,7 +51,9 @@ the change is wrong.
    in the review view.
 4. **Configurable endpoints, local by default.** All model/OCR backends are
    admin-configured base URLs. The UI shows a banner when a configured
-   endpoint is not local, so users know where document content flows.
+   endpoint is not local, so users know where document content flows; only
+   an explicit `DISABLE_EXTERNAL_ENDPOINT_WARNING` removes it, and
+   `/api/v1/status` reports locality regardless.
 5. **Never claim more than was checked.** A detector that is enabled but
    cannot run fails the request (`DetectorError`) instead of silently
    producing a thinner result. Validation warnings downgrade the status; they
@@ -300,7 +302,7 @@ route is protected by default rather than by remembering a dependency):
 | `POST /api/v1/export/pdf/pages` | Renders pages as PNGs for the area-redaction editor, with embedded-image boxes as one-click suggestions. |
 | `GET /api/v1/status` | Configured detectors + OCR engine, endpoint **hosts** and their locality, limits. Never returns paths, keys, or full URLs. |
 | `GET /health/live`, `GET /health/ready` | Liveness/readiness. |
-| `GET /api/v1/auth/session` | Whether a gate exists and who is signed in. The frontend's first call; with the gate off it answers `enabled=false, authenticated=true` and nothing else in the UI changes. |
+| `GET /api/v1/auth/session` | Whether a gate exists, who is signed in, and the operator's `page_title`/`tab_title` (here because the sign-in screen needs them and `/status` is gated). The frontend's first call; with the gate off it answers `enabled=false, authenticated=true` and nothing else in the UI changes. |
 | `GET /api/v1/auth/login` → `GET /api/v1/auth/callback` | Authorization Code + PKCE. The state token is signed and carried in *both* the URL and a cookie; the callback requires them to match. Failures redirect to `{APP_PUBLIC_URL}/?auth_error=<code>` so the reviewer reads a sentence, not JSON. |
 | `POST /api/v1/auth/logout` | Drops the session cookie; returns the provider's `end_session` URL when `OIDC_END_SESSION` is on. |
 
@@ -324,6 +326,7 @@ extensions `.txt/.docx/.pdf`. `Cache-Control: no-store` on content routes
 | `utils/policy.py`, `utils/transformation.py` | Default policy, labels, pure transformations. |
 | `utils/leakage.py` | Output validation + `compute_status`. |
 | `utils/cache.py` | `request_cache` (TTL, bounded, in-memory). |
+| `utils/layout.py` | Layout models + `complete_layout`: reading-order positions for OCR text without boxes, derived from the source text so a reviewer's areas stay put. |
 | `utils/pdf_export.py` | Native-PDF true redaction, rasterized fallback, scanned-PDF reconstruction, page rendering. **Fails closed**: an export that cannot be verified is refused. The one exception is a residual the anonymized *text* has too (`expected_text`), which is refused as `forceable` and exported only after the reviewer confirms it. |
 | `utils/notices.py` | Stable codes + English text for every non-fatal message (the translation contract). |
 | `utils/policy.py` | Default policy + the replacement placeholders of every output language. |

@@ -284,6 +284,8 @@ export interface StatusResponse {
   /** Selectable OCR profiles; empty unless several are configured. */
   ocr_profiles: OcrProfileStatus[]
   external_endpoints: ExternalEndpoint[]
+  /** False when the operator disabled the warning; the list stays complete. */
+  external_endpoint_warning: boolean
   limits: StatusLimits
   banner: Banner | null
 }

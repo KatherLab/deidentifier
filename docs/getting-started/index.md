@@ -32,4 +32,5 @@ Both point at **base URLs you control**. See
     every OCR request sends page images to the OCR endpoint. Point them at
     services inside your own network. The app shows a banner in the header
     when a configured endpoint is not local — treat that banner as a blocker,
-    not a hint.
+    not a hint. An operator can switch it off with
+    `DISABLE_EXTERNAL_ENDPOINT_WARNING`.

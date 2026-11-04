@@ -25,7 +25,8 @@ images, and formatting stay intact.
 
 **Scanned PDF (`PDF (OCR)`)** — the original pixels are **discarded** and the
 document is rebuilt from the anonymized text at the recognized line positions.
-The result carries a *"Maschinell rekonstruiertes und anonymisiertes Dokument"*
+If the OCR engine reports no positions, the text runs in reading order instead,
+so page breaks can differ from the scan. The result carries a *"Maschinell rekonstruiertes und anonymisiertes Dokument"*
 notice. Layout is approximate. This is deliberate: an image cannot be verified
 to be free of identifying pixels, so it is not shipped.
 

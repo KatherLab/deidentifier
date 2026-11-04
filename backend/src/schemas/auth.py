@@ -20,6 +20,11 @@ class SessionResponse(BaseModel):
     user: AuthUser | None = None
     #: Where the browser goes to start a sign-in; empty when the gate is off.
     login_url: str = ""
+    #: Operator-configured titles (APP_PAGE_TITLE, APP_TAB_TITLE); empty keeps
+    #: the translated default. Here rather than on /status because the sign-in
+    #: screen needs them too, and /status is behind the gate.
+    page_title: str = ""
+    tab_title: str = ""
 
 
 class LogoutResponse(BaseModel):

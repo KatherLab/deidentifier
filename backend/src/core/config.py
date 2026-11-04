@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     APP_MAX_TEXT_CHARS: int = Field(default=500_000, ge=1)
     APP_ALLOW_INSECURE_CONTENT_LOGGING: bool = False
     APP_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    # Operator-authored titles, shown verbatim in every interface language.
+    # Empty keeps the translated default; each one is independent of the other.
+    APP_PAGE_TITLE: str = ""  # the heading in the header
+    APP_TAB_TITLE: str = ""  # the browser tab
+    # Hides the UI's external-endpoint warning. /api/v1/status keeps reporting
+    # each endpoint's locality: this silences the hint, not the facts.
+    DISABLE_EXTERNAL_ENDPOINT_WARNING: bool = False
 
     # How long a finished result stays in memory for cheap review-UI re-runs.
     # This is a retention setting, not a performance one: while an entry lives,
@@ -163,6 +170,14 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.APP_MAX_UPLOAD_MB * 1024 * 1024
+
+    @property
+    def page_title(self) -> str:
+        return self.APP_PAGE_TITLE.strip()
+
+    @property
+    def tab_title(self) -> str:
+        return self.APP_TAB_TITLE.strip()
 
     @property
     def banner_text(self) -> str:

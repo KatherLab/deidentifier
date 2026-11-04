@@ -34,8 +34,9 @@ used for convenience.
 
 *Controls:* endpoints are deployment configuration, never user input;
 `/api/v1/status` reports each endpoint's host and locality; the UI shows a
-persistent warning chip when any is non-local; the docs call the banner a
-blocker rather than a hint.
+persistent warning chip when any is non-local, unless the operator set
+`DISABLE_EXTERNAL_ENDPOINT_WARNING`; the docs call the banner a blocker rather
+than a hint.
 
 *Residual:* a determined operator can point the app anywhere and users will
 still use it. **This is the highest-impact risk in the system** — the mitigation

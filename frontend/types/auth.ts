@@ -18,6 +18,10 @@ export interface AuthSession {
   user: AuthUser | null
   /** Where the browser goes to start a sign-in; empty when the gate is off. */
   login_url: string
+  /** Operator-configured header title; empty keeps the translated default. */
+  page_title: string
+  /** Operator-configured browser-tab title; empty keeps the translated default. */
+  tab_title: string
 }
 
 export interface LogoutResponse {

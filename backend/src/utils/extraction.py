@@ -18,6 +18,7 @@ from ..core.config import Settings
 from ..schemas.entities import Notice
 from ..services.docling_serve_client import DoclingServeClient, DoclingServeError
 from ..services.pdf_text_probe import has_embedded_text
+from .layout import LayoutLine, PageRange, complete_layout
 from .notices import (
     DOCX_COMMENTS,
     DOCX_TEXT_BOXES,
@@ -39,26 +40,6 @@ class ExtractionError(Exception):
     def __init__(self, message: str, status_code: int = 422):
         super().__init__(message)
         self.status_code = status_code
-
-
-class PageRange(BaseModel):
-    page_number: int
-    start: int
-    end: int
-
-
-class LayoutLine(BaseModel):
-    """A transcribed line with its normalized (0–1000, top-left origin)
-    bounding box and its character range in the extracted text. Basis for the
-    layout-preserving redacted-PDF reconstruction of scanned documents."""
-
-    page_number: int
-    x1: int
-    y1: int
-    x2: int
-    y2: int
-    start: int
-    end: int
 
 
 class ExtractedDocument(BaseModel):
@@ -225,6 +206,7 @@ async def extract_pdf(
         return ExtractedDocument(
             text=text,
             source_type="pdf-ocr",
+            layout=complete_layout(text, [], []),
             warnings=[notice(OCR_RECOGNITION_ERRORS)],
         )
     if engine == "llm_vision":
@@ -268,7 +250,7 @@ async def extract_pdf(
             text=text,
             source_type="pdf-ocr",
             pages=pages,
-            layout=layout,
+            layout=complete_layout(text, pages, layout),
             warnings=[notice(OCR_RECOGNITION_ERRORS)],
         )
     if engine == "mistral_ocr":

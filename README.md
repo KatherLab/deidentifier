@@ -121,7 +121,8 @@ See [Evaluation](https://katherlab.github.io/deidentifier/evaluation/).
 - API responses are sent with `Cache-Control: no-store`.
 - No analytics, telemetry, CDN, or third-party fonts and scripts.
 - All model and OCR backends are configurable base URLs, local by default; the
-  UI shows a banner when a configured endpoint is not local.
+  UI shows a banner when a configured endpoint is not local, unless the operator
+  disables it.
 - The repository contains only clearly marked synthetic example documents.
 
 ## Project documents

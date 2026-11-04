@@ -51,7 +51,8 @@ Document → extraction → rule + LLM detection → span merging
 - Logs never contain document content, enforced by a safe logger.
 - No analytics, no third-party fonts, scripts, or CDNs, no telemetry.
 - All model and OCR backends are configurable base URLs, local by default. The
-  UI shows a banner whenever a configured endpoint is not local.
+  UI shows a banner whenever a configured endpoint is not local, unless the
+  operator disables it.
 
 ## Citation
 
